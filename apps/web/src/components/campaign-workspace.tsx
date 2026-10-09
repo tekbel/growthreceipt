@@ -1358,7 +1358,6 @@ function CampaignsPage({
       />
       <CampaignProgress status={stage} />
       <section className="campaign-feature">
-        <div className="campaign-number">01</div>
         <div className="campaign-feature-copy">
           <span className={`status-tag ${statusClass(campaignLabels[campaign.status])}`}>
             {campaignLabels[campaign.status]}
@@ -1876,7 +1875,6 @@ function ExperimentPage({
         description="One evidence based test, chosen after the current campaign has something real to teach us."
       />
       <section className="experiment-stage">
-        <span className="experiment-number">01</span>
         {recommendation ? (
           <div>
             <span className="status-tag success">{recommendation.confidence} confidence</span>
