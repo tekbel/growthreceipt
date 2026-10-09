@@ -5,7 +5,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
-import { getSupabase, supabaseConfigured } from "@/lib/supabase";
+import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 
 type AuthState = "loading" | "signed-out" | "bootstrapping" | "ready" | "error";
 
@@ -200,14 +200,16 @@ export function AuthShell() {
           <div className="auth-divider">
             <span>or keep your workspace</span>
           </div>
-          <button
-            className="button secondary auth-provider-button"
-            type="button"
-            disabled={submitting}
-            onClick={() => void signInWithGoogle()}
-          >
-            Continue with Google
-          </button>
+          {googleAuthEnabled ? (
+            <button
+              className="button secondary auth-provider-button"
+              type="button"
+              disabled={submitting}
+              onClick={() => void signInWithGoogle()}
+            >
+              Continue with Google
+            </button>
+          ) : null}
           <form className="auth-email" onSubmit={sendMagicLink}>
             <label htmlFor="sign-in-email">Email address</label>
             <div>
