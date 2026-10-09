@@ -81,7 +81,7 @@ class PostgresCampaignStore:
             await self._session.execute(
                 text(
                     """
-                    insert into public.workspaces (id, name)
+                    insert into growthreceipt.workspaces (id, name)
                     values (:workspace_id, 'GrowthReceipt Demo')
                     on conflict (id) do nothing
                     """
@@ -91,7 +91,7 @@ class PostgresCampaignStore:
             campaign_id = await self._session.scalar(
                 text(
                     """
-                    insert into public.campaigns (
+                    insert into growthreceipt.campaigns (
                       workspace_id, name, positioning, product_name, product_icon_url,
                       product_description, audience, objective, channels, brand_voice,
                       agent_session_id, agent_turn_id
@@ -122,7 +122,7 @@ class PostgresCampaignStore:
             await self._session.execute(
                 text(
                     """
-                    insert into public.campaign_posts (
+                    insert into growthreceipt.campaign_posts (
                       campaign_id, day, channel, theme, content, call_to_action
                     ) values (
                       :campaign_id, :day, :channel, :theme, :content, :call_to_action
@@ -155,7 +155,7 @@ class PostgresCampaignStore:
             campaign_id = await self._session.scalar(
                 text(
                     """
-                    select id from public.campaigns
+                    select id from growthreceipt.campaigns
                     where workspace_id = :workspace_id
                     order by created_at desc
                     limit 1
@@ -183,8 +183,8 @@ class PostgresCampaignStore:
                         select post.id, post.day, post.channel, post.theme, post.content,
                                post.call_to_action, post.status::text as status,
                                post.review_note
-                        from public.campaign_posts post
-                        join public.campaigns campaign on campaign.id = post.campaign_id
+                        from growthreceipt.campaign_posts post
+                        join growthreceipt.campaigns campaign on campaign.id = post.campaign_id
                         where post.id = :post_id
                           and post.campaign_id = :campaign_id
                           and campaign.workspace_id = :workspace_id
@@ -204,9 +204,9 @@ class PostgresCampaignStore:
             await self._session.execute(
                 text(
                     """
-                    update public.campaign_posts
+                    update growthreceipt.campaign_posts
                     set content = :content,
-                        status = cast(:status as public.campaign_post_status),
+                        status = cast(:status as growthreceipt.campaign_post_status),
                         review_note = :review_note,
                         updated_at = now()
                     where id = :post_id
@@ -234,9 +234,9 @@ class PostgresCampaignStore:
                 await self._session.execute(
                     text(
                         """
-                        update public.campaign_posts post
+                        update growthreceipt.campaign_posts post
                         set status = 'approved', review_note = null, updated_at = now()
-                        from public.campaigns campaign
+                        from growthreceipt.campaigns campaign
                         where campaign.id = post.campaign_id
                           and campaign.id = :campaign_id
                           and campaign.workspace_id = :workspace_id
@@ -264,8 +264,8 @@ class PostgresCampaignStore:
                     """
                     select event.id, event.post_id, event.actor, event.action,
                            event.detail, event.created_at
-                    from public.campaign_events event
-                    join public.campaigns campaign on campaign.id = event.campaign_id
+                    from growthreceipt.campaign_events event
+                    join growthreceipt.campaigns campaign on campaign.id = event.campaign_id
                     where campaign.id = :campaign_id and campaign.workspace_id = :workspace_id
                     order by event.created_at desc, event.id desc
                     """
@@ -303,7 +303,8 @@ class PostgresCampaignStore:
         await self._session.execute(
             text(
                 """
-                insert into public.campaign_events (campaign_id, post_id, actor, action, detail)
+                insert into growthreceipt.campaign_events
+                    (campaign_id, post_id, actor, action, detail)
                 values (:campaign_id, :post_id, :actor, :action, cast(:detail as jsonb))
                 """
             ),
@@ -322,7 +323,7 @@ class PostgresCampaignStore:
                 text(
                     f"""
                     select {CAMPAIGN_COLUMNS}
-                    from public.campaigns
+                    from growthreceipt.campaigns
                     where id = :campaign_id and workspace_id = :workspace_id
                     """
                 ),
@@ -336,7 +337,7 @@ class PostgresCampaignStore:
                 """
                 select id, day, channel, theme, content, call_to_action,
                        status::text as status, review_note
-                from public.campaign_posts
+                from growthreceipt.campaign_posts
                 where campaign_id = :campaign_id
                 order by day, created_at
                 """

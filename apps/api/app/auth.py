@@ -42,7 +42,9 @@ class SupabaseAuthGateway:
         try:
             user_id = UUID(str(payload["id"]))
         except (KeyError, TypeError, ValueError) as error:
-            raise HTTPException(status_code=401, detail="Your session is no longer valid") from error
+            raise HTTPException(
+                status_code=401, detail="Your session is no longer valid"
+            ) from error
         email = payload.get("email")
         return AuthActor(
             user_id=user_id,

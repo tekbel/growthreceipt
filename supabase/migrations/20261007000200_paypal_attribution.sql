@@ -1,4 +1,4 @@
-create type public.payment_order_status as enum (
+create type growthreceipt.payment_order_status as enum (
   'created',
   'approved',
   'completed',
@@ -6,9 +6,9 @@ create type public.payment_order_status as enum (
   'failed'
 );
 
-create table public.offers (
+create table growthreceipt.offers (
   id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  workspace_id uuid not null references growthreceipt.workspaces(id) on delete cascade,
   slug text not null,
   name text not null,
   description text not null,
@@ -20,16 +20,16 @@ create table public.offers (
   unique (workspace_id, slug)
 );
 
-create table public.payment_orders (
+create table growthreceipt.payment_orders (
   id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  offer_id uuid not null references public.offers(id) on delete restrict,
+  workspace_id uuid not null references growthreceipt.workspaces(id) on delete cascade,
+  offer_id uuid not null references growthreceipt.offers(id) on delete restrict,
   campaign_id uuid not null,
   content_id uuid not null,
   paypal_order_id text not null unique,
   paypal_capture_id text unique,
   idempotency_key uuid not null unique,
-  status public.payment_order_status not null default 'created',
+  status growthreceipt.payment_order_status not null default 'created',
   amount numeric(12, 2) not null check (amount > 0),
   currency text not null check (currency ~ '^[A-Z]{3}$'),
   captured_at timestamptz,
@@ -37,7 +37,7 @@ create table public.payment_orders (
   updated_at timestamptz not null default now()
 );
 
-create table public.paypal_webhook_events (
+create table growthreceipt.paypal_webhook_events (
   id text primary key,
   event_type text not null,
   resource jsonb not null,
@@ -47,18 +47,18 @@ create table public.paypal_webhook_events (
 );
 
 create index payment_orders_workspace_campaign_idx
-on public.payment_orders (workspace_id, campaign_id, created_at desc);
+on growthreceipt.payment_orders (workspace_id, campaign_id, created_at desc);
 
-alter table public.offers enable row level security;
-alter table public.payment_orders enable row level security;
-alter table public.paypal_webhook_events enable row level security;
+alter table growthreceipt.offers enable row level security;
+alter table growthreceipt.payment_orders enable row level security;
+alter table growthreceipt.paypal_webhook_events enable row level security;
 
 create policy "members can read offers"
-on public.offers for select
-using (private.is_workspace_member(workspace_id));
+on growthreceipt.offers for select
+using (growthreceipt.is_workspace_member(workspace_id));
 
 create policy "members can read payment orders"
-on public.payment_orders for select
-using (private.is_workspace_member(workspace_id));
+on growthreceipt.payment_orders for select
+using (growthreceipt.is_workspace_member(workspace_id));
 
 -- Webhook events contain provider payloads and remain service-role only.

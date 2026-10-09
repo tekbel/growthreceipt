@@ -1,5 +1,5 @@
-alter table public.campaigns drop constraint campaigns_product_icon_url_check;
-alter table public.campaigns
+alter table growthreceipt.campaigns drop constraint campaigns_product_icon_url_check;
+alter table growthreceipt.campaigns
   add constraint campaigns_product_icon_url_check
   check (
     product_icon_url is null

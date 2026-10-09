@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routes.auth import router as auth_router
 from app.routes.agents import router as agents_router
+from app.routes.auth import router as auth_router
 from app.routes.campaigns import router as campaigns_router
 from app.routes.health import router as health_router
 from app.routes.paypal import router as paypal_router

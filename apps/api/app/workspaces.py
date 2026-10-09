@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import AuthActor, CurrentActor
+from app.auth import CurrentActor
 from app.config import get_settings
 from app.database import get_session
 
@@ -29,8 +29,8 @@ async def get_workspace_context(
                 """
                 select workspace.id,
                        coalesce(workspace.settings->>'kind', 'user') as mode
-                from public.workspace_members membership
-                join public.workspaces workspace on workspace.id = membership.workspace_id
+                from growthreceipt.workspace_members membership
+                join growthreceipt.workspaces workspace on workspace.id = membership.workspace_id
                 where membership.user_id = :user_id
                 order by membership.created_at
                 limit 1

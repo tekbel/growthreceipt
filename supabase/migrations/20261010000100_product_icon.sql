@@ -1,4 +1,4 @@
-alter table public.campaigns
+alter table growthreceipt.campaigns
   add column product_icon_url text
   check (
     product_icon_url is null

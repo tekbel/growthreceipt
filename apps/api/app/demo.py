@@ -4,7 +4,6 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 CAMPAIGN = {
     "name": "Launch week",
     "positioning": "Clear writing without another place to work.",
@@ -52,7 +51,8 @@ POSTS = [
     (
         "Instagram",
         "From messy to meaningful",
-        "Messy first draft? Keep it. Scribe can help you turn it into a message you are ready to send.",
+        "Messy first draft? Keep it. Scribe can help you turn it into a message "
+        "you are ready to send.",
         "Link in bio.",
         "needs_review",
         None,
@@ -68,17 +68,17 @@ async def seed_judge_workspace(
 ) -> UUID:
     if reset:
         await session.execute(
-            text("delete from public.payment_orders where workspace_id = :workspace_id"),
+            text("delete from growthreceipt.payment_orders where workspace_id = :workspace_id"),
             {"workspace_id": workspace_id},
         )
         await session.execute(
-            text("delete from public.campaigns where workspace_id = :workspace_id"),
+            text("delete from growthreceipt.campaigns where workspace_id = :workspace_id"),
             {"workspace_id": workspace_id},
         )
     existing = await session.scalar(
         text(
             """
-            select id from public.campaigns
+            select id from growthreceipt.campaigns
             where workspace_id = :workspace_id
             order by created_at
             limit 1
@@ -92,7 +92,7 @@ async def seed_judge_workspace(
     await session.execute(
         text(
             """
-            insert into public.campaigns (
+            insert into growthreceipt.campaigns (
               id, workspace_id, name, positioning, product_name, product_description,
               audience, objective, channels, brand_voice, product_icon_url
             ) values (
@@ -107,11 +107,11 @@ async def seed_judge_workspace(
         await session.execute(
             text(
                 """
-                insert into public.campaign_posts (
+                insert into growthreceipt.campaign_posts (
                   campaign_id, day, channel, theme, content, call_to_action, status, review_note
                 ) values (
                   :campaign_id, :day, :channel, :theme, :content, :call_to_action,
-                  cast(:status as public.campaign_post_status), :review_note
+                  cast(:status as growthreceipt.campaign_post_status), :review_note
                 )
                 """
             ),
@@ -129,7 +129,7 @@ async def seed_judge_workspace(
     await session.execute(
         text(
             """
-            insert into public.campaign_events (campaign_id, actor, action, detail)
+            insert into growthreceipt.campaign_events (campaign_id, actor, action, detail)
             values (:campaign_id, 'system', 'campaign_seeded', cast(:detail as jsonb))
             """
         ),

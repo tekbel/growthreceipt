@@ -41,7 +41,7 @@ async def bootstrap_workspace(
                 text(
                     """
                     select id, name, coalesce(settings->>'kind', 'user') as mode
-                    from public.workspaces
+                    from growthreceipt.workspaces
                     where created_by_user_id = :user_id
                     """
                 ),
@@ -54,7 +54,7 @@ async def bootstrap_workspace(
             workspace_id = await session.scalar(
                 text(
                     """
-                    insert into public.workspaces (name, settings, created_by_user_id)
+                    insert into growthreceipt.workspaces (name, settings, created_by_user_id)
                     values (:name, cast(:settings as jsonb), :user_id)
                     returning id
                     """
@@ -69,7 +69,7 @@ async def bootstrap_workspace(
             await session.execute(
                 text(
                     """
-                    insert into public.workspace_members (workspace_id, user_id, role)
+                    insert into growthreceipt.workspace_members (workspace_id, user_id, role)
                     values (:workspace_id, :user_id, 'owner')
                     """
                 ),

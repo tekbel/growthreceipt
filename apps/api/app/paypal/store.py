@@ -66,7 +66,7 @@ class PostgresPaymentStore:
             await self._session.execute(
                 text(
                     """
-                    insert into public.workspaces (id, name)
+                    insert into growthreceipt.workspaces (id, name)
                     values (:workspace_id, 'GrowthReceipt Demo')
                     on conflict (id) do nothing
                     """
@@ -76,7 +76,7 @@ class PostgresPaymentStore:
             offer_id = await self._session.scalar(
                 text(
                     """
-                    insert into public.offers (
+                    insert into growthreceipt.offers (
                       workspace_id, slug, name, description, amount, currency
                     ) values (
                       :workspace_id, :slug, :name, :description, :amount, :currency
@@ -102,7 +102,7 @@ class PostgresPaymentStore:
             await self._session.execute(
                 text(
                     """
-                    insert into public.payment_orders (
+                    insert into growthreceipt.payment_orders (
                       workspace_id, offer_id, campaign_id, content_id,
                       paypal_order_id, idempotency_key, status, amount, currency
                     ) values (
@@ -131,7 +131,7 @@ class PostgresPaymentStore:
                 await self._session.execute(
                     text(
                         """
-                        update public.payment_orders
+                        update growthreceipt.payment_orders
                         set paypal_capture_id = :capture_id,
                             status = 'completed',
                             amount = :amount,
@@ -158,7 +158,7 @@ class PostgresPaymentStore:
                 text(
                     """
                     select exists (
-                      select 1 from public.payment_orders
+                      select 1 from growthreceipt.payment_orders
                       where workspace_id = :workspace_id
                         and paypal_order_id = :paypal_order_id
                     )
@@ -181,7 +181,7 @@ class PostgresPaymentStore:
                 await self._session.execute(
                     text(
                         """
-                        insert into public.paypal_webhook_events (
+                        insert into growthreceipt.paypal_webhook_events (
                           id, event_type, resource, processed_at
                         )
                         values (:event_id, :event_type, cast(:resource as jsonb), now())
@@ -207,7 +207,7 @@ class PostgresPaymentStore:
                            coalesce(max(currency), 'USD') as currency,
                            (array_agg(paypal_capture_id order by captured_at desc))[1]
                              as latest_capture_id
-                    from public.payment_orders
+                    from growthreceipt.payment_orders
                     where campaign_id = :campaign_id and status = 'completed'
                     """
                 ),

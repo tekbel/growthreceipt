@@ -121,21 +121,21 @@ async def seed(reset: bool) -> None:
         async with connection.transaction():
             if reset:
                 await connection.execute(
-                    "delete from public.payment_orders where workspace_id = $1", workspace_id
+                    "delete from growthreceipt.payment_orders where workspace_id = $1", workspace_id
                 )
                 await connection.execute(
-                    "delete from public.campaigns where workspace_id = $1", workspace_id
+                    "delete from growthreceipt.campaigns where workspace_id = $1", workspace_id
                 )
             await connection.execute(
                 """
-                insert into public.workspaces (id, name) values ($1, 'GrowthReceipt Demo')
+                insert into growthreceipt.workspaces (id, name) values ($1, 'GrowthReceipt Demo')
                 on conflict (id) do nothing
                 """,
                 workspace_id,
             )
             created = await connection.fetchval(
                 """
-                insert into public.campaigns (
+                insert into growthreceipt.campaigns (
                   id, workspace_id, name, positioning, product_name, product_description,
                   audience, objective, channels, brand_voice, product_icon_url
                 ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -152,12 +152,12 @@ async def seed(reset: bool) -> None:
             for day, (channel, theme, content, cta, status, note) in enumerate(POSTS, start=1):
                 await connection.execute(
                     """
-                    insert into public.campaign_posts (
+                    insert into growthreceipt.campaign_posts (
                       id, campaign_id, day, channel, theme, content, call_to_action,
                       status, review_note
                     ) values (
                       coalesce($1::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7,
-                      $8::public.campaign_post_status, $9
+                      $8::growthreceipt.campaign_post_status, $9
                     )
                     """,
                     FIRST_POST_ID if day == 1 else None,
@@ -172,7 +172,7 @@ async def seed(reset: bool) -> None:
                 )
             await connection.execute(
                 """
-                insert into public.campaign_events (campaign_id, actor, action, detail)
+                insert into growthreceipt.campaign_events (campaign_id, actor, action, detail)
                 values ($1, 'system', 'campaign_seeded', $2::jsonb)
                 """,
                 CAMPAIGN_ID,
