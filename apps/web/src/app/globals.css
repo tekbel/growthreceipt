@@ -202,9 +202,12 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .product-avatar { width: 68px; height: 68px; display: grid; place-items: center; border-radius: var(--corner-lg); background: var(--accent-soft); color: var(--accent-strong); font-size: var(--type-title); font-weight: 600; }
 .product-hero h2 { margin: 12px 0 0; font-size: var(--type-title); letter-spacing: -.02em; font-weight: 400; }
 .product-hero p { max-width: 650px; margin: 8px 0 0; color: var(--muted); font-size: var(--type-md); line-height: 1.55; }
-.detail-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 42px; margin-top: 48px; }
-.detail-columns h3 { margin: 14px 0 0; font-size: var(--type-xl); line-height: 1.2; letter-spacing: -.02em; }
-.detail-columns p { color: var(--muted); line-height: 1.6; }
+.detail-columns { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+.detail-columns > div { display: flex; flex-direction: column; gap: 10px; padding: 20px 24px; }
+.detail-columns > div:first-child { padding-left: 0; }
+.detail-columns > div:not(:last-child) { border-right: 1px solid var(--line); }
+.detail-columns h3 { margin: 0; font-size: var(--type-md); font-weight: 500; line-height: 1.45; letter-spacing: 0; }
+.detail-columns p { margin: 0; color: var(--muted); font-size: var(--type-xs); }
 
 .campaign-feature { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 24px; padding: 36px 0; border-bottom: 1px solid var(--line); }
 .campaign-number { color: var(--muted); font-size: var(--type-title); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -398,7 +401,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .signal:nth-child(2) { border-right: 0; }
   .signal:nth-child(n + 3) { border-top: 1px solid var(--line); }
   .two-column-section, .lower-grid, .results-body { grid-template-columns: 1fr; }
-  .detail-columns { grid-template-columns: 1fr; gap: 26px; }
+  .detail-columns { grid-template-columns: 1fr; }
+  .detail-columns > div { padding: 18px 0; }
+  .detail-columns > div:not(:last-child) { border-right: 0; border-bottom: 1px solid var(--line); }
   .campaign-feature { grid-template-columns: 70px 1fr; }
   .campaign-feature-actions { grid-column: 2; flex-direction: row; justify-content: flex-start; }
   .review-workspace { grid-template-columns: 1fr; }
