@@ -1709,7 +1709,10 @@ function CalendarPage({ campaign }: { campaign: Campaign }) {
       <section className="calendar-board">
         {campaign.posts.map((post) => (
           <article key={post.id}>
-            <span className="calendar-date">{postDate(campaign, post).split(" ")[1]}</span>
+            <span className="date-chip" aria-hidden="true">
+              <small>{postDate(campaign, post).split(" ")[0]}</small>
+              <strong>{postDate(campaign, post).split(" ")[1]}</strong>
+            </span>
             <div>
               <ChannelIcon channel={post.channel} />
               <span>{post.channel}</span>
@@ -2074,7 +2077,7 @@ function CheckoutPage({
         <div className="checkout-offer">
           <SiPaypal aria-hidden="true" />
           <span>PayPal Sandbox</span>
-          <strong>12.00 USD</strong>
+          <strong>{formatMoney("12.00", "USD")}</strong>
           <p>No live money is charged in Sandbox.</p>
           {post ? (
             <small>
