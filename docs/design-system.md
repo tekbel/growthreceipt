@@ -49,6 +49,8 @@ The home view answers one question: what needs attention today? Campaign review,
 8. Agent work shows only steps the agent actually reached, reported by the API stream. Never simulate progress with timers.
 9. The theme comes from the saved choice, then the OS, and is applied to `<html>` before first paint.
 10. Selection and active states use a soft tinted background and accent text. No thick accent side bars on rows, navigation, or toasts.
+11. Page content aligns left to the sidebar with a 40px gutter (24px tablet, 16px phone) and a 1320px max width. Never center the page column.
+12. Raise only the single most important element on a page into a card. Other sections are headings over divided lists, and metrics are a strip with dividers.
 
 ## Responsive rules
 

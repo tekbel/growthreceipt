@@ -720,6 +720,20 @@ function CampaignProgress({ status }: { status: Stage }) {
   );
 }
 
+function greetingFor(hour: number): string {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function excerpt(content: string): string {
+  return content.split("\n").find((line) => line.trim()) ?? content;
+}
+
+function formatMoney(amount: string, currency: string): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount));
+}
+
 function TodayPage({
   campaign,
   revenue,
@@ -735,143 +749,336 @@ function TodayPage({
   needsReview: number;
   navigate: (view: View) => void;
 }) {
-  const [date, setDate] = useState("Today in Stockholm");
+  const [clock, setClock] = useState<{ date: string; greeting: string } | null>(null);
 
+  // Formatted on the client so server and browser render the same markup.
   useEffect(() => {
-    setDate(
-      new Intl.DateTimeFormat("en-GB", {
+    const now = new Date();
+    setClock({
+      date: new Intl.DateTimeFormat("en-GB", {
         weekday: "long",
-        day: "2-digit",
+        day: "numeric",
         month: "long",
-        year: "numeric",
-        timeZone: "Europe/Stockholm",
-      }).format(new Date()),
-    );
+      }).format(now),
+      greeting: greetingFor(now.getHours()),
+    });
   }, []);
   const attention = campaign.posts.filter((post) => post.status !== "approved").slice(0, 3);
   const approved = campaign.posts.filter((post) => post.status === "approved");
-  const nextPost = approved[0];
+  const sales = revenue?.completed_orders ?? 0;
   return (
     <>
-      <PageHeader
-        eyebrow={date}
-        title="Today"
-        description={`The small set of decisions that keeps ${campaign.product_name} moving.`}
-        action={
-          <button className="button dark" type="button" onClick={() => navigate("campaigns")}>
-            Continue campaign
-          </button>
-        }
+      <header className="today-header">
+        <span className="eyebrow">{clock?.date ?? "Today"}</span>
+        <h1>{clock?.greeting ?? "Today"}</h1>
+        <p>
+          {campaign.name} for {campaign.product_name} · {scheduleRange(campaign)}
+        </p>
+      </header>
+      <FocusCard
+        campaign={campaign}
+        stage={stage}
+        needsReview={needsReview}
+        sales={sales}
+        navigate={navigate}
       />
-      <CampaignProgress status={stage} />
-      <section className="signal-row" aria-label="Workspace summary">
-        <Signal
+      <section className="metric-strip" aria-label="Workspace summary">
+        <Metric
+          icon={<Check aria-hidden="true" />}
           label="Campaign status"
           value={campaignLabels[campaign.status]}
-          detail={`${needsReview} post${needsReview === 1 ? "" : "s"} need a decision`}
+          detail={
+            needsReview
+              ? `${needsReview} post${needsReview === 1 ? "" : "s"} need a decision`
+              : `All ${campaign.posts.length} posts approved`
+          }
+          tone={needsReview ? "review" : "success"}
         />
-        <Signal
+        <Metric
+          icon={<CalendarDays aria-hidden="true" />}
           label="Next publish"
-          value={nextPost ? postDate(campaign, nextPost) : "Nothing approved"}
-          detail={nextPost ? `${nextPost.channel} · ${campaign.name}` : "Approve a post first"}
+          value={approved[0] ? postDate(campaign, approved[0]) : "Not scheduled"}
+          detail={
+            approved[0] ? `Day ${approved[0].day} · ${approved[0].channel}` : "Approve a post first"
+          }
+          tone={approved[0] ? "success" : "neutral"}
         />
-        <Signal
+        <Metric
+          icon={<CreditCard aria-hidden="true" />}
           label="Verified revenue"
           value={
             revenue
-              ? `${revenue.gross_revenue} ${revenue.currency}`
+              ? formatMoney(revenue.gross_revenue, revenue.currency)
               : revenueError
                 ? "Unavailable"
                 : "Loading"
           }
-          detail={revenue?.latest_capture_id ? "Verified by PayPal" : "Waiting for PayPal data"}
+          detail={
+            sales
+              ? `${sales} PayPal sale${sales === 1 ? "" : "s"} verified`
+              : "Waiting for the first PayPal sale"
+          }
+          tone={sales ? "success" : "neutral"}
         />
-        <Signal label="Trial to paid" value="Not connected" detail="Waiting for PostHog data" />
+        <Metric
+          icon={<TrendingUp aria-hidden="true" />}
+          label="Trial to paid"
+          value="Not connected"
+          detail="Connect PostHog to measure"
+          tone="neutral"
+          muted
+        />
       </section>
-      <section className="two-column-section">
-        <div>
+      <section className="today-grid">
+        <article>
           <SectionTitle
             title="Needs your attention"
             action="View content queue"
             onAction={() => navigate("content")}
           />
           {attention.length ? (
-            attention.map((post) => (
-              <AttentionRow
-                key={post.id}
-                channel={post.channel}
-                title={post.theme}
-                detail={
-                  post.status === "changes_requested"
-                    ? "Changes requested before it can be scheduled"
-                    : `${campaign.name} · ${post.channel} post`
-                }
-                status={post.status === "changes_requested" ? "Changes requested" : "Review"}
-              />
-            ))
+            <ul className="row-list">
+              {attention.map((post, index) => (
+                <PostRow
+                  key={post.id}
+                  campaign={campaign}
+                  post={post}
+                  index={index}
+                  onOpen={() => navigate("content")}
+                />
+              ))}
+            </ul>
           ) : (
-            <EmptyState title="Nothing waiting" copy="Every post in this campaign is approved." />
+            <QuietState
+              icon={<Check aria-hidden="true" />}
+              tone="success"
+              title={`All ${campaign.posts.length} posts approved`}
+              copy="Nothing is waiting on you."
+            />
           )}
-        </div>
-        <div>
+        </article>
+        <article>
           <SectionTitle
             title="Publishing next"
             action="Open calendar"
             onAction={() => navigate("calendar")}
           />
           {approved.length ? (
-            approved
-              .slice(0, 3)
-              .map((post) => (
-                <AttentionRow
+            <ul className="row-list">
+              {approved.slice(0, 3).map((post, index) => (
+                <PostRow
                   key={post.id}
-                  channel={post.channel}
-                  title={post.theme}
-                  detail={`${campaign.name} · ${postDate(campaign, post)}`}
-                  status="Approved"
+                  campaign={campaign}
+                  post={post}
+                  index={index}
+                  onOpen={() => navigate("calendar")}
                 />
-              ))
+              ))}
+            </ul>
           ) : (
-            <EmptyState
+            <QuietState
+              icon={<CalendarDays aria-hidden="true" />}
               title="Nothing approved yet"
-              copy="Approved posts appear here in publishing order."
+              copy="Approved posts line up here in publishing order."
             />
           )}
-        </div>
+        </article>
       </section>
-      <section className="lower-grid">
-        <div className="plain-panel">
-          <h2>Recent results</h2>
-          {revenue?.completed_orders ? (
-            <>
-              <strong className="result-value">
-                {revenue.gross_revenue} {revenue.currency}
-              </strong>
-              <p>
-                {revenue.completed_orders} verified PayPal sandbox purchase
-                {revenue.completed_orders === 1 ? "" : "s"}.
-              </p>
-            </>
+      <section className="today-grid">
+        <article>
+          <SectionTitle title="Recent results" />
+          {sales && revenue ? (
+            <div className="result-summary">
+              <strong>{formatMoney(revenue.gross_revenue, revenue.currency)}</strong>
+              <span>
+                {sales} verified PayPal sandbox purchase{sales === 1 ? "" : "s"}
+              </span>
+            </div>
           ) : (
-            <EmptyState
-              title="No connected results yet"
-              copy="Complete a PayPal sandbox purchase or connect PostHog to see verified activity."
+            <QuietState
+              icon={<BarChart3 aria-hidden="true" />}
+              title="No results yet"
+              copy="A PayPal sandbox purchase shows up here as verified revenue."
               action="Open checkout"
               onAction={() => navigate("checkout")}
             />
           )}
-        </div>
-        <div className="plain-panel">
-          <h2>Next experiment</h2>
-          <EmptyState
+        </article>
+        <article>
+          <SectionTitle title="Next experiment" />
+          <QuietState
+            icon={<FlaskConical aria-hidden="true" />}
             title="No recommendation yet"
-            copy="Northstar will use verified campaign results to choose a useful test."
+            copy="Northstar picks a test once it has verified results."
             action="See what is needed"
             onAction={() => navigate("experiment")}
           />
-        </div>
+        </article>
       </section>
     </>
+  );
+}
+
+function FocusCard({
+  campaign,
+  stage,
+  needsReview,
+  sales,
+  navigate,
+}: {
+  campaign: Campaign;
+  stage: Stage;
+  needsReview: number;
+  sales: number;
+  navigate: (view: View) => void;
+}) {
+  const waiting = campaign.posts.find((post) => post.status !== "approved");
+  const next = campaign.posts.find((post) => post.status === "approved");
+  const post = needsReview ? waiting : next;
+  const focus = needsReview
+    ? {
+        label: "Next decision",
+        title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
+        action: "Review posts",
+        view: "content" as View,
+      }
+    : sales
+      ? {
+          label: "Next move",
+          title: "Results are in. Choose the next experiment",
+          action: "Find next move",
+          view: "experiment" as View,
+        }
+      : {
+          label: "Next up",
+          title: next
+            ? `Day ${next.day} goes out ${postDate(campaign, next)} on ${next.channel}`
+            : "Approve a post to schedule it",
+          action: "Connect channels",
+          view: "integrations" as View,
+        };
+  return (
+    <section className="panel focus-card" aria-label={focus.label}>
+      <div className="focus-body">
+        <span className="focus-label">{focus.label}</span>
+        <h2>{focus.title}</h2>
+        {post ? (
+          <figure className="focus-post">
+            <figcaption>
+              <ChannelIcon channel={post.channel} />
+              <strong>{post.theme}</strong>
+              <span className={`status-tag ${statusClass(statusFor(post))}`}>
+                {statusFor(post)}
+              </span>
+            </figcaption>
+            <p>{excerpt(post.content)}</p>
+          </figure>
+        ) : null}
+        <div className="focus-actions">
+          <button className="button dark" type="button" onClick={() => navigate(focus.view)}>
+            {focus.action}
+          </button>
+          <button className="button secondary" type="button" onClick={() => navigate("campaigns")}>
+            Open campaign
+          </button>
+        </div>
+      </div>
+      <CampaignProgress status={stage} />
+    </section>
+  );
+}
+
+function Metric({
+  icon,
+  label,
+  value,
+  detail,
+  tone,
+  muted = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "success" | "review" | "neutral";
+  muted?: boolean;
+}) {
+  return (
+    <article className="metric">
+      <span className="metric-label">
+        {icon}
+        {label}
+      </span>
+      <strong className={muted ? "muted" : ""}>{value}</strong>
+      <small>
+        <span className={`dot ${tone}`} aria-hidden="true" />
+        {detail}
+      </small>
+    </article>
+  );
+}
+
+function PostRow({
+  campaign,
+  post,
+  index,
+  onOpen,
+}: {
+  campaign: Campaign;
+  post: Post;
+  index: number;
+  onOpen: () => void;
+}) {
+  const [month, day] = postDate(campaign, post).split(" ");
+  const status = statusFor(post);
+  return (
+    <li className="reveal" style={{ "--i": index } as React.CSSProperties}>
+      <button className="post-row" type="button" onClick={onOpen}>
+        <span className="date-chip" aria-hidden="true">
+          <small>{month}</small>
+          <strong>{day}</strong>
+        </span>
+        <span className="post-row-body">
+          <strong>
+            <ChannelIcon channel={post.channel} />
+            {post.theme}
+          </strong>
+          <small>{post.review_note ?? excerpt(post.content)}</small>
+        </span>
+        <span className={`status-tag ${statusClass(status)}`}>{status}</span>
+      </button>
+    </li>
+  );
+}
+
+function QuietState({
+  icon,
+  title,
+  copy,
+  action,
+  onAction,
+  tone = "neutral",
+}: {
+  icon: React.ReactNode;
+  title: string;
+  copy: string;
+  action?: string;
+  onAction?: () => void;
+  tone?: "success" | "neutral";
+}) {
+  return (
+    <div className="quiet-state">
+      <span className={`quiet-icon ${tone}`}>{icon}</span>
+      <div>
+        <strong>{title}</strong>
+        <p>{copy}</p>
+      </div>
+      {action && onAction ? (
+        <button className="button secondary small" type="button" onClick={onAction}>
+          {action}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1859,40 +2066,18 @@ function SectionTitle({
   onAction,
 }: {
   title: string;
-  action: string;
-  onAction: () => void;
+  action?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="section-title">
       <h2>{title}</h2>
-      <button type="button" onClick={onAction}>
-        {action}
-      </button>
+      {action && onAction ? (
+        <button type="button" onClick={onAction}>
+          {action}
+        </button>
+      ) : null}
     </div>
-  );
-}
-function AttentionRow({
-  channel,
-  title,
-  detail,
-  status,
-}: {
-  channel: Channel;
-  title: string;
-  detail: string;
-  status: string;
-}) {
-  return (
-    <article className="attention-row">
-      <span className={`provider-icon ${channel.toLowerCase()}`}>
-        <ChannelIcon channel={channel} />
-      </span>
-      <div>
-        <strong>{title}</strong>
-        <small>{detail}</small>
-      </div>
-      <span className={`status-tag ${statusClass(status)}`}>{status}</span>
-    </article>
   );
 }
 function EmptyState({
