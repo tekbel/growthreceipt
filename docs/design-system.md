@@ -56,6 +56,8 @@ The home view answers one question: what needs attention today? Campaign review,
 15. Form fields are 16px on phones so iOS does not zoom on focus.
 16. The current page is in the URL hash (`#content`), so refresh, back, and shared links land on the same page.
 17. Every page title uses `--type-title` and section headings stay at `--type-2xl` or below. Fixed min heights on headers and panels are not used, content sets the height. Filters are soft pills, not bordered boxes.
+18. Visual direction follows Otter.ai: Figtree (a free stand in for Averta and Circular), light 400 weight on large headings with little tracking, cool slate neutrals, and a dimmed blue accent (#3a5bc7) instead of Otter's bright #144fff. Primary actions are blue filled, a paired second action is a blue outline (`.button.outline`), everything else stays neutral.
+19. Every button variant shares one disabled look (subtle surface, muted text). Previews of third party UI such as the LinkedIn post use theme tokens, so dark mode has no white slabs. On wide screens the topbar actions line up with the content edge (page max width 1480px).
 
 ## Responsive rules
 

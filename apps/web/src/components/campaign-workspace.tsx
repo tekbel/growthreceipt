@@ -997,7 +997,7 @@ function FocusCard({
           <button className="button dark" type="button" onClick={() => navigate(focus.view)}>
             {focus.action}
           </button>
-          <button className="button secondary" type="button" onClick={() => navigate("campaigns")}>
+          <button className="button outline" type="button" onClick={() => navigate("campaigns")}>
             Open campaign
           </button>
         </div>
@@ -1383,7 +1383,7 @@ function CampaignsPage({
           </dl>
         </div>
         <div className="campaign-feature-actions">
-          <button className="button secondary" type="button" onClick={() => navigate("content")}>
+          <button className="button outline" type="button" onClick={() => navigate("content")}>
             Review content
           </button>
           <button
