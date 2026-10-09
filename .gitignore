@@ -1,0 +1,25 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+.next/
+coverage/
+dist/
+build/
+.vercel/
+supabase/.branches/
+supabase/.temp/
+
+# Local design references
+northstar-*.zip
+content-review-*.png
+web-proto-type-skill/

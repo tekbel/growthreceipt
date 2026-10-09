@@ -1,0 +1,50 @@
+# Northstar design system
+
+## Direction
+
+Northstar uses a quiet editorial workspace system. It should feel precise, useful, and authored by a product team. The interface is compact enough for daily work without becoming a generic administration dashboard.
+
+The home view answers one question: what needs attention today? Campaign review, content, checkout, results, and the next decision appear in that order.
+
+## Brand principles
+
+1. Clarity comes from structure, not decoration.
+2. Use one type family throughout the product.
+3. Use scale, alignment, weight, and spacing before adding containers.
+4. Every visible divider must explain a relationship.
+5. A single accent is more recognizable than a broad palette.
+6. The campaign progress ribbon is the shared product signature.
+
+## Visual system
+
+1. Use warm white and charcoal surfaces with subtle neutral separation.
+2. Use `#087A72` as the interface accent.
+3. Use self hosted Instrument Sans for display, body, labels, controls, and tabular numbers.
+4. Use hairline rules to organize related information.
+5. Use restrained four to seven pixel corners for controls and working surfaces.
+6. Keep typography left aligned.
+7. Avoid decorative gradients, grain, glass effects, glow, and excessive shadows.
+8. Avoid card grids when a list, rule, or open composition communicates the same hierarchy.
+9. Official providers may retain their real brand colors.
+
+## Content rules
+
+1. Write standard product language that says what an action does.
+2. Do not use sparkle symbols, robot imagery, magic language, or assistant language.
+3. Do not describe normal features as intelligent, smart, powered, or agentic in the interface.
+4. Do not invent comments, users, metrics, notifications, or activity.
+5. Do not use dash punctuation in visible interface copy.
+6. Use real provider names and official brand marks for connected services.
+7. Keep technical implementation terms out of customer facing screens.
+
+## Interaction rules
+
+1. Primary actions use charcoal. Deep teal identifies progress, selection, and approval.
+2. Hover feedback changes surface or border color without moving the layout.
+3. Focus uses a visible teal ring.
+4. Loading controls remain disabled until the action completes.
+5. Reduced motion preferences disable nonessential motion.
+
+## Responsive rules
+
+Desktop uses persistent navigation and a three region review workspace. Mobile uses a navigation drawer and a single reading column. The campaign ribbon and filter row may scroll horizontally on narrow screens, with the rest of the page free from horizontal overflow.

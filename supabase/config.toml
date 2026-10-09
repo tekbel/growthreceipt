@@ -1,0 +1,22 @@
+project_id = "northstar-marketing"
+
+[api]
+enabled = true
+port = 54331
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54332
+shadow_port = 54330
+major_version = 17
+
+[studio]
+enabled = true
+port = 54333
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+
