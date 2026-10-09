@@ -1,3 +1,4 @@
+import base64
 import json
 from collections.abc import AsyncIterator, Generator
 from typing import Any
@@ -67,6 +68,7 @@ async def test_create_campaign_persists_generated_posts_for_review(
     assert response.status_code == 201
     body = response.json()
     assert body["product_name"] == "Ledgerly"
+    assert body["product_icon_url"] is None
     assert body["status"] == "in_review"
     assert [item["day"] for item in body["posts"]] == [1, 2]
     assert {item["status"] for item in body["posts"]} == {"needs_review"}
@@ -76,6 +78,56 @@ async def test_create_campaign_persists_generated_posts_for_review(
     events = (await client.get(f"/v1/campaigns/{body['id']}/events")).json()
     assert events[0]["action"] == "campaign_generated"
     assert events[0]["detail"]["session_id"] == "fake-session"
+
+
+@pytest.mark.asyncio
+async def test_create_campaign_supports_facebook_channel() -> None:
+    app.dependency_overrides[get_agent_gateway] = lambda: FakeAgentGateway(
+        {"campaign-draft": draft(post(1, "Facebook"), post(2, "LinkedIn"))}
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/v1/campaigns", json={**BRIEF, "channels": ["LinkedIn", "Facebook"]}
+        )
+
+    assert response.status_code == 201
+    assert [item["channel"] for item in response.json()["posts"]] == ["Facebook", "LinkedIn"]
+
+
+@pytest.mark.asyncio
+async def test_create_campaign_keeps_optional_product_icon(client: AsyncClient) -> None:
+    icon = "https://example.com/icon.png"
+    response = await client.post("/v1/campaigns", json={**BRIEF, "product_icon_url": icon})
+    assert response.status_code == 201
+    assert response.json()["product_icon_url"] == icon
+
+    blank = await client.post("/v1/campaigns", json={**BRIEF, "product_icon_url": "  "})
+    assert blank.json()["product_icon_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_create_campaign_keeps_uploaded_product_icon(client: AsyncClient) -> None:
+    icon = "data:image/png;base64," + base64.b64encode(b"png bytes").decode()
+    response = await client.post("/v1/campaigns", json={**BRIEF, "product_icon_url": icon})
+    assert response.status_code == 201
+    assert response.json()["product_icon_url"] == icon
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "icon",
+    [
+        "http://example.com/icon.png",
+        "javascript:alert(1)",
+        "//evil.example/icon.png",
+        "data:image/svg+xml;base64,PHN2Zz4=",
+        "data:image/png;base64,not base64!",
+        "data:image/png;base64," + base64.b64encode(bytes(150_001)).decode(),
+    ],
+)
+async def test_create_campaign_rejects_unsafe_product_icon(client: AsyncClient, icon: str) -> None:
+    response = await client.post("/v1/campaigns", json={**BRIEF, "product_icon_url": icon})
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

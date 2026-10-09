@@ -130,10 +130,13 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .wordmark-symbol svg { width: 15px; height: 15px; stroke-width: 1.8; }
 .mobile-close { display: none; width: 34px; height: 34px; place-items: center; border: 0; background: transparent; color: var(--ink); }
 .mobile-close svg { width: 18px; }
-.product-picker { width: 100%; height: 43px; display: grid; grid-template-columns: 10px 1fr 15px; align-items: center; gap: 9px; margin-top: 15px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--corner-sm); background: var(--surface); color: var(--ink); text-align: left; }
+.product-picker { width: 100%; height: 43px; display: grid; grid-template-columns: auto 1fr 15px; align-items: center; gap: 9px; margin-top: 15px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--corner-sm); background: var(--surface); color: var(--ink); text-align: left; }
 .product-picker:hover { background: var(--surface-subtle); }
 .product-picker strong { font-size: var(--type-base); font-weight: 600; }
 .product-picker svg { width: 14px; }
+.product-mark { overflow: hidden; }
+.product-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.picker-mark { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 22%; background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 600; }
 .product-dot, .environment-state > span { width: 8px; height: 8px; border-radius: var(--corner-sm); background: var(--accent); }
 .navigation-group { margin-top: 24px; }
 .navigation-group > span { display: block; padding: 0 10px 8px; color: var(--muted); font-size: var(--type-xs); font-weight: 500; }
@@ -271,6 +274,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 
 .campaign-feature { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; padding: 36px 0; border-bottom: 1px solid var(--line); }
 .campaign-feature-copy h2 { margin: 12px 0 0; font-size: var(--type-2xl); letter-spacing: -.02em; font-weight: 400; }
+.campaign-feature-title { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.campaign-feature-copy .campaign-feature-title h2 { margin: 0; }
+.title-mark { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 22%; background: var(--accent-soft); color: var(--accent-strong); font-size: var(--type-lg); font-weight: 600; }
 .campaign-feature-copy > p { max-width: 610px; color: var(--muted); font-size: var(--type-base); line-height: 1.55; }
 .campaign-feature dl, .experiment-stage dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 24px 0 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .campaign-feature dl div, .experiment-stage dl div { display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; }
@@ -416,6 +422,15 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .brief-form textarea, .note-form textarea { width: min(560px, 100%); margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-sm); background: var(--surface); color: var(--ink); line-height: 1.5; resize: vertical; }
 .brief-form input:not([type="checkbox"]), .brief-form select { width: min(560px, 100%); }
 .field-label { font-size: var(--type-xs); font-weight: 600; }
+.field-hint { margin: -14px 0 12px; color: var(--muted); font-size: var(--type-xs); }
+.optional { margin-left: 6px; color: var(--muted); font-weight: 400; }
+.field-hint.error { color: var(--danger); }
+.icon-field { width: min(560px, 100%); display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.brief-form .icon-field input:not([type="checkbox"]) { flex: 1; width: auto; min-width: 0; margin-bottom: 0; }
+.icon-field .button { flex: none; }
+.icon-field .button svg { width: 15px; }
+.icon-preview { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 22%; background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+.icon-uploaded { flex: 1; color: var(--ink-soft); font-size: var(--type-sm); }
 .channel-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
 .channel-option { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-sm); font-size: var(--type-sm) !important; cursor: pointer; }
 .channel-option input { accent-color: var(--accent); }

@@ -23,6 +23,7 @@ CAMPAIGN = {
     "objective": "Increase qualified app installs",
     "channels": ["LinkedIn", "X", "Instagram"],
     "brand_voice": "Clear, confident, useful",
+    "product_icon_url": "/products/scribe.png",
 }
 
 # (channel, theme, content, call to action, status, review note)
@@ -136,8 +137,8 @@ async def seed(reset: bool) -> None:
                 """
                 insert into public.campaigns (
                   id, workspace_id, name, positioning, product_name, product_description,
-                  audience, objective, channels, brand_voice
-                ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                  audience, objective, channels, brand_voice, product_icon_url
+                ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 on conflict (id) do nothing
                 returning id
                 """,

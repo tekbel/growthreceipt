@@ -17,6 +17,7 @@ CAMPAIGN = {
     "objective": "Increase qualified app installs",
     "channels": ["LinkedIn", "X", "Instagram"],
     "brand_voice": "Clear, confident, useful",
+    "product_icon_url": "/products/scribe.png",
 }
 
 POSTS = [
@@ -93,10 +94,10 @@ async def seed_judge_workspace(
             """
             insert into public.campaigns (
               id, workspace_id, name, positioning, product_name, product_description,
-              audience, objective, channels, brand_voice
+              audience, objective, channels, brand_voice, product_icon_url
             ) values (
               :id, :workspace_id, :name, :positioning, :product_name, :product_description,
-              :audience, :objective, :channels, :brand_voice
+              :audience, :objective, :channels, :brand_voice, :product_icon_url
             )
             """
         ),

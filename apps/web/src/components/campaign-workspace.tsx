@@ -23,9 +23,10 @@ import {
   SlidersHorizontal,
   Sun,
   TrendingUp,
+  Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { PayPalCheckout } from "@/components/paypal-checkout";
@@ -484,12 +485,14 @@ export function CampaignWorkspace({
   }
 
   const productName = campaign?.product_name ?? "New product";
+  const productIcon = campaign?.product_icon_url ?? null;
   return (
     <div className="growthreceipt-app">
       <Sidebar
         currentView={view}
         isOpen={mobileNavigationOpen}
         productName={productName}
+        productIcon={productIcon}
         navigate={navigate}
         onClose={() => setMobileNavigationOpen(false)}
         notify={notify}
@@ -550,6 +553,7 @@ function Sidebar({
   currentView,
   isOpen,
   productName,
+  productIcon,
   navigate,
   onClose,
   notify,
@@ -560,6 +564,7 @@ function Sidebar({
   currentView: View;
   isOpen: boolean;
   productName: string;
+  productIcon: string | null;
   navigate: (view: View) => void;
   onClose: () => void;
   notify: (message: string) => void;
@@ -604,7 +609,11 @@ function Sidebar({
           type="button"
           onClick={() => notify("Product switching is coming next.")}
         >
-          <span className="product-dot" />
+          {productIcon ? (
+            <ProductMark className="picker-mark" name={productName} iconUrl={productIcon} />
+          ) : (
+            <span className="product-dot" />
+          )}
           <strong>{productName}</strong>
           <ChevronDown aria-hidden="true" />
         </button>
@@ -1300,7 +1309,11 @@ function ProductsPage({
         }
       />
       <section className="product-hero">
-        <div className="product-avatar">{campaign.product_name.charAt(0).toUpperCase()}</div>
+        <ProductMark
+          className="product-avatar"
+          name={campaign.product_name}
+          iconUrl={campaign.product_icon_url}
+        />
         <div>
           <span className="status-tag success">Active</span>
           <h2>{campaign.product_name}</h2>
@@ -1344,6 +1357,7 @@ function NewCampaignPage({
   const [brief, setBrief] = useState<CampaignBrief>({
     ...exampleBrief,
     product_name: "",
+    product_icon_url: "",
     product_description: "",
     audience: "",
     objective: "",
@@ -1352,6 +1366,34 @@ function NewCampaignPage({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<DraftProgress | null>(null);
   const [thought, setThought] = useState<string | null>(null);
+  const [iconError, setIconError] = useState<string | null>(null);
+  const iconInput = useRef<HTMLInputElement>(null);
+  const iconUploaded = brief.product_icon_url.startsWith("data:");
+  const [previewIcon, setPreviewIcon] = useState("");
+
+  // Load the preview once typing pauses, so partial links do not flash an error.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPreviewIcon(brief.product_icon_url), 400);
+    return () => window.clearTimeout(timer);
+  }, [brief.product_icon_url]);
+
+  async function uploadIcon(file: File | undefined) {
+    if (!file) return;
+    if (!ICON_TYPES.includes(file.type)) {
+      setIconError("Use a PNG, JPEG, or WebP image.");
+      return;
+    }
+    if (file.size > 5_000_000) {
+      setIconError("Use an image smaller than 5 MB.");
+      return;
+    }
+    try {
+      field("product_icon_url", await squareIcon(file));
+      setIconError(null);
+    } catch {
+      setIconError("This image could not be read. Try another file.");
+    }
+  }
 
   function field<K extends keyof CampaignBrief>(key: K, value: CampaignBrief[K]) {
     setBrief((current) => ({ ...current, [key]: value }));
@@ -1417,6 +1459,78 @@ function NewCampaignPage({
             value={brief.product_name}
             onChange={(event) => field("product_name", event.target.value)}
           />
+          <label htmlFor="product-icon">
+            Product icon <span className="optional">Optional</span>
+          </label>
+          <div className="icon-field">
+            <ProductMark
+              className="icon-preview"
+              name={brief.product_name || "?"}
+              iconUrl={previewIcon || null}
+              onLoadResult={(loaded) =>
+                setIconError(
+                  loaded
+                    ? null
+                    : "This link did not load an image. Copy the image address itself, or upload a file.",
+                )
+              }
+            />
+            {iconUploaded ? (
+              <span className="icon-uploaded">Uploaded image</span>
+            ) : (
+              <input
+                id="product-icon"
+                inputMode="url"
+                maxLength={500}
+                pattern="(https://|/).+"
+                title="Use a link that starts with https://"
+                placeholder="https://"
+                aria-describedby="product-icon-hint"
+                value={brief.product_icon_url}
+                onChange={(event) => {
+                  setIconError(null);
+                  field("product_icon_url", event.target.value.trim());
+                }}
+              />
+            )}
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => iconInput.current?.click()}
+            >
+              <Upload aria-hidden="true" /> Upload
+            </button>
+            {brief.product_icon_url ? (
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  setIconError(null);
+                  field("product_icon_url", "");
+                }}
+              >
+                Remove
+              </button>
+            ) : null}
+            <input
+              ref={iconInput}
+              type="file"
+              accept={ICON_TYPES.join(",")}
+              hidden
+              onChange={(event) => {
+                void uploadIcon(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </div>
+          <p
+            id="product-icon-hint"
+            className={iconError ? "field-hint error" : "field-hint"}
+            role={iconError ? "alert" : undefined}
+          >
+            {iconError ??
+              "A square PNG, JPEG, or WebP. Without one, the first letter of the name is used."}
+          </p>
           <label htmlFor="product-description">What it does</label>
           <textarea
             id="product-description"
@@ -1541,7 +1655,14 @@ function CampaignsPage({
           <span className={`status-tag ${statusClass(campaignLabels[campaign.status])}`}>
             {campaignLabels[campaign.status]}
           </span>
-          <h2>{campaign.name}</h2>
+          <div className="campaign-feature-title">
+            <ProductMark
+              className="title-mark"
+              name={campaign.product_name}
+              iconUrl={campaign.product_icon_url}
+            />
+            <h2>{campaign.name}</h2>
+          </div>
           <p>{campaign.positioning}</p>
           <dl>
             <div>
@@ -1730,7 +1851,11 @@ function ContentPage({
               <small>Preview</small>
             </header>
             <div className="social-preview-body">
-              <div className="author-mark">{campaign.product_name.charAt(0).toUpperCase()}</div>
+              <ProductMark
+                className="author-mark"
+                name={campaign.product_name}
+                iconUrl={campaign.product_icon_url}
+              />
               <div className="author-copy">
                 <strong>{campaign.product_name}</strong>
                 <small>{campaign.name}</small>
@@ -2139,42 +2264,17 @@ function IntegrationsPage({
           action="Connect"
           onAction={() => notify("PostHog connection is planned for the next integration slice.")}
         />
-        <Integration
-          provider="LinkedIn"
-          description="Publish approved posts and collect delivery results."
-          icon={<FaLinkedinIn aria-hidden="true" />}
-          status="Not connected"
-          action="Connect"
-          onAction={() =>
-            notify("LinkedIn connection will open here after OAuth credentials are configured.")
-          }
-        />
-        <Integration
-          provider="Facebook"
-          description="Publish approved posts to Pages and collect delivery results."
-          icon={<FaFacebookF aria-hidden="true" />}
-          status="Not connected"
-          action="Connect"
-          onAction={() =>
-            notify("Facebook connection will open here after Meta credentials are configured.")
-          }
-        />
-        <Integration
-          provider="X"
-          description="Publish approved posts and collect delivery results."
-          icon={<FaXTwitter aria-hidden="true" />}
-          status="Not connected"
-          action="Connect"
-          onAction={() => notify("X publishing is not connected yet.")}
-        />
-        <Integration
-          provider="Instagram"
-          description="Publish approved posts and collect delivery results."
-          icon={<FaInstagram aria-hidden="true" />}
-          status="Not connected"
-          action="Connect"
-          onAction={() => notify("Instagram publishing is not connected yet.")}
-        />
+        {channels.map((channel) => (
+          <Integration
+            key={channel}
+            provider={channel}
+            description={channelIntegration[channel]}
+            icon={<ChannelIcon channel={channel} />}
+            status="Not connected"
+            action="Connect"
+            onAction={() => notify(`${channel} publishing is not connected yet.`)}
+          />
+        ))}
       </section>
     </>
   );
@@ -2451,8 +2551,71 @@ function statusClass(status: string) {
   if (status === "Review" || status === "Needs review") return "review";
   return "neutral";
 }
+const ICON_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ICON_SIZE = 160;
+
+// Crop to a centered square and shrink, so the icon is small enough to store with the campaign.
+async function squareIcon(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = ICON_SIZE;
+  canvas.height = ICON_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is unavailable");
+  const side = Math.min(bitmap.width, bitmap.height);
+  const left = (bitmap.width - side) / 2;
+  const top = (bitmap.height - side) / 2;
+  context.drawImage(bitmap, left, top, side, side, 0, 0, ICON_SIZE, ICON_SIZE);
+  bitmap.close();
+  const webp = canvas.toDataURL("image/webp", 0.9);
+  // Older Safari cannot encode WebP and silently returns PNG instead.
+  return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/png");
+}
+
+function ProductMark({
+  name,
+  iconUrl,
+  className,
+  onLoadResult,
+}: {
+  name: string;
+  iconUrl: string | null;
+  className: string;
+  onLoadResult?: (loaded: boolean) => void;
+}) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showIcon = iconUrl && iconUrl !== failedUrl;
+  return (
+    <span className={`product-mark ${className}`} aria-hidden="true">
+      {showIcon ? (
+        // Product icons are arbitrary user links, so next/image remote patterns do not fit.
+        // biome-ignore lint/performance/noImgElement: see above
+        <img
+          src={iconUrl}
+          alt=""
+          onLoad={() => onLoadResult?.(true)}
+          onError={() => {
+            setFailedUrl(iconUrl);
+            onLoadResult?.(false);
+          }}
+        />
+      ) : (
+        name.trim().charAt(0).toUpperCase() || "P"
+      )}
+    </span>
+  );
+}
+
+const channelIntegration: Record<Channel, string> = {
+  LinkedIn: "Publish approved posts and collect delivery results.",
+  Facebook: "Publish approved posts to Pages and collect delivery results.",
+  X: "Publish approved posts and collect delivery results.",
+  Instagram: "Publish approved posts and collect delivery results.",
+};
+
 function ChannelIcon({ channel }: { channel: Channel }) {
   if (channel === "LinkedIn") return <FaLinkedinIn aria-hidden="true" />;
+  if (channel === "Facebook") return <FaFacebookF aria-hidden="true" />;
   if (channel === "Instagram") return <FaInstagram aria-hidden="true" />;
   return <FaXTwitter aria-hidden="true" />;
 }

@@ -84,7 +84,7 @@ async def test_campaign_draft_rejects_unsupported_channel(transport: ASGITranspo
                 "product_description": "An AI keyboard that rewrites messages inside any app.",
                 "audience": "Knowledge workers",
                 "objective": "Increase qualified app installs",
-                "channels": ["Facebook"],
+                "channels": ["TikTok"],
                 "days": 1,
             },
         )

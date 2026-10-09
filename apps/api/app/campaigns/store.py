@@ -59,8 +59,8 @@ class CampaignStore(Protocol):
 
 
 CAMPAIGN_COLUMNS = """
-    id, name, positioning, product_name, product_description, audience, objective,
-    channels, brand_voice, starts_on, created_at
+    id, name, positioning, product_name, product_icon_url, product_description, audience,
+    objective, channels, brand_voice, starts_on, created_at
 """
 
 
@@ -92,11 +92,12 @@ class PostgresCampaignStore:
                 text(
                     """
                     insert into public.campaigns (
-                      workspace_id, name, positioning, product_name, product_description,
-                      audience, objective, channels, brand_voice,
+                      workspace_id, name, positioning, product_name, product_icon_url,
+                      product_description, audience, objective, channels, brand_voice,
                       agent_session_id, agent_turn_id
                     ) values (
-                      :workspace_id, :name, :positioning, :product_name, :product_description,
+                      :workspace_id, :name, :positioning, :product_name, :product_icon_url,
+                      :product_description,
                       :audience, :objective, :channels, :brand_voice,
                       :session_id, :turn_id
                     )
@@ -108,6 +109,7 @@ class PostgresCampaignStore:
                     "name": draft.campaign_name,
                     "positioning": draft.positioning,
                     "product_name": brief.product_name,
+                    "product_icon_url": brief.product_icon_url,
                     "product_description": brief.product_description,
                     "audience": brief.audience,
                     "objective": brief.objective,
@@ -369,6 +371,7 @@ class FakeCampaignStore:
             name=draft.campaign_name,
             positioning=draft.positioning,
             product_name=brief.product_name,
+            product_icon_url=brief.product_icon_url,
             product_description=brief.product_description,
             audience=brief.audience,
             objective=brief.objective,

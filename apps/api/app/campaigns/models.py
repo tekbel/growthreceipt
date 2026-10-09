@@ -1,23 +1,52 @@
+import base64
+import binascii
+import re
 from datetime import date, datetime
 from typing import Any, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
-Channel = Literal["LinkedIn", "X", "Instagram"]
+Channel = Literal["LinkedIn", "Facebook", "X", "Instagram"]
 PostStatus = Literal["needs_review", "changes_requested", "approved"]
 CampaignStatus = Literal["in_review", "changes_requested", "approved"]
 EventActor = Literal["agent", "human", "system"]
 
 
+# A small PNG, JPEG, or WebP resized in the browser. SVG is excluded on purpose.
+UPLOADED_ICON = re.compile(r"data:image/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})")
+
+
 class CampaignBrief(BaseModel):
     product_name: str = Field(min_length=2, max_length=120)
+    product_icon_url: str | None = Field(default=None, max_length=200_000)
     product_description: str = Field(min_length=10, max_length=2_000)
     audience: str = Field(min_length=3, max_length=500)
     objective: str = Field(min_length=3, max_length=240)
     channels: list[Channel] = Field(min_length=1)
     days: int = Field(default=7, ge=1, le=14)
     brand_voice: str = Field(default="Clear, confident, useful", max_length=500)
+
+    @field_validator("product_icon_url")
+    @classmethod
+    def _icon_url(cls, value: str | None) -> str | None:
+        # Optional. Accept an https link, a path served by the web app, or a small uploaded image.
+        value = (value or "").strip()
+        if not value:
+            return None
+        if upload := UPLOADED_ICON.fullmatch(value):
+            try:
+                size = len(base64.b64decode(upload.group(1), validate=True))
+            except binascii.Error:
+                raise ValueError("Product icon upload is not valid") from None
+            if size > 150_000:
+                raise ValueError("Product icon upload is too large")
+            return value
+        if len(value) > 500:
+            raise ValueError("Product icon link is too long")
+        if value.startswith("https://") or (value.startswith("/") and not value.startswith("//")):
+            return value
+        raise ValueError("Product icon must be an https link")
 
 
 class CampaignPost(BaseModel):
@@ -45,6 +74,7 @@ class Campaign(BaseModel):
     name: str
     positioning: str
     product_name: str
+    product_icon_url: str | None = None
     product_description: str
     audience: str
     objective: str

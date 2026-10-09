@@ -13,8 +13,9 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${API_URL}${path}`, { ...init, headers });
 }
 
-export type Channel = "LinkedIn" | "X" | "Instagram";
-export const channels: Channel[] = ["LinkedIn", "X", "Instagram"];
+export type Channel = "LinkedIn" | "Facebook" | "X" | "Instagram";
+// One list drives both campaign creation and the Integrations page.
+export const channels: Channel[] = ["LinkedIn", "Facebook", "X", "Instagram"];
 
 export type PostStatus = "needs_review" | "changes_requested" | "approved";
 export type CampaignStatus = "in_review" | "changes_requested" | "approved";
@@ -35,6 +36,7 @@ export type Campaign = {
   name: string;
   positioning: string;
   product_name: string;
+  product_icon_url: string | null;
   product_description: string;
   audience: string;
   objective: string;
@@ -48,6 +50,7 @@ export type Campaign = {
 
 export type CampaignBrief = {
   product_name: string;
+  product_icon_url: string;
   product_description: string;
   audience: string;
   objective: string;
@@ -73,6 +76,7 @@ export type PostUpdate = {
 
 export const exampleBrief: CampaignBrief = {
   product_name: "Scribe",
+  product_icon_url: "/products/scribe.png",
   product_description:
     "A writing keyboard that helps professionals turn rough thoughts into clear messages wherever they type.",
   audience: "Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.",
