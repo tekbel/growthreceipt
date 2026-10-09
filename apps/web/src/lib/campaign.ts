@@ -69,19 +69,69 @@ export const exampleBrief: CampaignBrief = {
   brand_voice: "Clear, confident, useful",
 };
 
+export type DraftStage =
+  | "brief_received"
+  | "session_started"
+  | "thinking"
+  | "writing"
+  | "checking"
+  | "saving";
+
+export type DraftProgress = {
+  stage: DraftStage;
+  detail?: string | null;
+  items: number;
+  total: number;
+};
+
 export class ApiError extends Error {}
+
+async function errorFrom(response: Response): Promise<ApiError> {
+  const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
+  const detail = typeof body?.detail === "string" ? body.detail : null;
+  return new ApiError(detail ?? `Northstar API returned ${response.status}`);
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
-    const detail = typeof body?.detail === "string" ? body.detail : null;
-    throw new ApiError(detail ?? `Northstar API returned ${response.status}`);
-  }
+  if (!response.ok) throw await errorFrom(response);
   return response.json() as Promise<T>;
+}
+
+/** Drafts a campaign and reports each step the agent reaches until the saved campaign arrives. */
+async function streamCreate(
+  brief: CampaignBrief,
+  onProgress: (progress: DraftProgress) => void,
+): Promise<Campaign> {
+  const response = await fetch(`${API_URL}/v1/campaigns/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(brief),
+  });
+  if (!response.ok || !response.body) throw await errorFrom(response);
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      const event = /^event: (.+)$/m.exec(block)?.[1];
+      const data = JSON.parse(/^data: (.+)$/m.exec(block)?.[1] ?? "null");
+      if (event === "progress") onProgress(data as DraftProgress);
+      if (event === "error") throw new ApiError((data as { detail: string }).detail);
+      if (event === "campaign") {
+        await reader.cancel();
+        return data as Campaign;
+      }
+    }
+  }
+  throw new ApiError("The campaign agent stopped before it finished.");
 }
 
 export const campaignApi = {
@@ -95,6 +145,7 @@ export const campaignApi = {
   },
   create: (brief: CampaignBrief) =>
     request<Campaign>("/v1/campaigns", { method: "POST", body: JSON.stringify(brief) }),
+  streamCreate,
   updatePost: (campaignId: string, postId: string, update: PostUpdate) =>
     request<Campaign>(`/v1/campaigns/${campaignId}/posts/${postId}`, {
       method: "PATCH",

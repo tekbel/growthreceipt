@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from openai import APIError
 
-from app.agents.gateway import AgentGateway, AgentRun
+from app.agents.gateway import AgentGateway, AgentProgress, AgentRun, ProgressCallback
 from app.campaigns.models import CampaignBrief, CampaignDraft
 
 CAMPAIGN_INSTRUCTIONS = """You are Northstar's campaign strategist.
@@ -13,7 +13,11 @@ Each post must be ready for human review and must include one clear call to acti
 """
 
 
-async def draft_campaign(gateway: AgentGateway, brief: CampaignBrief) -> AgentRun[CampaignDraft]:
+async def draft_campaign(
+    gateway: AgentGateway,
+    brief: CampaignBrief,
+    on_progress: ProgressCallback | None = None,
+) -> AgentRun[CampaignDraft]:
     prompt = (
         f"Product: {brief.product_name}\n"
         f"Description: {brief.product_description}\n"
@@ -29,6 +33,7 @@ async def draft_campaign(gateway: AgentGateway, brief: CampaignBrief) -> AgentRu
             instructions=CAMPAIGN_INSTRUCTIONS,
             input_text=prompt,
             output_type=CampaignDraft,
+            on_progress=on_progress,
         )
     except (APIError, RuntimeError) as error:
         raise HTTPException(
@@ -36,6 +41,8 @@ async def draft_campaign(gateway: AgentGateway, brief: CampaignBrief) -> AgentRu
             detail="Campaign agent is temporarily unavailable",
         ) from error
 
+    if on_progress is not None:
+        await on_progress(AgentProgress("checking"))
     if run.session_id is None or run.turn_id is None:
         raise HTTPException(status_code=502, detail="Campaign agent did not return run identifiers")
     posts = run.output.posts

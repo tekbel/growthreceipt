@@ -50,6 +50,7 @@ The tunnel always uses `https://justify-usual-twirl.ngrok-free.dev/v1/paypal/web
 ### Implemented API slices
 
 - `POST /v1/campaigns` turns a product brief into a typed campaign through an OpenAI-hosted agent session and persists it for review.
+- `POST /v1/campaigns/stream` does the same and reports each step the agent reaches as server-sent events (`progress`, then `campaign` or `error`). The web app uses this route.
 - `GET /v1/campaigns/latest` and `GET /v1/campaigns/{campaign_id}` load a campaign with its posts.
 - `PATCH /v1/campaigns/{campaign_id}/posts/{post_id}` edits a post, approves it, or requests changes with a note. Edited text always needs a fresh approval.
 - `POST /v1/campaigns/{campaign_id}/approve` approves every post in the campaign.

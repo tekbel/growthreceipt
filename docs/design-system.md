@@ -44,6 +44,11 @@ The home view answers one question: what needs attention today? Campaign review,
 3. Focus uses a visible teal ring.
 4. Loading controls remain disabled until the action completes.
 5. Reduced motion preferences disable nonessential motion.
+6. Motion uses `--duration-fast` (120ms), `--duration-base` (220ms) and `--ease`. Lists reveal with a 45ms stagger. Reduced motion sets both durations to zero.
+7. Loading uses skeleton blocks shaped like the page, never a bare text line.
+8. Agent work shows only steps the agent actually reached, reported by the API stream. Never simulate progress with timers.
+9. The theme comes from the saved choice, then the OS, and is applied to `<html>` before first paint.
+10. Selection and active states use a soft tinted background and accent text. No thick accent side bars on rows, navigation, or toasts.
 
 ## Responsive rules
 

@@ -1,19 +1,33 @@
-from typing import Annotated
+import asyncio
+import json
+import logging
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.agents.dependencies import get_agent_gateway
-from app.agents.gateway import AgentGateway
+from app.agents.gateway import AgentGateway, AgentProgress, AgentRun
 from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.generation import draft_campaign
-from app.campaigns.models import Campaign, CampaignBrief, CampaignEvent, PostUpdate
+from app.campaigns.models import (
+    Campaign,
+    CampaignBrief,
+    CampaignDraft,
+    CampaignEvent,
+    PostUpdate,
+)
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/campaigns", tags=["campaigns"])
 
 Store = Annotated[CampaignStore, Depends(get_campaign_store)]
+Gateway = Annotated[AgentGateway, Depends(get_agent_gateway)]
 
 
 def _found(campaign: Campaign | None) -> Campaign:
@@ -22,13 +36,9 @@ def _found(campaign: Campaign | None) -> Campaign:
     return campaign
 
 
-@router.post("", response_model=Campaign, status_code=201)
-async def create_campaign(
-    brief: CampaignBrief,
-    gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
-    store: Store,
+async def _save(
+    store: CampaignStore, brief: CampaignBrief, run: AgentRun[CampaignDraft]
 ) -> Campaign:
-    run = await draft_campaign(gateway, brief)
     assert run.session_id is not None and run.turn_id is not None
     return await store.create(
         workspace_id=get_settings().demo_workspace_id,
@@ -36,6 +46,56 @@ async def create_campaign(
         draft=run.output,
         session_id=run.session_id,
         turn_id=run.turn_id,
+    )
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("", response_model=Campaign, status_code=201)
+async def create_campaign(brief: CampaignBrief, gateway: Gateway, store: Store) -> Campaign:
+    return await _save(store, brief, await draft_campaign(gateway, brief))
+
+
+@router.post("/stream")
+async def stream_campaign(
+    brief: CampaignBrief, gateway: Gateway, store: Store
+) -> StreamingResponse:
+    """Draft a campaign and report each step the agent reaches as server-sent events."""
+
+    async def events() -> AsyncIterator[str]:
+        queue: asyncio.Queue[AgentProgress | None] = asyncio.Queue()
+        task = asyncio.create_task(draft_campaign(gateway, brief, on_progress=queue.put))
+        task.add_done_callback(lambda _: queue.put_nowait(None))
+        try:
+            yield _sse("progress", {"stage": "brief_received", "items": 0, "total": brief.days})
+            while (progress := await queue.get()) is not None:
+                yield _sse(
+                    "progress",
+                    {
+                        "stage": progress.stage,
+                        "detail": progress.detail,
+                        "items": min(progress.items, brief.days),
+                        "total": brief.days,
+                    },
+                )
+            run = task.result()
+            yield _sse("progress", {"stage": "saving", "items": brief.days, "total": brief.days})
+            campaign = await _save(store, brief, run)
+            yield _sse("campaign", campaign.model_dump(mode="json"))
+        except HTTPException as error:
+            yield _sse("error", {"detail": error.detail})
+        except Exception:
+            logger.exception("Streaming campaign draft failed")
+            yield _sse("error", {"detail": "The campaign could not be drafted right now."})
+        finally:
+            task.cancel()
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

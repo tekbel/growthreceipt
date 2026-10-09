@@ -35,6 +35,8 @@ import {
   type Channel,
   campaignApi,
   channels,
+  type DraftProgress,
+  type DraftStage,
   exampleBrief,
   type Post,
   type PostStatus,
@@ -123,13 +125,25 @@ const eventLabels: Record<string, string> = {
   next_action_recommended: "Next move recommended from PayPal revenue",
 };
 
+const draftSteps: [DraftStage, string][] = [
+  ["brief_received", "Brief sent to the campaign agent"],
+  ["session_started", "Campaign agent connected"],
+  ["thinking", "Planning the campaign"],
+  ["writing", "Writing posts"],
+  ["checking", "Checking channels and schedule"],
+  ["saving", "Saving drafts for your review"],
+];
+
+type Theme = "light" | "dark";
+const THEME_KEY = "northstar-theme";
+
 function statusFor(post: Post): ReviewStatus {
   return reviewLabels[post.status];
 }
 
 export function CampaignWorkspace() {
   const [view, setView] = useState<View>("today");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<Theme>("light");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -184,6 +198,22 @@ export function CampaignWorkspace() {
   useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
+
+  // The inline script in layout.tsx applies the theme before first paint. Mirror it here.
+  useEffect(() => {
+    if (document.documentElement.dataset.theme === "dark") setTheme("dark");
+  }, []);
+
+  function toggleTheme() {
+    const next: Theme = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Storage can be blocked. The choice still applies for this visit.
+    }
+  }
 
   const campaignId = campaign?.id;
   const loadRevenue = useCallback(async () => {
@@ -262,8 +292,11 @@ export function CampaignWorkspace() {
     );
   }
 
-  async function createCampaign(brief: CampaignBrief) {
-    const created = await campaignApi.create(brief);
+  async function createCampaign(
+    brief: CampaignBrief,
+    onProgress: (progress: DraftProgress) => void,
+  ) {
+    const created = await campaignApi.streamCreate(brief, onProgress);
     setCampaign(created);
     setSelectedId(created.posts[0]?.id ?? null);
     setFilter("All");
@@ -296,7 +329,7 @@ export function CampaignWorkspace() {
 
   function renderPage() {
     if (loadState === "loading") {
-      return <p className="page-status">Loading your campaign…</p>;
+      return <WorkspaceSkeleton />;
     }
     if (loadState === "error") {
       return (
@@ -305,6 +338,7 @@ export function CampaignWorkspace() {
           copy="Start the API with make dev-api, then try again."
           action="Try again"
           onAction={() => void loadCampaign()}
+          boxed
         />
       );
     }
@@ -415,7 +449,7 @@ export function CampaignWorkspace() {
 
   const productName = campaign?.product_name ?? "New product";
   return (
-    <div className="northstar-app" data-theme={theme}>
+    <div className="northstar-app">
       <Sidebar
         currentView={view}
         isOpen={mobileNavigationOpen}
@@ -432,10 +466,12 @@ export function CampaignWorkspace() {
           searchOpen={searchOpen}
           onMenu={() => setMobileNavigationOpen(true)}
           onSearch={() => setSearchOpen((open) => !open)}
-          onTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
+          onTheme={toggleTheme}
           notify={notify}
         />
-        <main className="page-shell">{renderPage()}</main>
+        <main className="page-shell" key={loadState === "ready" ? view : loadState}>
+          {renderPage()}
+        </main>
       </div>
       {toast ? (
         <div className="toast" role="status">
@@ -580,7 +616,7 @@ function Topbar({
 }: {
   currentView: View;
   productName: string;
-  theme: "light" | "dark";
+  theme: Theme;
   searchOpen: boolean;
   onMenu: () => void;
   onSearch: () => void;
@@ -893,7 +929,10 @@ function NewCampaignPage({
   onCancel,
 }: {
   canCancel: boolean;
-  createCampaign: (brief: CampaignBrief) => Promise<void>;
+  createCampaign: (
+    brief: CampaignBrief,
+    onProgress: (progress: DraftProgress) => void,
+  ) => Promise<void>;
   onCancel: () => void;
 }) {
   const [brief, setBrief] = useState<CampaignBrief>({
@@ -905,6 +944,8 @@ function NewCampaignPage({
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<DraftProgress | null>(null);
+  const [thought, setThought] = useState<string | null>(null);
 
   function field<K extends keyof CampaignBrief>(key: K, value: CampaignBrief[K]) {
     setBrief((current) => ({ ...current, [key]: value }));
@@ -927,8 +968,13 @@ function NewCampaignPage({
     }
     setGenerating(true);
     setError(null);
+    setProgress(null);
+    setThought(null);
     try {
-      await createCampaign(brief);
+      await createCampaign(brief, (next) => {
+        setProgress(next);
+        if (next.detail) setThought(next.detail);
+      });
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "The campaign could not be drafted right now.",
@@ -1035,10 +1081,7 @@ function NewCampaignPage({
           </p>
         ) : null}
         {generating ? (
-          <p className="page-status" role="status">
-            The campaign agent is drafting {brief.days} posts for {brief.product_name}. This usually
-            takes under a minute.
-          </p>
+          <AgentSteps progress={progress} thought={thought} productName={brief.product_name} />
         ) : null}
         <div className="form-actions">
           <button className="button dark" type="submit" disabled={generating}>
@@ -1167,8 +1210,8 @@ function ActivityPanel({ campaign }: { campaign: Campaign }) {
       </div>
       {failed ? <p className="inline-error">Activity could not be loaded.</p> : null}
       <ol>
-        {(events ?? []).slice(0, 12).map((event) => (
-          <li key={event.id}>
+        {(events ?? []).slice(0, 12).map((event, index) => (
+          <li className="reveal" style={{ "--i": index } as React.CSSProperties} key={event.id}>
             <span className={`activity-actor ${event.actor}`}>{event.actor}</span>
             <strong>
               {eventLabels[event.action] ?? event.action}
@@ -1243,12 +1286,13 @@ function ContentPage({
             <span>{posts.length} posts</span>
           </div>
           {posts.length ? (
-            posts.map((post) => {
+            posts.map((post, index) => {
               const status = statusFor(post);
               return (
                 <button
                   type="button"
-                  className={`queue-item ${post.id === selected.id ? "selected" : ""}`}
+                  className={`queue-item reveal ${post.id === selected.id ? "selected" : ""}`}
+                  style={{ "--i": index } as React.CSSProperties}
                   aria-pressed={post.id === selected.id}
                   onClick={() => selectPost(post.id)}
                   key={post.id}
@@ -1856,14 +1900,16 @@ function EmptyState({
   copy,
   action,
   onAction,
+  boxed = false,
 }: {
   title: string;
   copy: string;
   action?: string;
   onAction?: () => void;
+  boxed?: boolean;
 }) {
   return (
-    <div className="empty-state">
+    <div className={`empty-state ${boxed ? "boxed" : ""}`} role={boxed ? "alert" : undefined}>
       <strong>{title}</strong>
       <p>{copy}</p>
       {action && onAction ? (
@@ -1874,6 +1920,88 @@ function EmptyState({
     </div>
   );
 }
+function WorkspaceSkeleton() {
+  return (
+    <section className="skeleton" aria-busy="true" aria-label="Loading your campaign">
+      <div className="skeleton-block heading" />
+      <div className="skeleton-row">
+        <div className="skeleton-block card" />
+        <div className="skeleton-block card" />
+        <div className="skeleton-block card" />
+      </div>
+      <div className="skeleton-block panel" />
+    </section>
+  );
+}
+
+function AgentSteps({
+  progress,
+  thought,
+  productName,
+}: {
+  progress: DraftProgress | null;
+  thought: string | null;
+  productName: string;
+}) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const current = progress ? draftSteps.findIndex(([stage]) => stage === progress.stage) : 0;
+  return (
+    <section className="agent-steps" aria-label="Campaign agent progress">
+      <div className="agent-steps-heading">
+        <strong>Drafting {productName || "your"} campaign</strong>
+        <span aria-hidden="true">{seconds}s</span>
+      </div>
+      <ol>
+        {draftSteps.map(([stage, label], index) => {
+          const state = index < current ? "done" : index === current ? "active" : "pending";
+          const writing = stage === "writing" && progress && index <= current;
+          return (
+            <li
+              className={`agent-step ${state}`}
+              key={stage}
+              aria-current={state === "active" ? "step" : undefined}
+            >
+              <span className="agent-step-marker" aria-hidden="true">
+                {state === "done" ? <Check /> : null}
+              </span>
+              <div>
+                <span>
+                  {writing
+                    ? `Writing post ${Math.max(progress.items, 1)} of ${progress.total}`
+                    : label}
+                </span>
+                {stage === "thinking" && thought && state !== "pending" ? (
+                  <p className="agent-thought">{thought}</p>
+                ) : null}
+                {writing ? (
+                  <div
+                    className="agent-meter"
+                    role="progressbar"
+                    aria-label="Posts written"
+                    aria-valuemin={0}
+                    aria-valuemax={progress.total}
+                    aria-valuenow={progress.items}
+                  >
+                    <span style={{ width: `${(progress.items / progress.total) * 100}%` }} />
+                  </div>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="sr-only" role="status">
+        {progress ? draftSteps[current]?.[1] : "Sending brief"}
+      </p>
+    </section>
+  );
+}
+
 function Integration({
   provider,
   description,

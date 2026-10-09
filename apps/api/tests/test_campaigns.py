@@ -1,4 +1,6 @@
+import json
 from collections.abc import AsyncIterator, Generator
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -85,6 +87,52 @@ async def test_create_campaign_rejects_unrequested_channel() -> None:
         response = await client.post("/v1/campaigns", json=BRIEF)
 
     assert response.status_code == 502
+
+
+def sse_events(body: str) -> list[tuple[str, dict[str, Any]]]:
+    events = []
+    for block in body.strip().split("\n\n"):
+        name, data = block.split("\n")
+        events.append((name.removeprefix("event: "), json.loads(data.removeprefix("data: "))))
+    return events
+
+
+@pytest.mark.asyncio
+async def test_stream_campaign_reports_agent_steps_then_saves(client: AsyncClient) -> None:
+    response = await client.post("/v1/campaigns/stream", json=BRIEF)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = sse_events(response.text)
+    stages = [data["stage"] for name, data in events if name == "progress"]
+    assert stages == [
+        "brief_received",
+        "session_started",
+        "thinking",
+        "writing",
+        "writing",
+        "checking",
+        "saving",
+    ]
+    assert [data["items"] for name, data in events if data.get("stage") == "writing"] == [1, 2]
+    name, campaign = events[-1]
+    assert name == "campaign"
+    assert campaign["product_name"] == "Ledgerly"
+    latest = await client.get("/v1/campaigns/latest")
+    assert latest.json()["id"] == campaign["id"]
+
+
+@pytest.mark.asyncio
+async def test_stream_campaign_reports_rejected_draft_as_error_event() -> None:
+    app.dependency_overrides[get_agent_gateway] = lambda: FakeAgentGateway(
+        {"campaign-draft": draft(post(1), post(2, "Instagram"))}
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/v1/campaigns/stream", json=BRIEF)
+
+    name, data = sse_events(response.text)[-1]
+    assert name == "error"
+    assert data == {"detail": "Campaign agent used an unrequested channel"}
 
 
 @pytest.mark.asyncio
