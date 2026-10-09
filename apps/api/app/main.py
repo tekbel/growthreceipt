@@ -9,12 +9,13 @@ from app.routes.paypal import router as paypal_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
-allowed_origins = {str(settings.web_origin).rstrip("/")}
-if settings.app_env == "local":
-    allowed_origins.update({"http://localhost:3000", "http://127.0.0.1:3000"})
+allowed_origins = [str(settings.web_origin).rstrip("/")]
+# Locally the web app may run on any port and on either loopback host name.
+local_origins = r"http://(localhost|127\.0\.0\.1)(:\d+)?" if settings.app_env == "local" else None
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=sorted(allowed_origins),
+    allow_origins=allowed_origins,
+    allow_origin_regex=local_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
