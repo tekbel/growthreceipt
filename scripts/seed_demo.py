@@ -127,7 +127,7 @@ async def seed(reset: bool) -> None:
                 )
             await connection.execute(
                 """
-                insert into public.workspaces (id, name) values ($1, 'Northstar Demo')
+                insert into public.workspaces (id, name) values ($1, 'GrowthReceipt Demo')
                 on conflict (id) do nothing
                 """,
                 workspace_id,

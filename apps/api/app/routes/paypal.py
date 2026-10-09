@@ -12,6 +12,7 @@ from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import Offer, PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
+from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/paypal", tags=["paypal"])
 
@@ -19,7 +20,7 @@ OFFERS = {
     "scribe-pro": Offer(
         id="scribe-pro",
         name="Scribe Pro",
-        description="One month of Scribe AI Keyboard Pro",
+        description="Scribe Monthly Pro with 200 writing actions per day",
         amount=Decimal("12.00"),
         currency="USD",
     )
@@ -66,7 +67,7 @@ class RevenueSummaryResponse(BaseModel):
 
 
 @router.get("/config", response_model=PayPalConfigResponse)
-async def get_paypal_config() -> PayPalConfigResponse:
+async def get_paypal_config(_workspace_id: WorkspaceId) -> PayPalConfigResponse:
     settings = get_settings()
     if settings.paypal_client_id is None:
         raise HTTPException(status_code=503, detail="PayPal is not configured")
@@ -83,11 +84,11 @@ async def create_order(
     gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
 ) -> OrderResponse:
     offer = OFFERS.get(request.offer_id)
     if offer is None:
         raise HTTPException(status_code=404, detail="Offer not found")
-    workspace_id = get_settings().demo_workspace_id
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None or all(post.id != request.content_id for post in campaign.posts):
         raise HTTPException(status_code=404, detail="Campaign content not found")
@@ -116,8 +117,11 @@ async def create_order(
 async def capture_order(
     gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
+    workspace_id: WorkspaceId,
     order_id: Annotated[str, Path(pattern=r"^[A-Z0-9-]{6,64}$")],
 ) -> CaptureResponse:
+    if not await store.owns_order(workspace_id=workspace_id, paypal_order_id=order_id):
+        raise HTTPException(status_code=404, detail="PayPal order not found")
     try:
         capture = await gateway.capture_order(order_id=order_id, request_id=str(uuid4()))
     except PayPalAPIError as error:
@@ -170,7 +174,11 @@ async def receive_webhook(
 async def get_revenue_summary(
     campaign_id: UUID,
     store: Annotated[PaymentStore, Depends(get_payment_store)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
 ) -> RevenueSummaryResponse:
+    if await campaigns.get(workspace_id=workspace_id, campaign_id=campaign_id) is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
     summary = await store.revenue_summary(campaign_id=campaign_id)
     return RevenueSummaryResponse(
         campaign_id=campaign_id,

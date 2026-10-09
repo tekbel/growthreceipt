@@ -1,5 +1,5 @@
-import { CampaignWorkspace } from "@/components/campaign-workspace";
+import { AuthShell } from "@/components/auth-shell";
 
 export default function Home() {
-  return <CampaignWorkspace />;
+  return <AuthShell />;
 }

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal["local", "test", "staging", "production"] = "local"
-    app_name: str = "Northstar API"
+    app_name: str = "GrowthReceipt API"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     web_origin: HttpUrl = HttpUrl("http://localhost:3000")
@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     paypal_client_id: SecretStr | None = None
     paypal_client_secret: SecretStr | None = None
     paypal_webhook_id: SecretStr | None = None
+    auth_required: bool = False
+    supabase_url: str | None = None
+    supabase_publishable_key: SecretStr | None = None
     demo_workspace_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
 

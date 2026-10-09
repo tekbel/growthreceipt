@@ -82,7 +82,7 @@ class PostgresCampaignStore:
                 text(
                     """
                     insert into public.workspaces (id, name)
-                    values (:workspace_id, 'Northstar Demo')
+                    values (:workspace_id, 'GrowthReceipt Demo')
                     on conflict (id) do nothing
                     """
                 ),

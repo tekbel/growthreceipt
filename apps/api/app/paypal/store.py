@@ -35,6 +35,8 @@ class PaymentStore(Protocol):
 
     async def record_capture(self, capture: PayPalCapture) -> None: ...
 
+    async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool: ...
+
     async def record_webhook(
         self,
         *,
@@ -65,7 +67,7 @@ class PostgresPaymentStore:
                 text(
                     """
                     insert into public.workspaces (id, name)
-                    values (:workspace_id, 'Northstar Demo')
+                    values (:workspace_id, 'GrowthReceipt Demo')
                     on conflict (id) do nothing
                     """
                 ),
@@ -150,6 +152,22 @@ class PostgresPaymentStore:
             if result.rowcount != 1:
                 raise LookupError("PayPal order attribution was not found")
 
+    async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
+        async with self._session.begin():
+            found = await self._session.scalar(
+                text(
+                    """
+                    select exists (
+                      select 1 from public.payment_orders
+                      where workspace_id = :workspace_id
+                        and paypal_order_id = :paypal_order_id
+                    )
+                    """
+                ),
+                {"workspace_id": workspace_id, "paypal_order_id": paypal_order_id},
+            )
+        return bool(found)
+
     async def record_webhook(
         self,
         *,
@@ -206,7 +224,7 @@ class PostgresPaymentStore:
 
 class FakePaymentStore:
     def __init__(self) -> None:
-        self.orders: dict[str, tuple[UUID, UUID]] = {}
+        self.orders: dict[str, tuple[UUID, UUID, UUID]] = {}
         self.captures: dict[str, PayPalCapture] = {}
         self.webhook_ids: set[str] = set()
 
@@ -220,8 +238,12 @@ class FakePaymentStore:
         paypal_order_id: str,
         idempotency_key: UUID,
     ) -> None:
-        del workspace_id, offer, idempotency_key
-        self.orders[paypal_order_id] = (campaign_id, content_id)
+        del offer, idempotency_key
+        self.orders[paypal_order_id] = (workspace_id, campaign_id, content_id)
+
+    async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
+        order = self.orders.get(paypal_order_id)
+        return order is not None and order[0] == workspace_id
 
     async def record_capture(self, capture: PayPalCapture) -> None:
         if capture.order_id not in self.orders:
@@ -244,7 +266,7 @@ class FakePaymentStore:
         captures = [
             capture
             for order_id, capture in self.captures.items()
-            if self.orders[order_id][0] == campaign_id
+            if self.orders[order_id][1] == campaign_id
         ]
         gross = sum((Decimal(capture.amount) for capture in captures), Decimal("0"))
         return RevenueSummary(

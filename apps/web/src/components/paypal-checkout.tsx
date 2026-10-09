@@ -4,7 +4,7 @@ import { Check, LockKeyhole, X } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
-import { API_URL } from "@/lib/campaign";
+import { apiFetch } from "@/lib/campaign";
 
 type PayPalConfig = {
   client_id: string;
@@ -12,19 +12,31 @@ type PayPalConfig = {
   currency: string;
 };
 
-type PayPalButtonsInstance = {
-  render: (container: HTMLElement) => Promise<void>;
-  close: () => Promise<void>;
+type PayPalPaymentSession = {
+  start: (
+    options: { presentationMode: "auto" },
+    order: Promise<{ orderId: string }>,
+  ) => Promise<void>;
+};
+
+type PayPalSdkInstance = {
+  findEligibleMethods: (options: { currencyCode: string }) => Promise<{
+    isEligible: (method: string) => boolean;
+  }>;
+  createPayPalOneTimePaymentSession: (options: {
+    onApprove: (data: { orderId: string }) => Promise<void>;
+    onCancel: () => void;
+    onError: () => void;
+  }) => PayPalPaymentSession;
 };
 
 type PayPalNamespace = {
-  Buttons: (options: {
-    style: Record<string, string | boolean | number>;
-    createOrder: () => Promise<string>;
-    onApprove: (data: { orderID: string }) => Promise<void>;
-    onCancel: () => void;
-    onError: () => void;
-  }) => PayPalButtonsInstance;
+  createInstance: (options: {
+    clientId: string;
+    components: string[];
+    pageType: "checkout";
+    clientMetadataId: string;
+  }) => Promise<PayPalSdkInstance>;
 };
 
 declare global {
@@ -72,7 +84,7 @@ export function PayPalCheckout({
     const controller = new AbortController();
     async function loadConfig() {
       try {
-        const response = await fetch(`${API_URL}/v1/paypal/config`, {
+        const response = await apiFetch("/v1/paypal/config", {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("PayPal checkout is not configured.");
@@ -89,72 +101,113 @@ export function PayPalCheckout({
   }, []);
 
   useEffect(() => {
-    if (!sdkReady || !buttonContainer.current || !window.paypal || receipt) return;
+    const container = buttonContainer.current;
+    const paypal = window.paypal;
+    if (!sdkReady || !config || !container || !paypal || receipt) return;
+    const checkoutConfig = config;
+    const checkoutContainer = container;
+    const sdkNamespace: PayPalNamespace = paypal;
 
-    const buttons = window.paypal.Buttons({
-      style: {
-        color: "gold",
-        height: 46,
-        label: "paypal",
-        layout: "vertical",
-        shape: "rect",
-        tagline: false,
-      },
-      createOrder: async () => {
-        setError(null);
-        setStatus("Creating your sandbox order…");
-        const response = await fetch(`${API_URL}/v1/paypal/orders`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            offer_id: "scribe-pro",
-            campaign_id: campaignId,
-            content_id: contentId,
-          }),
-        });
-        if (!response.ok) throw new Error("PayPal could not create the order.");
-        const order = (await response.json()) as { order_id: string };
-        setStatus("Complete approval in PayPal.");
-        return order.order_id;
-      },
-      onApprove: async ({ orderID }) => {
-        setError(null);
-        setStatus("Capturing your payment…");
-        const response = await fetch(`${API_URL}/v1/paypal/orders/${orderID}/capture`, {
-          method: "POST",
-        });
-        if (!response.ok) throw new Error("The approved order could not be captured.");
-        const capture = (await response.json()) as {
-          capture_id: string;
-          amount: string;
-          currency: string;
-        };
-        setReceipt({
-          captureId: capture.capture_id,
-          amount: capture.amount,
-          currency: capture.currency,
-        });
-        onCaptured();
-        setStatus("Sandbox payment completed.");
-      },
-      onCancel: () => setStatus("Checkout cancelled. You can try again when ready."),
-      onError: () => {
-        setError("PayPal could not complete checkout. Please try again.");
-        setStatus("Checkout needs attention.");
-      },
-    });
+    let disposed = false;
+    let paypalButton: HTMLElement | null = null;
 
-    void buttons
-      .render(buttonContainer.current)
-      .then(() => setStatus("Choose PayPal or card to continue."))
-      .catch(() => {
-        setError("The PayPal button could not be displayed.");
+    async function createOrder(): Promise<{ orderId: string }> {
+      setError(null);
+      setStatus("Creating your sandbox order…");
+      const response = await apiFetch("/v1/paypal/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          offer_id: "scribe-pro",
+          campaign_id: campaignId,
+          content_id: contentId,
+        }),
       });
+      if (!response.ok) throw new Error("PayPal could not create the order.");
+      const order = (await response.json()) as { order_id: string };
+      setStatus("Complete approval in PayPal.");
+      return { orderId: order.order_id };
+    }
+
+    async function captureOrder(orderId: string) {
+      setError(null);
+      setStatus("Capturing your payment…");
+      const response = await apiFetch(`/v1/paypal/orders/${orderId}/capture`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("The approved order could not be captured.");
+      const capture = (await response.json()) as {
+        capture_id: string;
+        amount: string;
+        currency: string;
+      };
+      if (disposed) return;
+      setReceipt({
+        captureId: capture.capture_id,
+        amount: capture.amount,
+        currency: capture.currency,
+      });
+      onCaptured();
+      setStatus("Sandbox payment completed.");
+    }
+
+    async function initializeCheckout() {
+      try {
+        setStatus("Checking PayPal availability…");
+        const sdk = await sdkNamespace.createInstance({
+          clientId: checkoutConfig.client_id,
+          components: ["paypal-payments"],
+          pageType: "checkout",
+          clientMetadataId: crypto.randomUUID(),
+        });
+        if (!sdk || disposed) return;
+        const methods = await sdk.findEligibleMethods({ currencyCode: checkoutConfig.currency });
+        if (disposed) return;
+        if (!methods.isEligible("paypal")) {
+          throw new Error("PayPal is not available for this sandbox account.");
+        }
+
+        const paymentSession = sdk.createPayPalOneTimePaymentSession({
+          onApprove: ({ orderId }) => captureOrder(orderId),
+          onCancel: () => setStatus("Checkout cancelled. You can try again when ready."),
+          onError: () => {
+            setError("PayPal could not complete checkout. Please try again.");
+            setStatus("Checkout needs attention.");
+          },
+        });
+        paypalButton = document.createElement("paypal-button");
+        paypalButton.setAttribute("type", "pay");
+        paypalButton.setAttribute("aria-label", "Pay with PayPal");
+        paypalButton.addEventListener("click", () => {
+          setError(null);
+          void paymentSession
+            .start({ presentationMode: "auto" }, createOrder())
+            .catch((reason: unknown) => {
+              if (disposed) return;
+              setError(
+                reason instanceof Error
+                  ? reason.message
+                  : "PayPal could not start checkout. Please try again.",
+              );
+              setStatus("Checkout needs attention.");
+            });
+        });
+        checkoutContainer.replaceChildren(paypalButton);
+        setStatus("Choose PayPal to continue.");
+      } catch (reason) {
+        if (disposed) return;
+        setError(reason instanceof Error ? reason.message : "PayPal could not be initialized.");
+        setStatus("Checkout needs attention.");
+      }
+    }
+
+    void initializeCheckout();
 
     return () => {
-      void buttons.close();
+      disposed = true;
+      paypalButton?.remove();
     };
-  }, [campaignId, contentId, onCaptured, receipt, sdkReady]);
+  }, [campaignId, config, contentId, onCaptured, receipt, sdkReady]);
 
   return (
     <div className="checkout-backdrop">
@@ -178,7 +231,7 @@ export function PayPalCheckout({
           <div>
             <span className="checkout-label">Sandbox checkout</span>
             <h2 id="checkout-title">Scribe Pro</h2>
-            <p>One month of clearer writing wherever you type.</p>
+            <p>200 writing actions every day wherever you type.</p>
           </div>
           <div className="checkout-price">
             <strong>$12.00</strong>
@@ -186,13 +239,13 @@ export function PayPalCheckout({
           </div>
           <ul className="checkout-benefits">
             <li>
-              <Check aria-hidden="true" /> Professional rewrites
+              <Check aria-hidden="true" /> 200 actions every day
             </li>
             <li>
               <Check aria-hidden="true" /> Works inside your keyboard
             </li>
             <li>
-              <Check aria-hidden="true" /> One month of access
+              <Check aria-hidden="true" /> Monthly Pro plan
             </li>
           </ul>
         </div>
@@ -229,12 +282,12 @@ export function PayPalCheckout({
               </div>
               {config ? (
                 <Script
-                  id="paypal-checkout-sdk"
-                  src={`https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(config.client_id)}&currency=${config.currency}&intent=capture&components=buttons`}
+                  id="paypal-web-sdk-v6"
+                  src={`${config.environment === "sandbox" ? "https://www.sandbox.paypal.com" : "https://www.paypal.com"}/web-sdk/v6/core`}
                   strategy="afterInteractive"
                   onReady={() => {
                     setSdkReady(true);
-                    setStatus("Choose PayPal or card to continue.");
+                    setStatus("Checking PayPal availability…");
                   }}
                   onError={() => setError("The PayPal SDK could not be loaded.")}
                 />

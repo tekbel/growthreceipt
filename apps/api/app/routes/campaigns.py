@@ -20,7 +20,7 @@ from app.campaigns.models import (
     PostUpdate,
 )
 from app.campaigns.store import CampaignStore
-from app.config import get_settings
+from app.workspaces import WorkspaceId
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +37,14 @@ def _found(campaign: Campaign | None) -> Campaign:
 
 
 async def _save(
-    store: CampaignStore, brief: CampaignBrief, run: AgentRun[CampaignDraft]
+    store: CampaignStore,
+    brief: CampaignBrief,
+    run: AgentRun[CampaignDraft],
+    workspace_id: UUID,
 ) -> Campaign:
     assert run.session_id is not None and run.turn_id is not None
     return await store.create(
-        workspace_id=get_settings().demo_workspace_id,
+        workspace_id=workspace_id,
         brief=brief,
         draft=run.output,
         session_id=run.session_id,
@@ -54,13 +57,21 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 
 @router.post("", response_model=Campaign, status_code=201)
-async def create_campaign(brief: CampaignBrief, gateway: Gateway, store: Store) -> Campaign:
-    return await _save(store, brief, await draft_campaign(gateway, brief))
+async def create_campaign(
+    brief: CampaignBrief,
+    gateway: Gateway,
+    store: Store,
+    workspace_id: WorkspaceId,
+) -> Campaign:
+    return await _save(store, brief, await draft_campaign(gateway, brief), workspace_id)
 
 
 @router.post("/stream")
 async def stream_campaign(
-    brief: CampaignBrief, gateway: Gateway, store: Store
+    brief: CampaignBrief,
+    gateway: Gateway,
+    store: Store,
+    workspace_id: WorkspaceId,
 ) -> StreamingResponse:
     """Draft a campaign and report each step the agent reaches as server-sent events."""
 
@@ -82,7 +93,7 @@ async def stream_campaign(
                 )
             run = task.result()
             yield _sse("progress", {"stage": "saving", "items": brief.days, "total": brief.days})
-            campaign = await _save(store, brief, run)
+            campaign = await _save(store, brief, run, workspace_id)
             yield _sse("campaign", campaign.model_dump(mode="json"))
         except HTTPException as error:
             yield _sse("error", {"detail": error.detail})
@@ -100,15 +111,13 @@ async def stream_campaign(
 
 
 @router.get("/latest", response_model=Campaign)
-async def get_latest_campaign(store: Store) -> Campaign:
-    return _found(await store.latest(workspace_id=get_settings().demo_workspace_id))
+async def get_latest_campaign(store: Store, workspace_id: WorkspaceId) -> Campaign:
+    return _found(await store.latest(workspace_id=workspace_id))
 
 
 @router.get("/{campaign_id}", response_model=Campaign)
-async def get_campaign(campaign_id: UUID, store: Store) -> Campaign:
-    return _found(
-        await store.get(workspace_id=get_settings().demo_workspace_id, campaign_id=campaign_id)
-    )
+async def get_campaign(campaign_id: UUID, store: Store, workspace_id: WorkspaceId) -> Campaign:
+    return _found(await store.get(workspace_id=workspace_id, campaign_id=campaign_id))
 
 
 @router.patch("/{campaign_id}/posts/{post_id}", response_model=Campaign)
@@ -117,10 +126,11 @@ async def update_post(
     post_id: UUID,
     update: PostUpdate,
     store: Store,
+    workspace_id: WorkspaceId,
 ) -> Campaign:
     return _found(
         await store.update_post(
-            workspace_id=get_settings().demo_workspace_id,
+            workspace_id=workspace_id,
             campaign_id=campaign_id,
             post_id=post_id,
             update=update,
@@ -129,14 +139,21 @@ async def update_post(
 
 
 @router.post("/{campaign_id}/approve", response_model=Campaign)
-async def approve_campaign(campaign_id: UUID, store: Store) -> Campaign:
+async def approve_campaign(
+    campaign_id: UUID,
+    store: Store,
+    workspace_id: WorkspaceId,
+) -> Campaign:
     return _found(
-        await store.approve(workspace_id=get_settings().demo_workspace_id, campaign_id=campaign_id)
+        await store.approve(workspace_id=workspace_id, campaign_id=campaign_id)
     )
 
 
 @router.get("/{campaign_id}/events", response_model=list[CampaignEvent])
-async def list_campaign_events(campaign_id: UUID, store: Store) -> list[CampaignEvent]:
-    workspace_id = get_settings().demo_workspace_id
+async def list_campaign_events(
+    campaign_id: UUID,
+    store: Store,
+    workspace_id: WorkspaceId,
+) -> list[CampaignEvent]:
     _found(await store.get(workspace_id=workspace_id, campaign_id=campaign_id))
     return await store.events(workspace_id=workspace_id, campaign_id=campaign_id)

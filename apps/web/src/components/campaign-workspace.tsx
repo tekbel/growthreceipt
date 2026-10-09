@@ -17,6 +17,7 @@ import {
   PencilLine,
   Plus,
   Receipt,
+  ReceiptText,
   Search,
   Send,
   SlidersHorizontal,
@@ -25,11 +26,11 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
+import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { PayPalCheckout } from "@/components/paypal-checkout";
 import {
-  API_URL,
+  apiFetch,
   type Campaign,
   type CampaignBrief,
   type CampaignEvent,
@@ -144,17 +145,32 @@ const draftSteps: [DraftStage, string][] = [
 ];
 
 type Theme = "light" | "dark";
-const THEME_KEY = "northstar-theme";
+const THEME_KEY = "growthreceipt-theme";
+
+export type WorkspaceIdentity = {
+  mode: "local" | "judge" | "user";
+  displayName: string;
+  isAnonymous: boolean;
+};
 
 function statusFor(post: Post): ReviewStatus {
   return reviewLabels[post.status];
 }
 
-export function CampaignWorkspace() {
+export function CampaignWorkspace({
+  identity,
+  onSignOut,
+  onResetDemo,
+}: {
+  identity: WorkspaceIdentity;
+  onSignOut?: () => Promise<void>;
+  onResetDemo?: () => Promise<void>;
+}) {
   const [view, setView] = useState<View>("today");
   const [theme, setTheme] = useState<Theme>("light");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -238,7 +254,7 @@ export function CampaignWorkspace() {
   const loadRevenue = useCallback(async () => {
     if (!campaignId) return;
     try {
-      const response = await fetch(`${API_URL}/v1/paypal/revenue/${campaignId}`);
+      const response = await apiFetch(`/v1/paypal/revenue/${campaignId}`);
       if (!response.ok) throw new Error("Results are unavailable");
       setRevenue((await response.json()) as RevenueSummary);
       setRevenueError(false);
@@ -330,7 +346,7 @@ export function CampaignWorkspace() {
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
-      const response = await fetch(`${API_URL}/v1/agents/next-action`, {
+      const response = await apiFetch("/v1/agents/next-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaign_id: campaign.id }),
@@ -354,7 +370,7 @@ export function CampaignWorkspace() {
     if (loadState === "error") {
       return (
         <EmptyState
-          title="Northstar cannot reach its API"
+          title="GrowthReceipt cannot reach its API"
           copy="Start the API with make dev-api, then try again."
           action="Try again"
           onAction={() => void loadCampaign()}
@@ -469,7 +485,7 @@ export function CampaignWorkspace() {
 
   const productName = campaign?.product_name ?? "New product";
   return (
-    <div className="northstar-app">
+    <div className="growthreceipt-app">
       <Sidebar
         currentView={view}
         isOpen={mobileNavigationOpen}
@@ -477,6 +493,9 @@ export function CampaignWorkspace() {
         navigate={navigate}
         onClose={() => setMobileNavigationOpen(false)}
         notify={notify}
+        identity={identity}
+        onSignOut={onSignOut}
+        onResetDemo={onResetDemo}
       />
       <div className="app-stage">
         <Topbar
@@ -487,7 +506,9 @@ export function CampaignWorkspace() {
           onMenu={() => setMobileNavigationOpen(true)}
           onSearch={() => setSearchOpen((open) => !open)}
           onTheme={toggleTheme}
+          onHelp={() => setHelpOpen(true)}
           notify={notify}
+          identity={identity}
         />
         <main className="page-shell" key={loadState === "ready" ? view : loadState}>
           {renderPage()}
@@ -509,6 +530,18 @@ export function CampaignWorkspace() {
           }}
         />
       ) : null}
+      {helpOpen ? (
+        <HelpPanel
+          campaign={campaign}
+          revenue={revenue}
+          recommendation={recommendation}
+          navigate={(nextView) => {
+            setHelpOpen(false);
+            navigate(nextView);
+          }}
+          onClose={() => setHelpOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -520,6 +553,9 @@ function Sidebar({
   navigate,
   onClose,
   notify,
+  identity,
+  onSignOut,
+  onResetDemo,
 }: {
   currentView: View;
   isOpen: boolean;
@@ -527,7 +563,17 @@ function Sidebar({
   navigate: (view: View) => void;
   onClose: () => void;
   notify: (message: string) => void;
+  identity: WorkspaceIdentity;
+  onSignOut?: () => Promise<void>;
+  onResetDemo?: () => Promise<void>;
 }) {
+  const initial = identity.displayName.trim().charAt(0).toUpperCase() || "G";
+  const environmentLabel =
+    identity.mode === "judge"
+      ? "Private judge demo"
+      : identity.mode === "user"
+        ? "Personal workspace"
+        : "Demo workspace · Local";
   return (
     <>
       <button
@@ -540,9 +586,9 @@ function Sidebar({
         <div className="sidebar-brand">
           <button className="wordmark" type="button" onClick={() => navigate("today")}>
             <span className="wordmark-symbol">
-              <Send aria-hidden="true" />
+              <ReceiptText aria-hidden="true" />
             </span>
-            <span>northstar</span>
+            <span>GrowthReceipt</span>
           </button>
           <button
             className="mobile-close"
@@ -576,16 +622,35 @@ function Sidebar({
         />
         <div className="sidebar-footer">
           <div className="environment-state">
-            <span /> Demo workspace · Local
+            <span /> {environmentLabel}
           </div>
           <button
             type="button"
             onClick={() => notify("Workspace settings are available from Settings.")}
           >
-            <span className="avatar">S</span>
-            <strong>Workspace owner</strong>
+            <span className="avatar">{initial}</span>
+            <strong>{identity.displayName}</strong>
             <ChevronDown aria-hidden="true" />
           </button>
+          {onResetDemo || onSignOut ? (
+            <div className="sidebar-session-actions">
+              {onResetDemo ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void onResetDemo().catch(() => notify("The judge demo could not be reset."))
+                  }
+                >
+                  Reset demo
+                </button>
+              ) : null}
+              {onSignOut ? (
+                <button type="button" onClick={() => void onSignOut()}>
+                  Sign out
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </aside>
     </>
@@ -632,7 +697,9 @@ function Topbar({
   onMenu,
   onSearch,
   onTheme,
+  onHelp,
   notify,
+  identity,
 }: {
   currentView: View;
   productName: string;
@@ -641,8 +708,11 @@ function Topbar({
   onMenu: () => void;
   onSearch: () => void;
   onTheme: () => void;
+  onHelp: () => void;
   notify: (message: string) => void;
+  identity: WorkspaceIdentity;
 }) {
+  const initial = identity.displayName.trim().charAt(0).toUpperCase() || "G";
   return (
     <header className="topbar">
       <button className="mobile-menu" type="button" onClick={onMenu} aria-label="Open navigation">
@@ -671,23 +741,132 @@ function Topbar({
         <button type="button" onClick={onSearch} aria-label="Search">
           <Search aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          onClick={() => notify("Help center is not connected in this prototype.")}
-          aria-label="Help"
-        >
+        <button type="button" onClick={onHelp} aria-label="Help">
           <CircleHelp aria-hidden="true" />
         </button>
         <button
           className="topbar-avatar"
           type="button"
-          onClick={() => notify("Signed in as workspace owner.")}
-          aria-label="Workspace owner"
+          onClick={() => notify(`Signed in to ${identity.displayName}.`)}
+          aria-label={identity.displayName}
         >
-          S
+          {initial}
         </button>
       </div>
     </header>
+  );
+}
+
+function HelpPanel({
+  campaign,
+  revenue,
+  recommendation,
+  navigate,
+  onClose,
+}: {
+  campaign: Campaign | null;
+  revenue: RevenueSummary | null;
+  recommendation: Recommendation | null;
+  navigate: (view: View) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const approved = campaign?.status === "approved";
+  const hasRevenue = Boolean(revenue?.completed_orders);
+  const steps: Array<{
+    title: string;
+    copy: string;
+    action: string;
+    view: View;
+    complete: boolean;
+  }> = [
+    {
+      title: "Describe your product",
+      copy: "Set the audience, revenue goal, channels, and voice.",
+      action: campaign ? "Review product" : "Add product",
+      view: campaign ? "products" : "new-campaign",
+      complete: Boolean(campaign),
+    },
+    {
+      title: "Review the campaign",
+      copy: "Edit the drafted posts and approve the work you want to use.",
+      action: "Open content",
+      view: "content",
+      complete: approved,
+    },
+    {
+      title: "Test the purchase",
+      copy: "Complete a PayPal Sandbox checkout. No real money moves.",
+      action: "Open checkout",
+      view: "checkout",
+      complete: hasRevenue,
+    },
+    {
+      title: "Read verified results",
+      copy: "See which campaign and post produced the captured order.",
+      action: "View results",
+      view: "results",
+      complete: hasRevenue,
+    },
+    {
+      title: "Choose the next test",
+      copy: "Turn verified revenue into one controlled recommendation.",
+      action: "Open experiment",
+      view: "experiment",
+      complete: Boolean(recommendation),
+    },
+  ];
+
+  return (
+    <div className="help-backdrop">
+      <button className="help-scrim" type="button" onClick={onClose} aria-label="Close help" />
+      <aside className="help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <header className="help-header">
+          <div>
+            <span className="eyebrow">Help</span>
+            <h2 id="help-title">Learn the workflow</h2>
+            <p>Five steps from a product brief to a revenue backed next move.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close help">
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <ol className="help-steps">
+          {steps.map((step, index) => (
+            <li className={step.complete ? "complete" : ""} key={step.title}>
+              <span className="help-step-mark" aria-hidden="true">
+                {step.complete ? <Check /> : index + 1}
+              </span>
+              <div>
+                <strong>{step.title}</strong>
+                <p>{step.copy}</p>
+                <button type="button" onClick={() => navigate(step.view)}>
+                  {step.action}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <footer className="help-footer">
+          <strong>Check your connections</strong>
+          <p>Review PayPal, publishing, and measurement services in one place.</p>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => navigate("integrations")}
+          >
+            Open integrations
+          </button>
+        </footer>
+      </aside>
+    </div>
   );
 }
 
@@ -929,7 +1108,7 @@ function TodayPage({
           <QuietState
             icon={<FlaskConical aria-hidden="true" />}
             title="No recommendation yet"
-            copy="Northstar picks a test once it has verified results."
+            copy="GrowthReceipt picks a test once it has verified results."
             action="See what is needed"
             onAction={() => navigate("experiment")}
           />
@@ -1113,7 +1292,7 @@ function ProductsPage({
     <>
       <PageHeader
         title="Products"
-        description="The source material Northstar uses to understand what you sell."
+        description="The source material GrowthReceipt uses to understand what you sell."
         action={
           <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
             <Plus aria-hidden="true" /> Add product
@@ -1214,7 +1393,7 @@ function NewCampaignPage({
     <>
       <PageHeader
         title="New campaign"
-        description="Describe the product and the result you want. Northstar drafts a campaign for you to review. Nothing is published without your approval."
+        description="Describe the product and the result you want. GrowthReceipt drafts a campaign for you to review. Nothing is published without your approval."
         action={
           <button
             className="button secondary"
@@ -1807,7 +1986,7 @@ function ResultsPage({
           <h2>{hasRevenue ? "Verified purchase activity" : "No purchase activity yet"}</h2>
           <p>
             {hasRevenue
-              ? `Northstar received ${revenue?.completed_orders} completed sandbox order${revenue?.completed_orders === 1 ? "" : "s"}.`
+              ? `GrowthReceipt received ${revenue?.completed_orders} completed sandbox order${revenue?.completed_orders === 1 ? "" : "s"}.`
               : "Complete a sandbox checkout to verify attribution from campaign to revenue."}
           </p>
           <button className="button dark" type="button" onClick={openCheckout}>
@@ -1832,7 +2011,7 @@ function ResultsPage({
             <>
               <h2>Choose the next test from real results.</h2>
               <p>
-                Northstar needs at least one verified purchase before it recommends a message,
+                GrowthReceipt needs at least one verified purchase before it recommends a message,
                 channel, or audience test.
               </p>
               <button
@@ -1903,7 +2082,7 @@ function ExperimentPage({
             </h2>
             <p>
               {ready
-                ? "Northstar can now inspect the campaign result and propose one controlled next step."
+                ? "GrowthReceipt can now inspect the campaign result and propose one controlled next step."
                 : "This keeps the recommendation grounded in a real outcome instead of invented performance data."}
             </p>
             <div className="form-actions">
@@ -1941,7 +2120,7 @@ function IntegrationsPage({
       <PageHeader
         eyebrow="System"
         title="Integrations"
-        description="Connect the sources Northstar needs to publish work and verify what happened."
+        description="Connect the sources GrowthReceipt needs to publish work and verify what happened."
       />
       <section className="integration-list">
         <Integration
@@ -1966,7 +2145,19 @@ function IntegrationsPage({
           icon={<FaLinkedinIn aria-hidden="true" />}
           status="Not connected"
           action="Connect"
-          onAction={() => notify("LinkedIn publishing is not connected yet.")}
+          onAction={() =>
+            notify("LinkedIn connection will open here after OAuth credentials are configured.")
+          }
+        />
+        <Integration
+          provider="Facebook"
+          description="Publish approved posts to Pages and collect delivery results."
+          icon={<FaFacebookF aria-hidden="true" />}
+          status="Not connected"
+          action="Connect"
+          onAction={() =>
+            notify("Facebook connection will open here after Meta credentials are configured.")
+          }
         />
         <Integration
           provider="X"
@@ -2007,7 +2198,7 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
         <fieldset>
           <legend>Workspace</legend>
           <label htmlFor="workspace-name">Workspace name</label>
-          <input id="workspace-name" defaultValue="Northstar demo" />
+          <input id="workspace-name" defaultValue="GrowthReceipt demo" />
           <label htmlFor="timezone">Timezone</label>
           <select id="timezone" defaultValue="Europe/Stockholm">
             <option value="Europe/Stockholm">Europe / Stockholm</option>
@@ -2020,7 +2211,9 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
             <input type="checkbox" defaultChecked />
             <span>
               <strong>Require approval before publishing</strong>
-              <small>Northstar will never publish campaign content without a human decision.</small>
+              <small>
+                GrowthReceipt will never publish campaign content without a human decision.
+              </small>
             </span>
           </label>
           <label className="check-row">
@@ -2059,16 +2252,16 @@ function CheckoutPage({
         <div>
           <span className="eyebrow">Scribe Pro</span>
           <h2>Clearer writing, wherever you type.</h2>
-          <p>One month of professional rewrites inside the Scribe keyboard.</p>
+          <p>200 writing actions every day inside the Scribe keyboard.</p>
           <ul>
             <li>
-              <Check aria-hidden="true" /> Professional rewrites
+              <Check aria-hidden="true" /> 200 actions every day
             </li>
             <li>
               <Check aria-hidden="true" /> Works inside your keyboard
             </li>
             <li>
-              <Check aria-hidden="true" /> One month of access
+              <Check aria-hidden="true" /> Monthly Pro plan
             </li>
           </ul>
         </div>

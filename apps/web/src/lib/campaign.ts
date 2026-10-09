@@ -1,5 +1,18 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
+let accessToken: string | null = null;
+
+export function setApiAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  return fetch(`${API_URL}${path}`, { ...init, headers });
+}
+
 export type Channel = "LinkedIn" | "X" | "Instagram";
 export const channels: Channel[] = ["LinkedIn", "X", "Instagram"];
 
@@ -89,14 +102,11 @@ export class ApiError extends Error {}
 async function errorFrom(response: Response): Promise<ApiError> {
   const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
   const detail = typeof body?.detail === "string" ? body.detail : null;
-  return new ApiError(detail ?? `Northstar API returned ${response.status}`);
+  return new ApiError(detail ?? `GrowthReceipt API returned ${response.status}`);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
+  const response = await apiFetch(path, init);
   if (!response.ok) throw await errorFrom(response);
   return response.json() as Promise<T>;
 }
@@ -106,7 +116,7 @@ async function streamCreate(
   brief: CampaignBrief,
   onProgress: (progress: DraftProgress) => void,
 ): Promise<Campaign> {
-  const response = await fetch(`${API_URL}/v1/campaigns/stream`, {
+  const response = await apiFetch("/v1/campaigns/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(brief),

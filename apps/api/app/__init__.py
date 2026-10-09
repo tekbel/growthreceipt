@@ -1,1 +1,1 @@
-"""Northstar API package."""
+"""GrowthReceipt API package."""

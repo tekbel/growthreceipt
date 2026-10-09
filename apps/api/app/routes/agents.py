@@ -12,9 +12,9 @@ from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.generation import draft_campaign
 from app.campaigns.models import CampaignBrief, CampaignDraft
 from app.campaigns.store import CampaignStore
-from app.config import get_settings
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
+from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
 
@@ -53,7 +53,7 @@ class NextActionResponse(BaseModel):
     next_action: NextAction
 
 
-REVENUE_LEARNING_INSTRUCTIONS = """You are Northstar's revenue learning agent.
+REVENUE_LEARNING_INSTRUCTIONS = """You are GrowthReceipt's revenue learning agent.
 Use only the normalized campaign and PayPal revenue evidence supplied by the application.
 Do not invent conversion rates, traffic, customer attributes, causality, or statistical confidence.
 State the small sample size plainly. Recommend exactly one bounded marketing experiment.
@@ -69,6 +69,7 @@ If there are no completed orders, recommend the smallest action needed to collec
 async def create_campaign_draft(
     request: CampaignBrief,
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
+    _workspace_id: WorkspaceId,
 ) -> CampaignDraftResponse:
     run = await draft_campaign(gateway, request)
     assert run.session_id is not None and run.turn_id is not None
@@ -85,9 +86,10 @@ async def create_next_action(
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
 ) -> NextActionResponse:
     campaign = await campaigns.get(
-        workspace_id=get_settings().demo_workspace_id,
+        workspace_id=workspace_id,
         campaign_id=request.campaign_id,
     )
     if campaign is None:

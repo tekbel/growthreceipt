@@ -4,7 +4,7 @@ from openai import APIError
 from app.agents.gateway import AgentGateway, AgentProgress, AgentRun, ProgressCallback
 from app.campaigns.models import CampaignBrief, CampaignDraft
 
-CAMPAIGN_INSTRUCTIONS = """You are Northstar's campaign strategist.
+CAMPAIGN_INSTRUCTIONS = """You are GrowthReceipt's campaign strategist.
 Create a cohesive campaign that is specific to the product and audience.
 Use plain language, preserve the requested brand voice, and avoid invented facts or metrics.
 Return exactly the requested number of posts. Distribute them across only the requested channels.

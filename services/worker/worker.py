@@ -3,7 +3,7 @@ import logging
 import signal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("northstar.worker")
+logger = logging.getLogger("growthreceipt.worker")
 
 
 async def run() -> None:
@@ -18,4 +18,3 @@ async def run() -> None:
 
 if __name__ == "__main__":
     asyncio.run(run())
-

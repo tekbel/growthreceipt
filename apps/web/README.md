@@ -1,6 +1,6 @@
-# Northstar marketing workspace
+# GrowthReceipt marketing workspace
 
-The Next.js frontend for Northstar. It includes the daily workspace, products, campaigns, content review, calendar, verified results, experiments, integrations, settings, and the PayPal Sandbox checkout preview.
+The Next.js frontend for GrowthReceipt. It includes the daily workspace, products, campaigns, content review, calendar, verified results, experiments, integrations, settings, and the PayPal Sandbox checkout preview.
 
 Run it from the repository root:
 

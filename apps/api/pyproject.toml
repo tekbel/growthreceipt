@@ -1,7 +1,7 @@
 [project]
-name = "northstar-api"
+name = "growthreceipt-api"
 version = "0.1.0"
-description = "API and agent orchestration for Northstar"
+description = "API and agent orchestration for GrowthReceipt"
 requires-python = ">=3.12"
 dependencies = [
   "asyncpg>=0.30,<1",

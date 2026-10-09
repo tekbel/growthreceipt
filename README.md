@@ -10,7 +10,7 @@ The product turns a product brief into a campaign, creates platform-specific con
 
 The repository contains the first application foundation: a responsive campaign-review workspace, a FastAPI service with liveness and readiness probes, a live hosted OpenAI agent adapter, a worker shell, shared contracts, and the first Supabase migration.
 
-The active competition build is **Northstar: the agentic revenue loop for indie software sellers**. It is being prepared for the 2026 PayPal AI Hackathon. See [the hackathon strategy](./docs/hackathon/paypal-ai-2026.md).
+The active competition build is **GrowthReceipt: marketing backed by payments**. It is being prepared for the 2026 PayPal AI Hackathon. See [the hackathon strategy](./docs/hackathon/paypal-ai-2026.md).
 
 ## Current implementation
 
@@ -67,7 +67,7 @@ Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tes
 
 ### PayPal sandbox checkout
 
-Open the campaign workspace and select **Preview checkout**. The buyer-facing modal loads PayPal's official JavaScript SDK, creates the order through the API, captures it after approval, and displays the capture receipt. Use a Personal account from PayPal's Sandbox Accounts page. No real money moves in sandbox mode.
+Open the campaign workspace and select **Preview checkout**. The buyer-facing modal loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the API, captures it after approval, and displays the capture receipt. Use a Personal account from PayPal's Sandbox Accounts page. No real money moves in sandbox mode.
 
 ## Documents
 
@@ -75,6 +75,8 @@ Open the campaign workspace and select **Preview checkout**. The buyer-facing mo
 - [ARCHITECTURE.md](./ARCHITECTURE.md) defines the recommended technical design and key decisions.
 - [PROMPTS.md](./PROMPTS.md) contains sequential implementation prompts for a coding agent. Run them in order.
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
+- [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
+- [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) records the deferred LinkedIn OAuth, publishing, security, and review plan.
 
 ## Recommended build order
 

@@ -1,8 +1,8 @@
-# Northstar design system
+# GrowthReceipt design system
 
 ## Direction
 
-Northstar uses a quiet editorial workspace system. It should feel precise, useful, and authored by a product team. The interface is compact enough for daily work without becoming a generic administration dashboard.
+GrowthReceipt uses a quiet editorial workspace system. It should feel precise, useful, and authored by a product team. The interface is compact enough for daily work without becoming a generic administration dashboard.
 
 The home view answers one question: what needs attention today? Campaign review, content, checkout, results, and the next decision appear in that order.
 
