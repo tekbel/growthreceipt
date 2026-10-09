@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
+from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.store import CampaignStore
 from app.config import get_settings
 from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import Offer, PayPalAPIError, PayPalGateway
@@ -80,10 +82,15 @@ async def create_order(
     request: CreateOrderRequest,
     gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
 ) -> OrderResponse:
     offer = OFFERS.get(request.offer_id)
     if offer is None:
         raise HTTPException(status_code=404, detail="Offer not found")
+    workspace_id = get_settings().demo_workspace_id
+    campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
+    if campaign is None or all(post.id != request.content_id for post in campaign.posts):
+        raise HTTPException(status_code=404, detail="Campaign content not found")
     attribution_id = f"{request.campaign_id}:{request.content_id}"
     request_id = uuid4()
     try:
@@ -95,7 +102,7 @@ async def create_order(
     except PayPalAPIError as error:
         raise HTTPException(status_code=502, detail="PayPal could not create the order") from error
     await store.record_order(
-        workspace_id=get_settings().demo_workspace_id,
+        workspace_id=workspace_id,
         offer=offer,
         campaign_id=request.campaign_id,
         content_id=request.content_id,

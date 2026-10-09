@@ -316,6 +316,29 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @keyframes checkout-fade { from { opacity: 0; } }
 @keyframes checkout-rise { from { opacity: 0; transform: translateY(12px); } }
 
+.page-status { color: var(--muted); font-size: 14px; }
+.brief-form textarea, .note-form textarea { width: min(560px, 100%); margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--ink); line-height: 1.5; resize: vertical; }
+.brief-form input:not([type="checkbox"]) { width: min(560px, 100%); }
+.field-label { font-size: 12px; font-weight: 620; }
+.channel-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.channel-option { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 4px; font-size: 13px !important; cursor: pointer; }
+.channel-option input { accent-color: var(--accent); }
+.form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.social-preview-body p.post-cta { margin-top: 0; font-weight: 620; }
+.note-form { display: grid; gap: 8px; margin: 14px 0; }
+.note-form label { font-size: 12px; font-weight: 620; }
+.note-form textarea { width: 100%; margin: 0; }
+.note-form .form-actions { margin-top: 0; }
+.activity-panel { margin-top: 42px; }
+.activity-panel ol { margin: 0; padding: 0; list-style: none; }
+.activity-panel li { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.activity-panel strong { font-weight: 560; }
+.activity-panel time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.activity-actor { justify-self: start; padding: 3px 8px; border-radius: 999px; background: var(--surface-subtle); color: var(--muted); font-size: 11px; font-weight: 650; text-transform: capitalize; }
+.activity-actor.agent { color: var(--accent-strong); }
+@media (max-width: 640px) {
+  .activity-panel li { grid-template-columns: 1fr; gap: 4px; }
+}
 @media (max-width: 1120px) {
   .review-workspace { grid-template-columns: minmax(250px, .8fr) minmax(390px, 1.2fr); }
   .review-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 20px 0 0; border-top: 1px solid var(--line); border-left: 0; }

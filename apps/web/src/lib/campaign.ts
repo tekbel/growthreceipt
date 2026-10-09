@@ -1,77 +1,129 @@
-export type Channel = "LinkedIn" | "X" | "Instagram";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
-export type ContentItem = {
-  id: number;
+export type Channel = "LinkedIn" | "X" | "Instagram";
+export const channels: Channel[] = ["LinkedIn", "X", "Instagram"];
+
+export type PostStatus = "needs_review" | "changes_requested" | "approved";
+export type CampaignStatus = "in_review" | "changes_requested" | "approved";
+
+export type Post = {
+  id: string;
   day: number;
-  date: string;
   channel: Channel;
   theme: string;
-  status: "Ready" | "Changes requested";
-  body: string;
+  content: string;
+  call_to_action: string;
+  status: PostStatus;
+  review_note: string | null;
 };
 
-export const contentItems: ContentItem[] = [
-  {
-    id: 1,
-    day: 1,
-    date: "Oct 12",
-    channel: "LinkedIn",
-    theme: "A clearer way to write at work",
-    status: "Ready",
-    body: "Clear writing is a professional advantage.\n\nScribe helps you rewrite messages without leaving the app you are using. Turn a rough thought into a clear update in seconds.\n\nWrite with confidence. Anywhere you work.\n\n#Productivity #BetterCommunication",
+export type Campaign = {
+  id: string;
+  name: string;
+  positioning: string;
+  product_name: string;
+  product_description: string;
+  audience: string;
+  objective: string;
+  channels: Channel[];
+  brand_voice: string;
+  starts_on: string;
+  created_at: string;
+  status: CampaignStatus;
+  posts: Post[];
+};
+
+export type CampaignBrief = {
+  product_name: string;
+  product_description: string;
+  audience: string;
+  objective: string;
+  channels: Channel[];
+  days: number;
+  brand_voice: string;
+};
+
+export type CampaignEvent = {
+  id: number;
+  post_id: string | null;
+  actor: "agent" | "human" | "system";
+  action: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+export type PostUpdate = {
+  content?: string;
+  status?: "approved" | "changes_requested";
+  review_note?: string;
+};
+
+export const exampleBrief: CampaignBrief = {
+  product_name: "Scribe",
+  product_description:
+    "A writing keyboard that helps professionals turn rough thoughts into clear messages wherever they type.",
+  audience: "Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.",
+  objective: "Turn readers into paying Scribe Pro subscribers",
+  channels: ["LinkedIn", "X", "Instagram"],
+  days: 7,
+  brand_voice: "Clear, confident, useful",
+};
+
+export class ApiError extends Error {}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
+    const detail = typeof body?.detail === "string" ? body.detail : null;
+    throw new ApiError(detail ?? `Northstar API returned ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export const campaignApi = {
+  async latest(): Promise<Campaign | null> {
+    try {
+      return await request<Campaign>("/v1/campaigns/latest");
+    } catch (error) {
+      if (error instanceof ApiError && error.message === "Campaign not found") return null;
+      throw error;
+    }
   },
-  {
-    id: 2,
-    day: 2,
-    date: "Oct 13",
-    channel: "LinkedIn",
-    theme: "Turn ideas into clear messages",
-    status: "Ready",
-    body: "Good ideas deserve clear words.\n\nScribe helps you turn thoughts into polished, professional messages faster and with less friction. Whether it is a quick reply or a complex update, you can sound like you, only clearer.\n\nWrite with confidence. Anywhere you work.\n\n#Productivity #BetterCommunication",
-  },
-  {
-    id: 3,
-    day: 3,
-    date: "Oct 14",
-    channel: "X",
-    theme: "Write with confidence, anywhere",
-    status: "Ready",
-    body: "Your next work message can be clearer before you press send. Scribe rewrites it where you already type.",
-  },
-  {
-    id: 4,
-    day: 4,
-    date: "Oct 15",
-    channel: "LinkedIn",
-    theme: "Real time, real impact",
-    status: "Ready",
-    body: "Clear writing matters most when the message matters. Scribe works inside your keyboard, so clarity is always one tap away.",
-  },
-  {
-    id: 5,
-    day: 5,
-    date: "Oct 16",
-    channel: "Instagram",
-    theme: "From messy to meaningful",
-    status: "Ready",
-    body: "Messy first draft? Keep it. Scribe can help you turn it into a message you are ready to send.",
-  },
-  {
-    id: 6,
-    day: 6,
-    date: "Oct 17",
-    channel: "X",
-    theme: "Your thoughts, better wording",
-    status: "Ready",
-    body: "Keep your meaning. Improve the wording. Scribe helps your messages sound clear without losing your voice.",
-  },
-  {
-    id: 7,
-    day: 7,
-    date: "Oct 18",
-    channel: "LinkedIn",
-    theme: "Small changes, bigger progress",
-    status: "Ready",
-    body: "One clearer message will not change your career. A habit of clear communication might. Start with the next thing you send.",
-  },
-];
+  create: (brief: CampaignBrief) =>
+    request<Campaign>("/v1/campaigns", { method: "POST", body: JSON.stringify(brief) }),
+  updatePost: (campaignId: string, postId: string, update: PostUpdate) =>
+    request<Campaign>(`/v1/campaigns/${campaignId}/posts/${postId}`, {
+      method: "PATCH",
+      body: JSON.stringify(update),
+    }),
+  approve: (campaignId: string) =>
+    request<Campaign>(`/v1/campaigns/${campaignId}/approve`, { method: "POST" }),
+  events: (campaignId: string) => request<CampaignEvent[]>(`/v1/campaigns/${campaignId}/events`),
+};
+
+export function postDate(campaign: Campaign, post: Post): string {
+  const date = new Date(`${campaign.starts_on}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + post.day - 1);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+export function scheduleRange(campaign: Campaign): string {
+  const days = Math.max(...campaign.posts.map((post) => post.day), 1);
+  const format = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+  const start = new Date(`${campaign.starts_on}T12:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + days - 1);
+  return `${format.format(start)} to ${format.format(end)}`;
+}

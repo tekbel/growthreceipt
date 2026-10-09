@@ -180,8 +180,8 @@ class PostgresPaymentStore:
         return result.rowcount == 1
 
     async def revenue_summary(self, *, campaign_id: UUID) -> RevenueSummary:
-        row = (
-            await self._session.execute(
+        async with self._session.begin():
+            result = await self._session.execute(
                 text(
                     """
                     select count(*)::int as completed_orders,
@@ -195,7 +195,7 @@ class PostgresPaymentStore:
                 ),
                 {"campaign_id": campaign_id},
             )
-        ).one()
+            row = result.one()
         return RevenueSummary(
             completed_orders=row.completed_orders,
             gross_revenue=Decimal(row.gross_revenue),

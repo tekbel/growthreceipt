@@ -4,9 +4,7 @@ import { Check, LockKeyhole, X } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
-const CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111";
-const CONTENT_ID = "22222222-2222-4222-8222-222222222222";
+import { API_URL } from "@/lib/campaign";
 
 type PayPalConfig = {
   client_id: string;
@@ -36,9 +34,13 @@ declare global {
 }
 
 export function PayPalCheckout({
+  campaignId,
+  contentId,
   onClose,
   onCaptured,
 }: {
+  campaignId: string;
+  contentId: string;
   onClose: () => void;
   onCaptured: () => void;
 }) {
@@ -106,8 +108,8 @@ export function PayPalCheckout({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             offer_id: "scribe-pro",
-            campaign_id: CAMPAIGN_ID,
-            content_id: CONTENT_ID,
+            campaign_id: campaignId,
+            content_id: contentId,
           }),
         });
         if (!response.ok) throw new Error("PayPal could not create the order.");
@@ -152,7 +154,7 @@ export function PayPalCheckout({
     return () => {
       void buttons.close();
     };
-  }, [onCaptured, receipt, sdkReady]);
+  }, [campaignId, contentId, onCaptured, receipt, sdkReady]);
 
   return (
     <div className="checkout-backdrop">

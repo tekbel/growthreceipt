@@ -4,38 +4,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from openai import APIError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import AgentGateway
+from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.generation import draft_campaign
+from app.campaigns.models import CampaignBrief, CampaignDraft
+from app.campaigns.store import CampaignStore
+from app.config import get_settings
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
-
-
-class CampaignDraftRequest(BaseModel):
-    product_name: str = Field(min_length=2, max_length=120)
-    product_description: str = Field(min_length=10, max_length=2_000)
-    audience: str = Field(min_length=3, max_length=500)
-    objective: str = Field(min_length=3, max_length=240)
-    channels: list[Literal["LinkedIn", "X", "Instagram"]] = Field(min_length=1)
-    days: int = Field(default=7, ge=1, le=14)
-    brand_voice: str = Field(default="Clear, confident, useful", max_length=500)
-
-
-class CampaignPost(BaseModel):
-    day: int
-    channel: Literal["LinkedIn", "X", "Instagram"]
-    theme: str
-    content: str
-    call_to_action: str
-
-
-class CampaignDraft(BaseModel):
-    campaign_name: str
-    positioning: str
-    posts: list[CampaignPost]
 
 
 class CampaignDraftResponse(BaseModel):
@@ -46,10 +27,6 @@ class CampaignDraftResponse(BaseModel):
 
 class NextActionRequest(BaseModel):
     campaign_id: UUID
-    product_name: str = Field(min_length=2, max_length=120)
-    campaign_name: str = Field(min_length=2, max_length=160)
-    objective: str = Field(min_length=3, max_length=240)
-    audience: str = Field(min_length=3, max_length=500)
 
 
 class NextAction(BaseModel):
@@ -76,13 +53,6 @@ class NextActionResponse(BaseModel):
     next_action: NextAction
 
 
-CAMPAIGN_INSTRUCTIONS = """You are Northstar's campaign strategist.
-Create a cohesive campaign that is specific to the product and audience.
-Use plain language, preserve the requested brand voice, and avoid invented facts or metrics.
-Return exactly the requested number of posts. Distribute them across only the requested channels.
-Each post must be ready for human review and must include one clear call to action.
-"""
-
 REVENUE_LEARNING_INSTRUCTIONS = """You are Northstar's revenue learning agent.
 Use only the normalized campaign and PayPal revenue evidence supplied by the application.
 Do not invent conversion rates, traffic, customer attributes, causality, or statistical confidence.
@@ -97,35 +67,11 @@ If there are no completed orders, recommend the smallest action needed to collec
 
 @router.post("/campaign-draft", response_model=CampaignDraftResponse)
 async def create_campaign_draft(
-    request: CampaignDraftRequest,
+    request: CampaignBrief,
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
 ) -> CampaignDraftResponse:
-    prompt = (
-        f"Product: {request.product_name}\n"
-        f"Description: {request.product_description}\n"
-        f"Audience: {request.audience}\n"
-        f"Objective: {request.objective}\n"
-        f"Channels: {', '.join(request.channels)}\n"
-        f"Number of posts: {request.days}\n"
-        f"Brand voice: {request.brand_voice}"
-    )
-    try:
-        run = await gateway.run_structured(
-            workflow="campaign-draft",
-            instructions=CAMPAIGN_INSTRUCTIONS,
-            input_text=prompt,
-            output_type=CampaignDraft,
-        )
-    except (APIError, RuntimeError) as error:
-        raise HTTPException(
-            status_code=502,
-            detail="Campaign agent is temporarily unavailable",
-        ) from error
-
-    if run.session_id is None or run.turn_id is None:
-        raise HTTPException(status_code=502, detail="Campaign agent did not return run identifiers")
-    if len(run.output.posts) != request.days:
-        raise HTTPException(status_code=502, detail="Campaign agent returned an incomplete draft")
+    run = await draft_campaign(gateway, request)
+    assert run.session_id is not None and run.turn_id is not None
     return CampaignDraftResponse(
         session_id=run.session_id,
         turn_id=run.turn_id,
@@ -138,8 +84,15 @@ async def create_next_action(
     request: NextActionRequest,
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
 ) -> NextActionResponse:
-    summary = await store.revenue_summary(campaign_id=request.campaign_id)
+    campaign = await campaigns.get(
+        workspace_id=get_settings().demo_workspace_id,
+        campaign_id=request.campaign_id,
+    )
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    summary = await store.revenue_summary(campaign_id=campaign.id)
     evidence = RevenueEvidence(
         completed_orders=summary.completed_orders,
         gross_revenue=f"{summary.gross_revenue:.2f}",
@@ -149,11 +102,15 @@ async def create_next_action(
     prompt = json.dumps(
         {
             "campaign": {
-                "id": str(request.campaign_id),
-                "product_name": request.product_name,
-                "campaign_name": request.campaign_name,
-                "objective": request.objective,
-                "audience": request.audience,
+                "id": str(campaign.id),
+                "product_name": campaign.product_name,
+                "campaign_name": campaign.name,
+                "positioning": campaign.positioning,
+                "objective": campaign.objective,
+                "audience": campaign.audience,
+                "channels": campaign.channels,
+                "approved_posts": sum(post.status == "approved" for post in campaign.posts),
+                "total_posts": len(campaign.posts),
             },
             "verified_revenue_evidence": evidence.model_dump(),
         },
@@ -182,6 +139,17 @@ async def create_next_action(
             status_code=502,
             detail="Revenue learning agent crossed a safety boundary",
         )
+    await campaigns.record_event(
+        campaign_id=campaign.id,
+        actor="agent",
+        action="next_action_recommended",
+        detail={
+            "session_id": run.session_id,
+            "turn_id": run.turn_id,
+            "evidence": evidence.model_dump(),
+            "next_action": run.output.model_dump(),
+        },
+    )
     return NextActionResponse(
         session_id=run.session_id,
         turn_id=run.turn_id,

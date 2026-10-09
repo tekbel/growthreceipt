@@ -1,14 +1,17 @@
 from collections.abc import Generator
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import FakeAgentGateway
+from app.campaigns.models import CampaignDraft, CampaignPost
+from app.campaigns.store import FakeCampaignStore
 from app.main import app
 from app.paypal.store import FakePaymentStore
 from app.paypal.store_dependencies import get_payment_store
-from app.routes.agents import CampaignDraft, CampaignPost, NextAction
+from app.routes.agents import NextAction
 
 
 @pytest.fixture
@@ -92,17 +95,12 @@ async def test_campaign_draft_rejects_unsupported_channel(transport: ASGITranspo
 @pytest.mark.asyncio
 async def test_next_action_returns_verified_evidence_and_approval_boundary(
     transport: ASGITransport,
+    campaign_store: FakeCampaignStore,
 ) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/v1/agents/next-action",
-            json={
-                "campaign_id": "11111111-1111-4111-8111-111111111111",
-                "product_name": "Scribe AI Keyboard",
-                "campaign_name": "Professional communication week",
-                "objective": "Increase qualified app installs",
-                "audience": "Knowledge workers aged 25 to 40",
-            },
+            json={"campaign_id": "11111111-1111-4111-8111-111111111111"},
         )
 
     assert response.status_code == 200
@@ -110,3 +108,19 @@ async def test_next_action_returns_verified_evidence_and_approval_boundary(
     assert body["evidence"]["gross_revenue"] == "0.00"
     assert body["next_action"]["confidence"] == "low"
     assert body["next_action"]["human_approval_required"] is True
+    events = await campaign_store.events(
+        workspace_id=uuid4(), campaign_id=UUID("11111111-1111-4111-8111-111111111111")
+    )
+    assert events[0].action == "next_action_recommended"
+    assert events[0].actor == "agent"
+
+
+@pytest.mark.asyncio
+async def test_next_action_rejects_unknown_campaign(transport: ASGITransport) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/v1/agents/next-action",
+            json={"campaign_id": "99999999-9999-4999-8999-999999999999"},
+        )
+
+    assert response.status_code == 404

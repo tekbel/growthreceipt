@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-migrate dev-web dev-api dev-worker dev-paypal-relay dev-paypal-tunnel lint typecheck test check
+.PHONY: setup db-up db-migrate demo-seed demo-reset dev-web dev-api dev-worker dev-paypal-relay dev-paypal-tunnel lint typecheck test check
 
 setup:
 	npm install
@@ -10,6 +10,12 @@ db-up:
 
 db-migrate:
 	PYTHONPATH=apps/api .venv/bin/python scripts/migrate_local_db.py
+
+demo-seed: db-migrate
+	PYTHONPATH=apps/api .venv/bin/python scripts/seed_demo.py
+
+demo-reset: db-migrate
+	PYTHONPATH=apps/api .venv/bin/python scripts/seed_demo.py --reset
 
 dev-web:
 	npm run dev:web

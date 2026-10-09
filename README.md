@@ -29,10 +29,12 @@ docs/design           Accepted visual concept
 cp .env.example .env
 make setup
 make db-up
-make db-migrate
+make demo-seed
 make dev-api
 make dev-web
 ```
+
+`make demo-seed` applies migrations and loads the judge demo campaign. `make demo-reset` deletes the demo workspace campaigns and PayPal orders, then reseeds. Both refuse to run when `APP_ENV=production`.
 
 Use separate terminals for the API and web commands. The API runs on port 8000 and the web app on port 3000 by default.
 
@@ -47,13 +49,18 @@ The tunnel always uses `https://justify-usual-twirl.ngrok-free.dev/v1/paypal/web
 
 ### Implemented API slices
 
-- `POST /v1/agents/campaign-draft` creates a typed campaign through an OpenAI-hosted agent session.
-- `POST /v1/paypal/orders` creates an attributed PayPal order from a server-owned offer.
+- `POST /v1/campaigns` turns a product brief into a typed campaign through an OpenAI-hosted agent session and persists it for review.
+- `GET /v1/campaigns/latest` and `GET /v1/campaigns/{campaign_id}` load a campaign with its posts.
+- `PATCH /v1/campaigns/{campaign_id}/posts/{post_id}` edits a post, approves it, or requests changes with a note. Edited text always needs a fresh approval.
+- `POST /v1/campaigns/{campaign_id}/approve` approves every post in the campaign.
+- `GET /v1/campaigns/{campaign_id}/events` returns the audit history of agent outputs and human decisions.
+- `POST /v1/agents/campaign-draft` returns a typed campaign draft without saving it.
+- `POST /v1/paypal/orders` creates an attributed PayPal order from a server-owned offer. The campaign and post must exist.
 - `POST /v1/paypal/orders/{order_id}/capture` captures an approved order and normalizes its result.
 - `POST /v1/paypal/webhooks` verifies the PayPal signature before accepting an event.
 - `GET /v1/paypal/config` exposes only the browser-safe sandbox client configuration.
 - `GET /v1/paypal/revenue/{campaign_id}` returns persisted, attributed revenue evidence.
-- `POST /v1/agents/next-action` turns normalized PayPal revenue into one approval-gated experiment.
+- `POST /v1/agents/next-action` loads the stored campaign, turns normalized PayPal revenue into one approval-gated experiment, and records it in the campaign history.
 
 Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tests use an explicit fake adapter. The application never treats placeholder credentials or fake responses as payments.
 

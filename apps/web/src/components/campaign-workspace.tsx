@@ -27,15 +27,27 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { PayPalCheckout } from "@/components/paypal-checkout";
-import { type Channel, type ContentItem, contentItems } from "@/lib/campaign";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
-const CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111";
+import {
+  API_URL,
+  type Campaign,
+  type CampaignBrief,
+  type CampaignEvent,
+  type Channel,
+  campaignApi,
+  channels,
+  exampleBrief,
+  type Post,
+  type PostStatus,
+  type PostUpdate,
+  postDate,
+  scheduleRange,
+} from "@/lib/campaign";
 
 type View =
   | "today"
   | "products"
   | "campaigns"
+  | "new-campaign"
   | "content"
   | "calendar"
   | "results"
@@ -45,6 +57,7 @@ type View =
   | "checkout";
 type Filter = "All" | "Needs review" | "Changes requested" | "Approved";
 type ReviewStatus = Exclude<Filter, "All">;
+type Stage = "Approval" | "Publishing" | "Measurement";
 
 type RevenueSummary = {
   completed_orders: number;
@@ -81,6 +94,7 @@ const viewLabels: Record<View, string> = {
   today: "Today",
   products: "Products",
   campaigns: "Campaigns",
+  "new-campaign": "New campaign",
   content: "Content",
   calendar: "Calendar",
   results: "Results",
@@ -89,22 +103,42 @@ const viewLabels: Record<View, string> = {
   settings: "Settings",
   checkout: "Checkout preview",
 };
-const reviewNotes: Partial<Record<number, string>> = {
-  2: "Make the opening more specific to the moment of interruption. Keep the final sentence.",
+const reviewLabels: Record<PostStatus, ReviewStatus> = {
+  needs_review: "Needs review",
+  changes_requested: "Changes requested",
+  approved: "Approved",
 };
+const campaignLabels: Record<Campaign["status"], string> = {
+  in_review: "In review",
+  changes_requested: "Changes requested",
+  approved: "Approved",
+};
+const eventLabels: Record<string, string> = {
+  campaign_generated: "Campaign drafted by the campaign agent",
+  campaign_seeded: "Demo campaign loaded",
+  post_edited: "Post edited",
+  post_approved: "Post approved",
+  changes_requested: "Changes requested",
+  campaign_approved: "Campaign approved",
+  next_action_recommended: "Next move recommended from PayPal revenue",
+};
+
+function statusFor(post: Post): ReviewStatus {
+  return reviewLabels[post.status];
+}
 
 export function CampaignWorkspace() {
   const [view, setView] = useState<View>("today");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState(1);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("All");
-  const [isEditing, setIsEditing] = useState(false);
-  const [drafts, setDrafts] = useState(contentItems);
-  const [approvedIds, setApprovedIds] = useState(() => new Set<number>([3]));
+  const [editingBody, setEditingBody] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [campaignStatus, setCampaignStatus] = useState("In review");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueError, setRevenueError] = useState(false);
@@ -112,44 +146,61 @@ export function CampaignWorkspace() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
-  const selected = useMemo(
-    () => drafts.find((item) => item.id === selectedId) ?? drafts[0],
-    [drafts, selectedId],
-  );
-  const statusFor = useCallback(
-    (item: ContentItem): ReviewStatus => {
-      if (approvedIds.has(item.id)) return "Approved";
-      if (item.status === "Changes requested") return "Changes requested";
-      return "Needs review";
-    },
-    [approvedIds],
-  );
-  const filteredDrafts = useMemo(
-    () => drafts.filter((item) => filter === "All" || statusFor(item) === filter),
-    [drafts, filter, statusFor],
+  const posts = useMemo(() => campaign?.posts ?? [], [campaign]);
+  const selected = posts.find((post) => post.id === selectedId) ?? posts[0] ?? null;
+  const checkoutPost = posts.find((post) => post.status === "approved") ?? posts[0] ?? null;
+  const filteredPosts = useMemo(
+    () => posts.filter((post) => filter === "All" || statusFor(post) === filter),
+    [posts, filter],
   );
   const counts = useMemo(
     () => ({
-      All: drafts.length,
-      "Needs review": drafts.filter((item) => statusFor(item) === "Needs review").length,
-      "Changes requested": drafts.filter((item) => statusFor(item) === "Changes requested").length,
-      Approved: drafts.filter((item) => statusFor(item) === "Approved").length,
+      All: posts.length,
+      "Needs review": posts.filter((post) => post.status === "needs_review").length,
+      "Changes requested": posts.filter((post) => post.status === "changes_requested").length,
+      Approved: posts.filter((post) => post.status === "approved").length,
     }),
-    [drafts, statusFor],
+    [posts],
   );
+  const stage: Stage =
+    campaign?.status !== "approved"
+      ? "Approval"
+      : revenue?.completed_orders
+        ? "Measurement"
+        : "Publishing";
 
-  const loadRevenue = useCallback(async () => {
+  const loadCampaign = useCallback(async () => {
+    setLoadState("loading");
     try {
-      const response = await fetch(`${API_URL}/v1/paypal/revenue/${CAMPAIGN_ID}`);
+      const latest = await campaignApi.latest();
+      setCampaign(latest);
+      setLoadState("ready");
+      if (!latest) setView("new-campaign");
+    } catch {
+      setLoadState("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCampaign();
+  }, [loadCampaign]);
+
+  const campaignId = campaign?.id;
+  const loadRevenue = useCallback(async () => {
+    if (!campaignId) return;
+    try {
+      const response = await fetch(`${API_URL}/v1/paypal/revenue/${campaignId}`);
       if (!response.ok) throw new Error("Results are unavailable");
       setRevenue((await response.json()) as RevenueSummary);
       setRevenueError(false);
     } catch {
       setRevenueError(true);
     }
-  }, []);
+  }, [campaignId]);
 
   useEffect(() => {
+    setRevenue(null);
+    setRecommendation(null);
     void loadRevenue();
   }, [loadRevenue]);
 
@@ -167,60 +218,69 @@ export function CampaignWorkspace() {
 
   function selectFilter(nextFilter: Filter) {
     setFilter(nextFilter);
-    const firstMatch = drafts.find(
-      (item) => nextFilter === "All" || statusFor(item) === nextFilter,
-    );
+    const firstMatch = posts.find((post) => nextFilter === "All" || statusFor(post) === nextFilter);
     if (firstMatch) setSelectedId(firstMatch.id);
-    setIsEditing(false);
+    setEditingBody(null);
   }
 
-  function saveBody(body: string) {
-    setDrafts((items) => items.map((item) => (item.id === selected.id ? { ...item, body } : item)));
+  async function mutate(action: () => Promise<Campaign>, message: string) {
+    setSaving(true);
+    try {
+      setCampaign(await action());
+      notify(message);
+      return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "That change could not be saved.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function approvePost() {
-    setApprovedIds((ids) => new Set(ids).add(selected.id));
-    setDrafts((items) =>
-      items.map((item) => (item.id === selected.id ? { ...item, status: "Ready" } : item)),
-    );
-    notify("Post approved.");
+  async function updateSelected(update: PostUpdate, message: string) {
+    if (!campaign || !selected) return false;
+    return mutate(() => campaignApi.updatePost(campaign.id, selected.id, update), message);
+  }
+
+  async function saveEdits() {
+    if (!selected || editingBody === null) return;
+    const content = editingBody.trim();
+    if (!content || content === selected.content) {
+      setEditingBody(null);
+      return;
+    }
+    if (await updateSelected({ content }, "Edits saved. The post needs a fresh approval.")) {
+      setEditingBody(null);
+    }
   }
 
   function approveCampaign() {
-    setApprovedIds(new Set(drafts.map((item) => item.id)));
-    setCampaignStatus("Approved");
-    notify("Campaign approved. Connect a channel when you are ready to publish.");
+    if (!campaign) return;
+    void mutate(
+      () => campaignApi.approve(campaign.id),
+      "Campaign approved. Connect a channel when you are ready to publish.",
+    );
   }
 
-  function requestChanges() {
-    setApprovedIds((ids) => {
-      const next = new Set(ids);
-      next.delete(selected.id);
-      return next;
-    });
-    setDrafts((items) =>
-      items.map((item) =>
-        item.id === selected.id ? { ...item, status: "Changes requested" } : item,
-      ),
-    );
-    setCampaignStatus("Changes requested");
-    notify(`Changes requested for day ${selected.day}.`);
+  async function createCampaign(brief: CampaignBrief) {
+    const created = await campaignApi.create(brief);
+    setCampaign(created);
+    setSelectedId(created.posts[0]?.id ?? null);
+    setFilter("All");
+    setEditingBody(null);
+    navigate("content");
+    notify(`${created.posts.length} posts drafted. Review them before anything is published.`);
   }
 
   async function findNextMove() {
+    if (!campaign) return;
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
       const response = await fetch(`${API_URL}/v1/agents/next-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaign_id: CAMPAIGN_ID,
-          product_name: "Scribe",
-          campaign_name: "Professional communication week",
-          objective: "Increase qualified app installs",
-          audience: "Knowledge workers aged 25 to 40",
-        }),
+        body: JSON.stringify({ campaign_id: campaign.id }),
       });
       if (!response.ok) throw new Error("A next move could not be prepared right now.");
       const result = (await response.json()) as { next_action: Recommendation };
@@ -234,11 +294,132 @@ export function CampaignWorkspace() {
     }
   }
 
+  function renderPage() {
+    if (loadState === "loading") {
+      return <p className="page-status">Loading your campaign…</p>;
+    }
+    if (loadState === "error") {
+      return (
+        <EmptyState
+          title="Northstar cannot reach its API"
+          copy="Start the API with make dev-api, then try again."
+          action="Try again"
+          onAction={() => void loadCampaign()}
+        />
+      );
+    }
+    if (view === "new-campaign" || !campaign || !selected) {
+      return (
+        <NewCampaignPage
+          canCancel={Boolean(campaign)}
+          createCampaign={createCampaign}
+          onCancel={() => navigate("campaigns")}
+        />
+      );
+    }
+    switch (view) {
+      case "today":
+        return (
+          <TodayPage
+            campaign={campaign}
+            revenue={revenue}
+            revenueError={revenueError}
+            stage={stage}
+            needsReview={counts["Needs review"] + counts["Changes requested"]}
+            navigate={navigate}
+          />
+        );
+      case "products":
+        return <ProductsPage campaign={campaign} navigate={navigate} />;
+      case "campaigns":
+        return (
+          <CampaignsPage
+            campaign={campaign}
+            counts={counts}
+            stage={stage}
+            saving={saving}
+            navigate={navigate}
+            approveCampaign={approveCampaign}
+          />
+        );
+      case "content":
+        return (
+          <ContentPage
+            campaign={campaign}
+            counts={counts}
+            posts={filteredPosts}
+            filter={filter}
+            stage={stage}
+            selected={selected}
+            editingBody={editingBody}
+            saving={saving}
+            approveCampaign={approveCampaign}
+            approvePost={() => void updateSelected({ status: "approved" }, "Post approved.")}
+            requestChanges={(note) =>
+              updateSelected(
+                { status: "changes_requested", review_note: note },
+                `Changes requested for day ${selected.day}.`,
+              )
+            }
+            saveEdits={saveEdits}
+            selectFilter={selectFilter}
+            selectPost={(id) => {
+              setSelectedId(id);
+              setEditingBody(null);
+            }}
+            setEditingBody={setEditingBody}
+          />
+        );
+      case "calendar":
+        return <CalendarPage campaign={campaign} />;
+      case "results":
+        return (
+          <ResultsPage
+            revenue={revenue}
+            revenueError={revenueError}
+            recommendation={recommendation}
+            recommendationError={recommendationError}
+            recommendationLoading={recommendationLoading}
+            findNextMove={findNextMove}
+            openCheckout={() => setCheckoutOpen(true)}
+            navigate={navigate}
+          />
+        );
+      case "experiment":
+        return (
+          <ExperimentPage
+            revenue={revenue}
+            recommendation={recommendation}
+            recommendationError={recommendationError}
+            recommendationLoading={recommendationLoading}
+            findNextMove={findNextMove}
+            navigate={navigate}
+          />
+        );
+      case "integrations":
+        return <IntegrationsPage navigate={navigate} notify={notify} />;
+      case "settings":
+        return <SettingsPage notify={notify} />;
+      case "checkout":
+        return (
+          <CheckoutPage
+            post={checkoutPost}
+            revenue={revenue}
+            openCheckout={() => setCheckoutOpen(true)}
+          />
+        );
+      default:
+        return null;
+    }
+  }
+
+  const productName = campaign?.product_name ?? "New product";
   return (
     <div className="northstar-app" data-theme={theme}>
       <Sidebar
         currentView={view}
         isOpen={mobileNavigationOpen}
+        productName={productName}
         navigate={navigate}
         onClose={() => setMobileNavigationOpen(false)}
         notify={notify}
@@ -246,6 +427,7 @@ export function CampaignWorkspace() {
       <div className="app-stage">
         <Topbar
           currentView={view}
+          productName={productName}
           theme={theme}
           searchOpen={searchOpen}
           onMenu={() => setMobileNavigationOpen(true)}
@@ -253,86 +435,17 @@ export function CampaignWorkspace() {
           onTheme={() => setTheme((value) => (value === "light" ? "dark" : "light"))}
           notify={notify}
         />
-        <main className="page-shell">
-          {view === "today" ? (
-            <TodayPage
-              revenue={revenue}
-              revenueError={revenueError}
-              campaignStatus={campaignStatus}
-              needsReview={counts["Needs review"] + counts["Changes requested"]}
-              navigate={navigate}
-            />
-          ) : null}
-          {view === "products" ? <ProductsPage navigate={navigate} /> : null}
-          {view === "campaigns" ? (
-            <CampaignsPage
-              campaignStatus={campaignStatus}
-              counts={counts}
-              navigate={navigate}
-              approveCampaign={approveCampaign}
-            />
-          ) : null}
-          {view === "content" ? (
-            <ContentPage
-              approvedIds={approvedIds}
-              counts={counts}
-              drafts={filteredDrafts}
-              filter={filter}
-              isEditing={isEditing}
-              selected={selected}
-              approveCampaign={approveCampaign}
-              approvePost={approvePost}
-              requestChanges={requestChanges}
-              saveBody={saveBody}
-              selectFilter={selectFilter}
-              selectPost={(id) => {
-                setSelectedId(id);
-                setIsEditing(false);
-              }}
-              setIsEditing={setIsEditing}
-              statusFor={statusFor}
-              notify={notify}
-            />
-          ) : null}
-          {view === "calendar" ? <CalendarPage drafts={drafts} statusFor={statusFor} /> : null}
-          {view === "results" ? (
-            <ResultsPage
-              revenue={revenue}
-              revenueError={revenueError}
-              recommendation={recommendation}
-              recommendationError={recommendationError}
-              recommendationLoading={recommendationLoading}
-              findNextMove={findNextMove}
-              openCheckout={() => setCheckoutOpen(true)}
-              navigate={navigate}
-            />
-          ) : null}
-          {view === "experiment" ? (
-            <ExperimentPage
-              revenue={revenue}
-              recommendation={recommendation}
-              recommendationError={recommendationError}
-              recommendationLoading={recommendationLoading}
-              findNextMove={findNextMove}
-              navigate={navigate}
-            />
-          ) : null}
-          {view === "integrations" ? (
-            <IntegrationsPage navigate={navigate} notify={notify} />
-          ) : null}
-          {view === "settings" ? <SettingsPage notify={notify} /> : null}
-          {view === "checkout" ? (
-            <CheckoutPage revenue={revenue} openCheckout={() => setCheckoutOpen(true)} />
-          ) : null}
-        </main>
+        <main className="page-shell">{renderPage()}</main>
       </div>
       {toast ? (
         <div className="toast" role="status">
           {toast}
         </div>
       ) : null}
-      {checkoutOpen ? (
+      {checkoutOpen && campaign && checkoutPost ? (
         <PayPalCheckout
+          campaignId={campaign.id}
+          contentId={checkoutPost.id}
           onClose={() => setCheckoutOpen(false)}
           onCaptured={async () => {
             await loadRevenue();
@@ -347,12 +460,14 @@ export function CampaignWorkspace() {
 function Sidebar({
   currentView,
   isOpen,
+  productName,
   navigate,
   onClose,
   notify,
 }: {
   currentView: View;
   isOpen: boolean;
+  productName: string;
   navigate: (view: View) => void;
   onClose: () => void;
   notify: (message: string) => void;
@@ -388,7 +503,7 @@ function Sidebar({
           onClick={() => notify("Product switching is coming next.")}
         >
           <span className="product-dot" />
-          <strong>Scribe</strong>
+          <strong>{productName}</strong>
           <ChevronDown aria-hidden="true" />
         </button>
         <NavigationGroup
@@ -455,6 +570,7 @@ function NavigationGroup({
 
 function Topbar({
   currentView,
+  productName,
   theme,
   searchOpen,
   onMenu,
@@ -463,6 +579,7 @@ function Topbar({
   notify,
 }: {
   currentView: View;
+  productName: string;
   theme: "light" | "dark";
   searchOpen: boolean;
   onMenu: () => void;
@@ -476,7 +593,7 @@ function Topbar({
         <Menu aria-hidden="true" />
       </button>
       <div className="breadcrumbs">
-        <span>Scribe</span>
+        <span>{productName}</span>
         <span>/</span>
         <strong>{viewLabels[currentView]}</strong>
       </div>
@@ -541,11 +658,7 @@ function PageHeader({
   );
 }
 
-function CampaignProgress({
-  status = "Approval",
-}: {
-  status?: "Approval" | "Publishing" | "Measurement";
-}) {
+function CampaignProgress({ status }: { status: Stage }) {
   const steps = ["Strategy", "Content", "Approval", "Publishing", "Measurement"];
   const currentIndex = steps.indexOf(status);
   return (
@@ -572,15 +685,17 @@ function CampaignProgress({
 }
 
 function TodayPage({
+  campaign,
   revenue,
   revenueError,
-  campaignStatus,
+  stage,
   needsReview,
   navigate,
 }: {
+  campaign: Campaign;
   revenue: RevenueSummary | null;
   revenueError: boolean;
-  campaignStatus: string;
+  stage: Stage;
   needsReview: number;
   navigate: (view: View) => void;
 }) {
@@ -597,26 +712,33 @@ function TodayPage({
       }).format(new Date()),
     );
   }, []);
+  const attention = campaign.posts.filter((post) => post.status !== "approved").slice(0, 3);
+  const approved = campaign.posts.filter((post) => post.status === "approved");
+  const nextPost = approved[0];
   return (
     <>
       <PageHeader
         eyebrow={date}
         title="Today"
-        description="The small set of decisions that keeps Scribe moving."
+        description={`The small set of decisions that keeps ${campaign.product_name} moving.`}
         action={
           <button className="button dark" type="button" onClick={() => navigate("campaigns")}>
             Continue campaign
           </button>
         }
       />
-      <CampaignProgress />
+      <CampaignProgress status={stage} />
       <section className="signal-row" aria-label="Workspace summary">
         <Signal
           label="Campaign status"
-          value={campaignStatus}
-          detail={`${needsReview} posts need a decision`}
+          value={campaignLabels[campaign.status]}
+          detail={`${needsReview} post${needsReview === 1 ? "" : "s"} need a decision`}
         />
-        <Signal label="Next publish" value="Thu 10:00" detail="LinkedIn · Launch week" />
+        <Signal
+          label="Next publish"
+          value={nextPost ? postDate(campaign, nextPost) : "Nothing approved"}
+          detail={nextPost ? `${nextPost.channel} · ${campaign.name}` : "Approve a post first"}
+        />
         <Signal
           label="Verified revenue"
           value={
@@ -637,18 +759,23 @@ function TodayPage({
             action="View content queue"
             onAction={() => navigate("content")}
           />
-          <AttentionRow
-            channel="LinkedIn"
-            title="A clearer way to write at work"
-            detail="Launch week · LinkedIn post"
-            status="Review"
-          />
-          <AttentionRow
-            channel="X"
-            title="Turn ideas into clear messages"
-            detail="Changes requested before it can be scheduled"
-            status="Changes requested"
-          />
+          {attention.length ? (
+            attention.map((post) => (
+              <AttentionRow
+                key={post.id}
+                channel={post.channel}
+                title={post.theme}
+                detail={
+                  post.status === "changes_requested"
+                    ? "Changes requested before it can be scheduled"
+                    : `${campaign.name} · ${post.channel} post`
+                }
+                status={post.status === "changes_requested" ? "Changes requested" : "Review"}
+              />
+            ))
+          ) : (
+            <EmptyState title="Nothing waiting" copy="Every post in this campaign is approved." />
+          )}
         </div>
         <div>
           <SectionTitle
@@ -656,18 +783,24 @@ function TodayPage({
             action="Open calendar"
             onAction={() => navigate("calendar")}
           />
-          <AttentionRow
-            channel="LinkedIn"
-            title="A better writing flow for busy days"
-            detail="Launch week · Thu 10:00"
-            status="Scheduled"
-          />
-          <AttentionRow
-            channel="Instagram"
-            title="Scribe in one sentence"
-            detail="Launch week · Fri 12:30"
-            status="Approved"
-          />
+          {approved.length ? (
+            approved
+              .slice(0, 3)
+              .map((post) => (
+                <AttentionRow
+                  key={post.id}
+                  channel={post.channel}
+                  title={post.theme}
+                  detail={`${campaign.name} · ${postDate(campaign, post)}`}
+                  status="Approved"
+                />
+              ))
+          ) : (
+            <EmptyState
+              title="Nothing approved yet"
+              copy="Approved posts appear here in publishing order."
+            />
+          )}
         </div>
       </section>
       <section className="lower-grid">
@@ -706,27 +839,30 @@ function TodayPage({
   );
 }
 
-function ProductsPage({ navigate }: { navigate: (view: View) => void }) {
+function ProductsPage({
+  campaign,
+  navigate,
+}: {
+  campaign: Campaign;
+  navigate: (view: View) => void;
+}) {
   return (
     <>
       <PageHeader
         title="Products"
         description="The source material Northstar uses to understand what you sell."
         action={
-          <button className="button dark" type="button">
+          <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
             <Plus aria-hidden="true" /> Add product
           </button>
         }
       />
       <section className="product-hero">
-        <div className="product-avatar">S</div>
+        <div className="product-avatar">{campaign.product_name.charAt(0).toUpperCase()}</div>
         <div>
           <span className="status-tag success">Active</span>
-          <h2>Scribe</h2>
-          <p>
-            A writing keyboard that helps professionals turn rough thoughts into clear messages
-            wherever they type.
-          </p>
+          <h2>{campaign.product_name}</h2>
+          <p>{campaign.product_description}</p>
         </div>
         <button className="button secondary" type="button" onClick={() => navigate("campaigns")}>
           View campaigns
@@ -735,35 +871,207 @@ function ProductsPage({ navigate }: { navigate: (view: View) => void }) {
       <section className="detail-columns">
         <div>
           <span className="eyebrow">Positioning</span>
-          <h3>Clear writing without another place to work.</h3>
-          <p>
-            Scribe stays close to the moment of writing. It improves the words without interrupting
-            the thought.
-          </p>
+          <h3>{campaign.positioning}</h3>
+          <p>Voice: {campaign.brand_voice}</p>
         </div>
         <div>
           <span className="eyebrow">Audience</span>
-          <h3>Professionals who write all day.</h3>
-          <p>Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.</p>
+          <h3>{campaign.audience}</h3>
         </div>
         <div>
           <span className="eyebrow">Primary goal</span>
-          <h3>Qualified app installs.</h3>
-          <p>Attract people whose daily work depends on clear communication.</p>
+          <h3>{campaign.objective}</h3>
         </div>
       </section>
     </>
   );
 }
 
+function NewCampaignPage({
+  canCancel,
+  createCampaign,
+  onCancel,
+}: {
+  canCancel: boolean;
+  createCampaign: (brief: CampaignBrief) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [brief, setBrief] = useState<CampaignBrief>({
+    ...exampleBrief,
+    product_name: "",
+    product_description: "",
+    audience: "",
+    objective: "",
+  });
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function field<K extends keyof CampaignBrief>(key: K, value: CampaignBrief[K]) {
+    setBrief((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleChannel(channel: Channel) {
+    field(
+      "channels",
+      brief.channels.includes(channel)
+        ? brief.channels.filter((item) => item !== channel)
+        : channels.filter((item) => item === channel || brief.channels.includes(item)),
+    );
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!brief.channels.length) {
+      setError("Choose at least one channel.");
+      return;
+    }
+    setGenerating(true);
+    setError(null);
+    try {
+      await createCampaign(brief);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "The campaign could not be drafted right now.",
+      );
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="New campaign"
+        description="Describe the product and the result you want. Northstar drafts a campaign for you to review. Nothing is published without your approval."
+        action={
+          <button
+            className="button secondary"
+            type="button"
+            disabled={generating}
+            onClick={() => setBrief(exampleBrief)}
+          >
+            Use example brief
+          </button>
+        }
+      />
+      <form className="settings-form brief-form" onSubmit={(event) => void submit(event)}>
+        <fieldset disabled={generating}>
+          <legend>Product</legend>
+          <label htmlFor="product-name">Product name</label>
+          <input
+            id="product-name"
+            required
+            minLength={2}
+            maxLength={120}
+            value={brief.product_name}
+            onChange={(event) => field("product_name", event.target.value)}
+          />
+          <label htmlFor="product-description">What it does</label>
+          <textarea
+            id="product-description"
+            required
+            minLength={10}
+            maxLength={2000}
+            rows={3}
+            value={brief.product_description}
+            onChange={(event) => field("product_description", event.target.value)}
+          />
+          <label htmlFor="audience">Who it is for</label>
+          <input
+            id="audience"
+            required
+            minLength={3}
+            maxLength={500}
+            value={brief.audience}
+            onChange={(event) => field("audience", event.target.value)}
+          />
+        </fieldset>
+        <fieldset disabled={generating}>
+          <legend>Campaign</legend>
+          <label htmlFor="objective">Revenue goal</label>
+          <input
+            id="objective"
+            required
+            minLength={3}
+            maxLength={240}
+            value={brief.objective}
+            onChange={(event) => field("objective", event.target.value)}
+          />
+          <span className="field-label">Channels</span>
+          <div className="channel-options">
+            {channels.map((channel) => (
+              <label className="channel-option" key={channel}>
+                <input
+                  type="checkbox"
+                  checked={brief.channels.includes(channel)}
+                  onChange={() => toggleChannel(channel)}
+                />
+                <ChannelIcon channel={channel} /> {channel}
+              </label>
+            ))}
+          </div>
+          <label htmlFor="days">Length</label>
+          <select
+            id="days"
+            value={brief.days}
+            onChange={(event) => field("days", Number(event.target.value))}
+          >
+            {[3, 5, 7, 10, 14].map((days) => (
+              <option value={days} key={days}>
+                {days} days, one post a day
+              </option>
+            ))}
+          </select>
+          <label htmlFor="brand-voice">Brand voice</label>
+          <input
+            id="brand-voice"
+            maxLength={500}
+            value={brief.brand_voice}
+            onChange={(event) => field("brand_voice", event.target.value)}
+          />
+        </fieldset>
+        {error ? (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {generating ? (
+          <p className="page-status" role="status">
+            The campaign agent is drafting {brief.days} posts for {brief.product_name}. This usually
+            takes under a minute.
+          </p>
+        ) : null}
+        <div className="form-actions">
+          <button className="button dark" type="submit" disabled={generating}>
+            <Send aria-hidden="true" /> {generating ? "Drafting campaign" : "Draft campaign"}
+          </button>
+          {canCancel ? (
+            <button
+              className="button secondary"
+              type="button"
+              disabled={generating}
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      </form>
+    </>
+  );
+}
+
 function CampaignsPage({
-  campaignStatus,
+  campaign,
   counts,
+  stage,
+  saving,
   navigate,
   approveCampaign,
 }: {
-  campaignStatus: string;
+  campaign: Campaign;
   counts: Record<Filter, number>;
+  stage: Stage;
+  saving: boolean;
   navigate: (view: View) => void;
   approveCampaign: () => void;
 }) {
@@ -773,33 +1081,35 @@ function CampaignsPage({
         title="Campaigns"
         description="Plan, review, publish, and measure one focused campaign at a time."
         action={
-          <button className="button dark" type="button">
+          <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
             <Plus aria-hidden="true" /> New campaign
           </button>
         }
       />
-      <CampaignProgress />
+      <CampaignProgress status={stage} />
       <section className="campaign-feature">
         <div className="campaign-number">01</div>
         <div className="campaign-feature-copy">
-          <span className="status-tag review">{campaignStatus}</span>
-          <h2>Launch week</h2>
-          <p>
-            Introduce Scribe through seven concise examples of better writing in the moments
-            professionals already know.
-          </p>
+          <span className={`status-tag ${statusClass(campaignLabels[campaign.status])}`}>
+            {campaignLabels[campaign.status]}
+          </span>
+          <h2>{campaign.name}</h2>
+          <p>{campaign.positioning}</p>
           <dl>
             <div>
               <dt>Objective</dt>
-              <dd>Increase qualified app installs</dd>
+              <dd>{campaign.objective}</dd>
             </div>
             <div>
               <dt>Schedule</dt>
-              <dd>12 to 18 October</dd>
+              <dd>{scheduleRange(campaign)}</dd>
             </div>
             <div>
               <dt>Content</dt>
-              <dd>{counts.All} posts across three channels</dd>
+              <dd>
+                {counts.All} posts across {campaign.channels.length} channel
+                {campaign.channels.length === 1 ? "" : "s"}
+              </dd>
             </div>
           </dl>
         </div>
@@ -807,47 +1117,103 @@ function CampaignsPage({
           <button className="button secondary" type="button" onClick={() => navigate("content")}>
             Review content
           </button>
-          <button className="button accent" type="button" onClick={approveCampaign}>
-            <Check aria-hidden="true" /> Approve campaign
+          <button
+            className="button accent"
+            type="button"
+            onClick={approveCampaign}
+            disabled={saving || campaign.status === "approved"}
+          >
+            <Check aria-hidden="true" />{" "}
+            {campaign.status === "approved" ? "Campaign approved" : "Approve campaign"}
           </button>
         </div>
       </section>
+      <ActivityPanel campaign={campaign} />
     </>
   );
 }
 
+function ActivityPanel({ campaign }: { campaign: Campaign }) {
+  const [events, setEvents] = useState<CampaignEvent[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    campaignApi
+      .events(campaign.id)
+      .then((items) => {
+        if (active) setEvents(items);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [campaign]);
+
+  const days = new Map(campaign.posts.map((post) => [post.id, post.day]));
+  const time = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <section className="activity-panel" aria-label="Campaign activity">
+      <div className="column-heading">
+        <h2>Activity</h2>
+        <span>Every agent output and human decision is recorded</span>
+      </div>
+      {failed ? <p className="inline-error">Activity could not be loaded.</p> : null}
+      <ol>
+        {(events ?? []).slice(0, 12).map((event) => (
+          <li key={event.id}>
+            <span className={`activity-actor ${event.actor}`}>{event.actor}</span>
+            <strong>
+              {eventLabels[event.action] ?? event.action}
+              {event.post_id && days.has(event.post_id) ? ` · day ${days.get(event.post_id)}` : ""}
+            </strong>
+            <time dateTime={event.created_at}>{time.format(new Date(event.created_at))}</time>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ContentPage({
-  approvedIds,
+  campaign,
   counts,
-  drafts,
+  posts,
   filter,
-  isEditing,
+  stage,
   selected,
+  editingBody,
+  saving,
   approveCampaign,
   approvePost,
   requestChanges,
-  saveBody,
+  saveEdits,
   selectFilter,
   selectPost,
-  setIsEditing,
-  statusFor,
-  notify,
+  setEditingBody,
 }: {
-  approvedIds: Set<number>;
+  campaign: Campaign;
   counts: Record<Filter, number>;
-  drafts: ContentItem[];
+  posts: Post[];
   filter: Filter;
-  isEditing: boolean;
-  selected: ContentItem;
+  stage: Stage;
+  selected: Post;
+  editingBody: string | null;
+  saving: boolean;
   approveCampaign: () => void;
   approvePost: () => void;
-  requestChanges: () => void;
-  saveBody: (body: string) => void;
+  requestChanges: (note: string) => Promise<boolean>;
+  saveEdits: () => Promise<void>;
   selectFilter: (filter: Filter) => void;
-  selectPost: (id: number) => void;
-  setIsEditing: React.Dispatch<React.SetStateAction<boolean>>;
-  statusFor: (item: ContentItem) => ReviewStatus;
-  notify: (message: string) => void;
+  selectPost: (id: string) => void;
+  setEditingBody: (body: string | null) => void;
 }) {
   const selectedStatus = statusFor(selected);
   return (
@@ -855,17 +1221,8 @@ function ContentPage({
       <PageHeader
         title="Content"
         description="A compact review queue for the work that is almost ready to publish."
-        action={
-          <button
-            className="button dark"
-            type="button"
-            onClick={() => notify("A new draft flow is planned for the next build.")}
-          >
-            <Plus aria-hidden="true" /> Add post
-          </button>
-        }
       />
-      <CampaignProgress />
+      <CampaignProgress status={stage} />
       <fieldset className="filter-row" aria-label="Filter content queue">
         {(["All", "Needs review", "Changes requested", "Approved"] as Filter[]).map((item) => (
           <button
@@ -882,24 +1239,24 @@ function ContentPage({
       <section className="review-workspace">
         <section className="review-queue" aria-label="Campaign content queue">
           <div className="column-heading">
-            <h2>Launch week</h2>
-            <span>{drafts.length} posts</span>
+            <h2>{campaign.name}</h2>
+            <span>{posts.length} posts</span>
           </div>
-          {drafts.length ? (
-            drafts.map((item) => {
-              const status = statusFor(item);
+          {posts.length ? (
+            posts.map((post) => {
+              const status = statusFor(post);
               return (
                 <button
                   type="button"
-                  className={`queue-item ${item.id === selected.id ? "selected" : ""}`}
-                  aria-pressed={item.id === selected.id}
-                  onClick={() => selectPost(item.id)}
-                  key={item.id}
+                  className={`queue-item ${post.id === selected.id ? "selected" : ""}`}
+                  aria-pressed={post.id === selected.id}
+                  onClick={() => selectPost(post.id)}
+                  key={post.id}
                 >
                   <span className={`status-tag ${statusClass(status)}`}>{status}</span>
-                  <strong>{item.theme}</strong>
+                  <strong>{post.theme}</strong>
                   <small>
-                    {item.channel} · {item.date}
+                    Day {post.day} · {post.channel} · {postDate(campaign, post)}
                   </small>
                 </button>
               );
@@ -924,19 +1281,22 @@ function ContentPage({
               <small>Preview</small>
             </header>
             <div className="social-preview-body">
-              <div className="author-mark">S</div>
+              <div className="author-mark">{campaign.product_name.charAt(0).toUpperCase()}</div>
               <div className="author-copy">
-                <strong>Scribe</strong>
-                <small>Launch week</small>
+                <strong>{campaign.product_name}</strong>
+                <small>{campaign.name}</small>
               </div>
-              {isEditing ? (
+              {editingBody !== null ? (
                 <textarea
                   aria-label="Edit post text"
-                  value={selected.body}
-                  onChange={(event) => saveBody(event.target.value)}
+                  value={editingBody}
+                  onChange={(event) => setEditingBody(event.target.value)}
                 />
               ) : (
-                <p>{selected.body}</p>
+                <>
+                  <p>{selected.content}</p>
+                  <p className="post-cta">{selected.call_to_action}</p>
+                </>
               )}
             </div>
             <footer>
@@ -945,82 +1305,146 @@ function ContentPage({
             </footer>
           </article>
         </section>
-        <aside className="review-actions" aria-label="Review notes and actions">
-          <div className="column-heading">
-            <h2>Review notes</h2>
-          </div>
-          {selectedStatus === "Changes requested" ? (
-            <>
-              <span className="eyebrow">Requested change</span>
-              <p>{reviewNotes[selected.id] ?? "Revise the draft before it is scheduled."}</p>
-            </>
-          ) : (
-            <>
-              <span className="eyebrow">Campaign context</span>
-              <p>Launch week · Scribe</p>
-            </>
-          )}
-          <div className="action-stack">
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => {
-                if (isEditing) notify("Post edits saved.");
-                setIsEditing((value) => !value);
-              }}
-            >
-              <PencilLine aria-hidden="true" /> {isEditing ? "Save edits" : "Edit post"}
-            </button>
-            <button className="button secondary" type="button" onClick={requestChanges}>
-              <FileText aria-hidden="true" /> Request changes
-            </button>
-            <button
-              className="button accent"
-              type="button"
-              onClick={approvePost}
-              disabled={approvedIds.has(selected.id)}
-            >
-              <Check aria-hidden="true" />{" "}
-              {approvedIds.has(selected.id) ? "Post approved" : "Approve post"}
-            </button>
-            <button className="button dark" type="button" onClick={approveCampaign}>
-              <Check aria-hidden="true" /> Approve campaign
-            </button>
-          </div>
-        </aside>
+        <ReviewActions
+          key={selected.id}
+          campaign={campaign}
+          post={selected}
+          editing={editingBody !== null}
+          saving={saving}
+          approveCampaign={approveCampaign}
+          approvePost={approvePost}
+          requestChanges={requestChanges}
+          startEditing={() => setEditingBody(selected.content)}
+          saveEdits={saveEdits}
+        />
       </section>
     </>
   );
 }
 
-function CalendarPage({
-  drafts,
-  statusFor,
+function ReviewActions({
+  campaign,
+  post,
+  editing,
+  saving,
+  approveCampaign,
+  approvePost,
+  requestChanges,
+  startEditing,
+  saveEdits,
 }: {
-  drafts: ContentItem[];
-  statusFor: (item: ContentItem) => ReviewStatus;
+  campaign: Campaign;
+  post: Post;
+  editing: boolean;
+  saving: boolean;
+  approveCampaign: () => void;
+  approvePost: () => void;
+  requestChanges: (note: string) => Promise<boolean>;
+  startEditing: () => void;
+  saveEdits: () => Promise<void>;
 }) {
+  const [note, setNote] = useState<string | null>(null);
+
+  async function submitNote(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (note?.trim() && (await requestChanges(note.trim()))) setNote(null);
+  }
+
+  return (
+    <aside className="review-actions" aria-label="Review notes and actions">
+      <div className="column-heading">
+        <h2>Review notes</h2>
+      </div>
+      {post.status === "changes_requested" ? (
+        <>
+          <span className="eyebrow">Requested change</span>
+          <p>{post.review_note ?? "Revise the draft before it is scheduled."}</p>
+        </>
+      ) : (
+        <>
+          <span className="eyebrow">Campaign context</span>
+          <p>
+            {campaign.name} · Day {post.day} · {post.theme}
+          </p>
+        </>
+      )}
+      {note !== null ? (
+        <form className="note-form" onSubmit={(event) => void submitNote(event)}>
+          <label htmlFor="review-note">What should change?</label>
+          <textarea
+            id="review-note"
+            rows={3}
+            maxLength={1000}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+          <div className="form-actions">
+            <button className="button dark" type="submit" disabled={saving || !note.trim()}>
+              Send request
+            </button>
+            <button className="button secondary" type="button" onClick={() => setNote(null)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : null}
+      <div className="action-stack">
+        <button
+          className="button secondary"
+          type="button"
+          disabled={saving}
+          onClick={() => (editing ? void saveEdits() : startEditing())}
+        >
+          <PencilLine aria-hidden="true" /> {editing ? "Save edits" : "Edit post"}
+        </button>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={saving || note !== null}
+          onClick={() => setNote("")}
+        >
+          <FileText aria-hidden="true" /> Request changes
+        </button>
+        <button
+          className="button accent"
+          type="button"
+          onClick={approvePost}
+          disabled={saving || editing || post.status === "approved"}
+        >
+          <Check aria-hidden="true" />{" "}
+          {post.status === "approved" ? "Post approved" : "Approve post"}
+        </button>
+        <button
+          className="button dark"
+          type="button"
+          onClick={approveCampaign}
+          disabled={saving || editing || campaign.status === "approved"}
+        >
+          <Check aria-hidden="true" /> Approve campaign
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function CalendarPage({ campaign }: { campaign: Campaign }) {
   return (
     <>
       <PageHeader
         title="Calendar"
         description="A quiet view of what is planned, approved, and ready to publish."
-        action={
-          <button className="button secondary" type="button">
-            October 2026 <ChevronDown aria-hidden="true" />
-          </button>
-        }
+        action={<span className="eyebrow">{scheduleRange(campaign)}</span>}
       />
       <section className="calendar-board">
-        {drafts.map((item) => (
-          <article key={item.id}>
-            <span className="calendar-date">{item.date.replace("Oct ", "")}</span>
+        {campaign.posts.map((post) => (
+          <article key={post.id}>
+            <span className="calendar-date">{postDate(campaign, post).split(" ")[1]}</span>
             <div>
-              <ChannelIcon channel={item.channel} />
-              <span>{item.channel}</span>
+              <ChannelIcon channel={post.channel} />
+              <span>{post.channel}</span>
             </div>
-            <h2>{item.theme}</h2>
-            <span className={`status-tag ${statusClass(statusFor(item))}`}>{statusFor(item)}</span>
+            <h2>{post.theme}</h2>
+            <span className={`status-tag ${statusClass(statusFor(post))}`}>{statusFor(post)}</span>
           </article>
         ))}
       </section>
@@ -1289,7 +1713,7 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
         <fieldset>
           <legend>Workspace</legend>
           <label htmlFor="workspace-name">Workspace name</label>
-          <input id="workspace-name" defaultValue="Scribe marketing" />
+          <input id="workspace-name" defaultValue="Northstar demo" />
           <label htmlFor="timezone">Timezone</label>
           <select id="timezone" defaultValue="Europe/Stockholm">
             <option value="Europe/Stockholm">Europe / Stockholm</option>
@@ -1322,9 +1746,11 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
 }
 
 function CheckoutPage({
+  post,
   revenue,
   openCheckout,
 }: {
+  post: Post | null;
   revenue: RevenueSummary | null;
   openCheckout: () => void;
 }) {
@@ -1357,7 +1783,12 @@ function CheckoutPage({
           <span>PayPal Sandbox</span>
           <strong>12.00 USD</strong>
           <p>No live money is charged in Sandbox.</p>
-          <button className="button dark" type="button" onClick={openCheckout}>
+          {post ? (
+            <small>
+              Attributed to day {post.day} · {post.channel} · {post.theme}
+            </small>
+          ) : null}
+          <button className="button dark" type="button" onClick={openCheckout} disabled={!post}>
             Open secure checkout
           </button>
           {revenue?.latest_capture_id ? (

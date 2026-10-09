@@ -68,6 +68,20 @@ async def test_config_exposes_only_browser_safe_paypal_values(
 
 
 @pytest.mark.asyncio
+async def test_create_order_rejects_unknown_campaign_content(client: AsyncClient) -> None:
+    response = await client.post(
+        "/v1/paypal/orders",
+        json={
+            "offer_id": "scribe-pro",
+            "campaign_id": CAMPAIGN_ID,
+            "content_id": "99999999-9999-4999-8999-999999999999",
+        },
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_capture_order_returns_normalized_capture(client: AsyncClient) -> None:
     await client.post(
         "/v1/paypal/orders",
