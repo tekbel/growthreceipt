@@ -16,6 +16,7 @@ import {
   Network,
   PencilLine,
   Plus,
+  Receipt,
   Search,
   Send,
   SlidersHorizontal,
@@ -1757,25 +1758,43 @@ function ResultsPage({
           </button>
         }
       />
-      <section className="signal-row results-signals">
-        <Signal
+      <section className="metric-strip results-metrics">
+        <Metric
+          icon={<CreditCard aria-hidden="true" />}
           label="Verified revenue"
           value={
             revenue
-              ? `${revenue.gross_revenue} ${revenue.currency}`
+              ? formatMoney(revenue.gross_revenue, revenue.currency)
               : revenueError
                 ? "Unavailable"
                 : "Loading"
           }
           detail="PayPal Sandbox"
+          tone={revenue?.completed_orders ? "success" : "neutral"}
         />
-        <Signal
+        <Metric
+          icon={<Receipt aria-hidden="true" />}
           label="Completed orders"
           value={String(revenue?.completed_orders ?? 0)}
           detail={revenue?.latest_capture_id ? "Capture verified" : "No capture yet"}
+          tone={revenue?.latest_capture_id ? "success" : "neutral"}
         />
-        <Signal label="Trial to paid" value="Not connected" detail="Connect PostHog" />
-        <Signal label="Published reach" value="Not connected" detail="Connect a social channel" />
+        <Metric
+          icon={<TrendingUp aria-hidden="true" />}
+          label="Trial to paid"
+          value="Not connected"
+          detail="Connect PostHog"
+          tone="neutral"
+          muted
+        />
+        <Metric
+          icon={<Send aria-hidden="true" />}
+          label="Published reach"
+          value="Not connected"
+          detail="Connect a social channel"
+          tone="neutral"
+          muted
+        />
       </section>
       <section className="results-body">
         <div className="plain-panel">
@@ -1873,7 +1892,9 @@ function ExperimentPage({
           </div>
         ) : (
           <div>
-            <span className="eyebrow">Waiting for evidence</span>
+            <span className={`status-tag ${ready ? "success" : "neutral"}`}>
+              {ready ? "Ready" : "Waiting for evidence"}
+            </span>
             <h2>
               {ready
                 ? "A recommendation is ready to prepare."
@@ -1884,19 +1905,21 @@ function ExperimentPage({
                 ? "Northstar can now inspect the campaign result and propose one controlled next step."
                 : "This keeps the recommendation grounded in a real outcome instead of invented performance data."}
             </p>
-            <button
-              className="button dark"
-              type="button"
-              disabled={!ready || recommendationLoading}
-              onClick={() => void findNextMove()}
-            >
-              {recommendationLoading ? "Reviewing results" : "Prepare next experiment"}
-            </button>
-            {!ready ? (
-              <button className="text-button" type="button" onClick={() => navigate("checkout")}>
-                Open checkout preview
+            <div className="form-actions">
+              {!ready ? (
+                <button className="button dark" type="button" onClick={() => navigate("checkout")}>
+                  Open checkout preview
+                </button>
+              ) : null}
+              <button
+                className={`button ${ready ? "dark" : "outline"}`}
+                type="button"
+                disabled={!ready || recommendationLoading}
+                onClick={() => void findNextMove()}
+              >
+                {recommendationLoading ? "Reviewing results" : "Prepare next experiment"}
               </button>
-            ) : null}
+            </div>
             {recommendationError ? <p className="inline-error">{recommendationError}</p> : null}
           </div>
         )}
@@ -2070,15 +2093,6 @@ function CheckoutPage({
   );
 }
 
-function Signal({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <article className="signal">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </article>
-  );
-}
 function SectionTitle({
   title,
   action,
