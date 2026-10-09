@@ -55,6 +55,7 @@ The home view answers one question: what needs attention today? Campaign review,
 14. Text on an accent fill uses `--on-accent`, which flips to dark ink in dark mode.
 15. Form fields are 16px on phones so iOS does not zoom on focus.
 16. The current page is in the URL hash (`#content`), so refresh, back, and shared links land on the same page.
+17. Every page title uses `--type-title` and section headings stay at `--type-2xl` or below. Fixed min heights on headers and panels are not used, content sets the height. Filters are soft pills, not bordered boxes.
 
 ## Responsive rules
 
