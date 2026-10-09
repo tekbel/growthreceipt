@@ -45,21 +45,29 @@ import {
   scheduleRange,
 } from "@/lib/campaign";
 
-type View =
-  | "today"
-  | "products"
-  | "campaigns"
-  | "new-campaign"
-  | "content"
-  | "calendar"
-  | "results"
-  | "experiment"
-  | "integrations"
-  | "settings"
-  | "checkout";
+const views = [
+  "today",
+  "products",
+  "campaigns",
+  "new-campaign",
+  "content",
+  "calendar",
+  "results",
+  "experiment",
+  "integrations",
+  "settings",
+  "checkout",
+] as const;
+type View = (typeof views)[number];
 type Filter = "All" | "Needs review" | "Changes requested" | "Approved";
 type ReviewStatus = Exclude<Filter, "All">;
 type Stage = "Approval" | "Publishing" | "Measurement";
+
+// The current page lives in the URL hash so refresh, back, and links work.
+function viewFromHash(): View | null {
+  const hash = window.location.hash.slice(1);
+  return (views as readonly string[]).includes(hash) ? (hash as View) : null;
+}
 
 type RevenueSummary = {
   completed_orders: number;
@@ -189,7 +197,10 @@ export function CampaignWorkspace() {
       const latest = await campaignApi.latest();
       setCampaign(latest);
       setLoadState("ready");
-      if (!latest) setView("new-campaign");
+      if (!latest) {
+        setView("new-campaign");
+        window.history.replaceState(null, "", "#new-campaign");
+      }
     } catch {
       setLoadState("error");
     }
@@ -198,6 +209,13 @@ export function CampaignWorkspace() {
   useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
+
+  useEffect(() => {
+    const syncView = () => setView(viewFromHash() ?? "today");
+    syncView();
+    window.addEventListener("popstate", syncView);
+    return () => window.removeEventListener("popstate", syncView);
+  }, []);
 
   // The inline script in layout.tsx applies the theme before first paint. Mirror it here.
   useEffect(() => {
@@ -240,6 +258,7 @@ export function CampaignWorkspace() {
   }
 
   function navigate(nextView: View) {
+    if (nextView !== view) window.history.pushState(null, "", `#${nextView}`);
     setView(nextView);
     setMobileNavigationOpen(false);
     setSearchOpen(false);

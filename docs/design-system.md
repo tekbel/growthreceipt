@@ -51,6 +51,10 @@ The home view answers one question: what needs attention today? Campaign review,
 10. Selection and active states use a soft tinted background and accent text. No thick accent side bars on rows, navigation, or toasts.
 11. Page content aligns left to the sidebar with a 40px gutter (24px tablet, 16px phone) and a 1320px max width. Never center the page column.
 12. Raise only the single most important element on a page into a card. Other sections are headings over divided lists, and metrics are a strip with dividers.
+13. Every font size uses a `--type-*` token (2xs 11 to hero clamp) and every radius a `--corner-*` token (6, 10, 14), plus 50% circles and 999px pills. Tailwind owns `--text-*` and `--radius-*`, so do not reuse those names.
+14. Text on an accent fill uses `--on-accent`, which flips to dark ink in dark mode.
+15. Form fields are 16px on phones so iOS does not zoom on focus.
+16. The current page is in the URL hash (`#content`), so refresh, back, and shared links land on the same page.
 
 ## Responsive rules
 
