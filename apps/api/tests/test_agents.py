@@ -30,6 +30,7 @@ def transport() -> ASGITransport:
         ],
     )
     next_action = NextAction(
+        headline="Collect the first verified purchase",
         evidence_summary="No completed PayPal orders are attributed to this campaign yet.",
         recommendation="Run one sandbox checkout from the approved LinkedIn post.",
         rationale="A captured order is required before messaging can be evaluated against revenue.",

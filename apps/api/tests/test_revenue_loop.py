@@ -34,6 +34,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
         ],
     )
     next_action = NextAction(
+        headline="Test a sharper opening line",
         evidence_summary="One PayPal order produced 9.00 USD in verified revenue.",
         recommendation="Test the approved message with a more specific professional audience.",
         rationale=(

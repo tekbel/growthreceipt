@@ -81,6 +81,7 @@ type RevenueSummary = {
 };
 
 type Recommendation = {
+  headline: string;
   evidence_summary: string;
   recommendation: string;
   rationale: string;
@@ -2189,9 +2190,9 @@ function ResultsPage({
           </div>
           {recommendation ? (
             <>
-              <span className="status-tag success">{recommendation.confidence} confidence</span>
-              <h2>{recommendation.recommendation}</h2>
-              <p>{recommendation.rationale}</p>
+              <ConfidenceTag confidence={recommendation.confidence} />
+              <h2>{recommendation.headline}</h2>
+              <p>{recommendation.recommendation}</p>
               <strong className="expected-signal">
                 Look for: {recommendation.expected_signal}
               </strong>
@@ -2206,10 +2207,11 @@ function ResultsPage({
               <button
                 className="button accent"
                 disabled={!hasRevenue || recommendationLoading}
+                aria-busy={recommendationLoading}
                 type="button"
                 onClick={() => void findNextMove()}
               >
-                {recommendationLoading ? "Reviewing results" : "Find next move"}
+                {recommendationLoading ? <BusyLabel text="Reviewing results" /> : "Find next move"}
               </button>
             </>
           )}
@@ -2245,8 +2247,9 @@ function ExperimentPage({
       <section className="experiment-stage">
         {recommendation ? (
           <div>
-            <span className="status-tag success">{recommendation.confidence} confidence</span>
-            <h2>{recommendation.recommendation}</h2>
+            <ConfidenceTag confidence={recommendation.confidence} />
+            <h2>{recommendation.headline}</h2>
+            <p className="experiment-plan">{recommendation.recommendation}</p>
             <p>{recommendation.rationale}</p>
             <dl>
               <div>
@@ -2254,7 +2257,7 @@ function ExperimentPage({
                 <dd>{recommendation.evidence_summary}</dd>
               </div>
               <div>
-                <dt>Expected signal</dt>
+                <dt>What to watch</dt>
                 <dd>{recommendation.expected_signal}</dd>
               </div>
             </dl>
@@ -2277,16 +2280,21 @@ function ExperimentPage({
             <div className="form-actions">
               {!ready ? (
                 <button className="button dark" type="button" onClick={() => navigate("checkout")}>
-                  Open checkout preview
+                  Open checkout
                 </button>
               ) : null}
               <button
                 className={`button ${ready ? "dark" : "outline"}`}
                 type="button"
                 disabled={!ready || recommendationLoading}
+                aria-busy={recommendationLoading}
                 onClick={() => void findNextMove()}
               >
-                {recommendationLoading ? "Reviewing results" : "Prepare next experiment"}
+                {recommendationLoading ? (
+                  <BusyLabel text="Reviewing results" />
+                ) : (
+                  "Prepare next experiment"
+                )}
               </button>
             </div>
             {recommendationError ? <p className="inline-error">{recommendationError}</p> : null}
@@ -2451,6 +2459,25 @@ function CheckoutPage({
         </div>
       </section>
     </>
+  );
+}
+
+const confidenceTone = { low: "review", medium: "neutral", high: "success" } as const;
+
+function ConfidenceTag({ confidence }: { confidence: Recommendation["confidence"] }) {
+  return (
+    <span className={`status-tag ${confidenceTone[confidence]}`}>
+      {confidence[0].toUpperCase() + confidence.slice(1)} confidence
+    </span>
+  );
+}
+
+function BusyLabel({ text }: { text: string }) {
+  return (
+    <span className="busy-label">
+      <span className="spinner" aria-hidden="true" />
+      {text}…
+    </span>
   );
 }
 

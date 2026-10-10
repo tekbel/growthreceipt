@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from openai import APIError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import AgentGateway
@@ -31,6 +31,7 @@ class NextActionRequest(BaseModel):
 
 
 class NextAction(BaseModel):
+    headline: str = Field(description="The experiment in at most 10 plain words.")
     evidence_summary: str
     recommendation: str
     rationale: str
@@ -61,6 +62,11 @@ State the small sample size plainly. Recommend exactly one bounded marketing exp
 The recommendation may change messaging, audience, channel, creative, or measurement.
 It must not initiate a payment, change a price, publish content, or spend money.
 Set human_approval_required to true.
+Write for a busy founder in plain, everyday English.
+headline names the experiment in at most 10 words.
+recommendation says what to do in at most 3 short sentences.
+evidence_summary, rationale and expected_signal are one or two short sentences each.
+Never use semicolons, dashes or jargon such as bounded, causality or attributed.
 Use low confidence when there are fewer than 10 completed orders.
 If there are no completed orders, recommend the smallest action needed to collect useful evidence.
 """
