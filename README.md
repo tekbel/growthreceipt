@@ -71,7 +71,7 @@ Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tes
 
 ### PayPal sandbox checkout
 
-Open the campaign workspace and select **Preview checkout**. The buyer-facing modal loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the API, captures it after approval, and displays the capture receipt. Use a Personal account from PayPal's Sandbox Accounts page. No real money moves in sandbox mode.
+Open the campaign workspace and select **Preview checkout**. The buyer-facing modal loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the API, captures it after approval, and displays the capture receipt. Use a Personal account from PayPal's Sandbox Accounts page. Set `PAYPAL_SANDBOX_BUYER_EMAIL` and `PAYPAL_SANDBOX_BUYER_PASSWORD` to show that login inside the checkout, which is how judges pay on the hosted demo. The API only shares them in sandbox mode. No real money moves in sandbox mode.
 
 ## Documents
 

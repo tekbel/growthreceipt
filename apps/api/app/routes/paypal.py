@@ -56,6 +56,8 @@ class PayPalConfigResponse(BaseModel):
     client_id: str
     environment: str
     currency: str
+    sandbox_buyer_email: str | None = None
+    sandbox_buyer_password: str | None = None
 
 
 class RevenueSummaryResponse(BaseModel):
@@ -71,10 +73,13 @@ async def get_paypal_config(_workspace_id: WorkspaceId) -> PayPalConfigResponse:
     settings = get_settings()
     if settings.paypal_client_id is None:
         raise HTTPException(status_code=503, detail="PayPal is not configured")
+    sandbox = settings.paypal_environment == "sandbox"
     return PayPalConfigResponse(
         client_id=settings.paypal_client_id.get_secret_value(),
         environment=settings.paypal_environment,
         currency="USD",
+        sandbox_buyer_email=settings.paypal_sandbox_buyer_email if sandbox else None,
+        sandbox_buyer_password=settings.paypal_sandbox_buyer_password if sandbox else None,
     )
 
 

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     paypal_client_id: SecretStr | None = None
     paypal_client_secret: SecretStr | None = None
     paypal_webhook_id: SecretStr | None = None
+    # Sandbox test buyer shown on the checkout so judges can pay. Sandbox only.
+    paypal_sandbox_buyer_email: str | None = None
+    paypal_sandbox_buyer_password: str | None = None
     auth_required: bool = False
     supabase_url: str | None = None
     supabase_publishable_key: SecretStr | None = None

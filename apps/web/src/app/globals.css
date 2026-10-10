@@ -437,6 +437,17 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .checkout-status.error { color: var(--danger); }
 .checkout-secure { display: flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); }
 .checkout-secure svg { width: 14px; }
+.test-buyer { margin: -14px 0 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface-subtle); }
+.test-buyer p { margin: 0 0 10px; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
+.test-buyer .test-buyer-title { margin-bottom: 4px; color: var(--ink); font-weight: 600; }
+.test-buyer dl { display: grid; gap: 6px; margin: 0; }
+.test-buyer dl > div { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 8px; }
+.test-buyer dt { color: var(--muted); font-size: var(--type-sm); }
+.test-buyer dd { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin: 0; }
+.test-buyer code { overflow-wrap: anywhere; font-size: var(--type-sm); }
+.test-buyer .icon-button { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: var(--corner-sm); background: transparent; color: var(--muted); cursor: pointer; transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease); }
+.test-buyer .icon-button:hover { color: var(--ink); background: var(--surface-hover); }
+.test-buyer .icon-button svg { width: 15px; height: 15px; }
 .success-icon { width: 58px; height: 58px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 50%; background: var(--success-soft); color: var(--success); }
 .checkout-success dl { margin: 28px 0 24px; border-top: 1px solid var(--line); }
 .checkout-success dl div { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }

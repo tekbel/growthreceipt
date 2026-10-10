@@ -63,8 +63,34 @@ async def test_config_exposes_only_browser_safe_paypal_values(
         "client_id": "sandbox-client-id",
         "environment": "sandbox",
         "currency": "USD",
+        "sandbox_buyer_email": None,
+        "sandbox_buyer_password": None,
     }
     assert "secret" not in response.text.lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("environment", ["sandbox", "live"])
+async def test_config_shares_the_test_buyer_only_in_sandbox(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, environment: str
+) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("PAYPAL_CLIENT_ID", "client-id")
+    monkeypatch.setenv("PAYPAL_ENVIRONMENT", environment)
+    monkeypatch.setenv("PAYPAL_SANDBOX_BUYER_EMAIL", "judge-buyer@personal.example.com")
+    monkeypatch.setenv("PAYPAL_SANDBOX_BUYER_PASSWORD", "buyer-password")
+    get_settings.cache_clear()
+    response = await client.get("/v1/paypal/config")
+    get_settings.cache_clear()
+
+    body = response.json()
+    if environment == "sandbox":
+        assert body["sandbox_buyer_email"] == "judge-buyer@personal.example.com"
+        assert body["sandbox_buyer_password"] == "buyer-password"
+    else:
+        assert body["sandbox_buyer_email"] is None
+        assert body["sandbox_buyer_password"] is None
 
 
 @pytest.mark.asyncio

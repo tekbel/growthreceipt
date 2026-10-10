@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LockKeyhole, X } from "lucide-react";
+import { Check, Copy, LockKeyhole, X } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
@@ -10,6 +10,8 @@ type PayPalConfig = {
   client_id: string;
   environment: string;
   currency: string;
+  sandbox_buyer_email: string | null;
+  sandbox_buyer_password: string | null;
 };
 
 type PayPalPaymentSession = {
@@ -227,11 +229,11 @@ export function PayPalCheckout({
         </button>
 
         <div className="checkout-product">
-          <div className="checkout-product-mark">S</div>
+          <div className="checkout-product-mark">L</div>
           <div>
             <span className="checkout-label">Sandbox checkout</span>
             <h2 id="checkout-title">LaunchCheck scan pack</h2>
-            <p>200 writing actions every day wherever you type.</p>
+            <p>Find what breaks a launch before your visitors do.</p>
           </div>
           <div className="checkout-price">
             <strong>$9.00</strong>
@@ -239,13 +241,13 @@ export function PayPalCheckout({
           </div>
           <ul className="checkout-benefits">
             <li>
-              <Check aria-hidden="true" /> 200 actions every day
+              <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
             </li>
             <li>
-              <Check aria-hidden="true" /> Works inside your keyboard
+              <Check aria-hidden="true" /> A clear fix for every problem found
             </li>
             <li>
-              <Check aria-hidden="true" /> Monthly Pro plan
+              <Check aria-hidden="true" /> One payment, no subscription
             </li>
           </ul>
         </div>
@@ -280,6 +282,16 @@ export function PayPalCheckout({
                 <h3>Pay securely</h3>
                 <p>Use a PayPal personal sandbox account. No real money will move.</p>
               </div>
+              {config?.sandbox_buyer_email && config.sandbox_buyer_password ? (
+                <div className="test-buyer">
+                  <p className="test-buyer-title">Test buyer login</p>
+                  <p>When PayPal asks you to log in, use this sandbox account.</p>
+                  <dl>
+                    <CopyRow label="Email" value={config.sandbox_buyer_email} />
+                    <CopyRow label="Password" value={config.sandbox_buyer_password} />
+                  </dl>
+                </div>
+              ) : null}
               {config ? (
                 <Script
                   id="paypal-web-sdk-v6"
@@ -304,6 +316,37 @@ export function PayPalCheckout({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function CopyRow({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>
+        <code>{value}</code>
+        <button
+          className="icon-button"
+          type="button"
+          onClick={() => void copy()}
+          aria-label={copied ? `${label} copied` : `Copy ${label.toLowerCase()}`}
+        >
+          {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+        </button>
+      </dd>
     </div>
   );
 }
