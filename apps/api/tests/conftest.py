@@ -7,6 +7,7 @@ from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.models import Campaign, Post
 from app.campaigns.store import FakeCampaignStore
 from app.main import app
+from app.quota import FakeAgentQuota, get_agent_quota
 
 CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"
 CONTENT_ID = "22222222-2222-4222-8222-222222222222"
@@ -56,3 +57,10 @@ def campaign_store() -> FakeCampaignStore:
     store = FakeCampaignStore([demo_campaign()])
     app.dependency_overrides[get_campaign_store] = lambda: store
     return store
+
+
+@pytest.fixture(autouse=True)
+def agent_quota() -> FakeAgentQuota:
+    quota = FakeAgentQuota()
+    app.dependency_overrides[get_agent_quota] = lambda: quota
+    return quota

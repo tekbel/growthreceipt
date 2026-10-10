@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     auth_required: bool = False
     supabase_url: str | None = None
     supabase_publishable_key: SecretStr | None = None
+    agent_runs_per_workspace_day: int = 20
+    agent_runs_per_day: int = 300
     demo_workspace_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 
 

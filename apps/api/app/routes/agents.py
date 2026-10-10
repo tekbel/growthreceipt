@@ -14,6 +14,7 @@ from app.campaigns.models import CampaignBrief, CampaignDraft
 from app.campaigns.store import CampaignStore
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
+from app.quota import CampaignDraftRun, NextActionRun
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
@@ -70,6 +71,7 @@ async def create_campaign_draft(
     request: CampaignBrief,
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
     _workspace_id: WorkspaceId,
+    _run: CampaignDraftRun,
 ) -> CampaignDraftResponse:
     run = await draft_campaign(gateway, request)
     assert run.session_id is not None and run.turn_id is not None
@@ -87,6 +89,7 @@ async def create_next_action(
     store: Annotated[PaymentStore, Depends(get_payment_store)],
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
+    _run: NextActionRun,
 ) -> NextActionResponse:
     campaign = await campaigns.get(
         workspace_id=workspace_id,

@@ -11,6 +11,7 @@ from app.agents.gateway import FakeAgentGateway
 from app.campaigns.models import CampaignDraft, CampaignPost
 from app.campaigns.store import FakeCampaignStore
 from app.main import app
+from app.quota import FakeAgentQuota
 
 CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"
 CONTENT_ID = "22222222-2222-4222-8222-222222222222"
@@ -239,3 +240,16 @@ async def test_unknown_campaign_and_post_return_not_found(client: AsyncClient) -
         f"/v1/campaigns/{CAMPAIGN_ID}/posts/{unknown}", json={"status": "approved"}
     )
     assert response.status_code == 404
+
+
+async def test_agent_runs_stop_at_the_daily_limit(
+    client: AsyncClient, campaign_store: FakeCampaignStore, agent_quota: FakeAgentQuota
+) -> None:
+    agent_quota.limit = 1
+    assert (await client.post("/v1/campaigns", json=BRIEF)).status_code == 201
+
+    response = await client.post("/v1/campaigns/stream", json=BRIEF)
+
+    assert response.status_code == 429
+    assert response.json()["detail"].startswith("The agent has reached today's limit.")
+    assert [kind for _, kind in agent_quota.claims] == ["campaign_draft"]

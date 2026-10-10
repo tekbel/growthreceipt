@@ -20,6 +20,7 @@ from app.campaigns.models import (
     PostUpdate,
 )
 from app.campaigns.store import CampaignStore
+from app.quota import CampaignDraftRun
 from app.workspaces import WorkspaceId
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ async def create_campaign(
     gateway: Gateway,
     store: Store,
     workspace_id: WorkspaceId,
+    _run: CampaignDraftRun,
 ) -> Campaign:
     return await _save(store, brief, await draft_campaign(gateway, brief), workspace_id)
 
@@ -72,6 +74,7 @@ async def stream_campaign(
     gateway: Gateway,
     store: Store,
     workspace_id: WorkspaceId,
+    _run: CampaignDraftRun,
 ) -> StreamingResponse:
     """Draft a campaign and report each step the agent reaches as server-sent events."""
 

@@ -352,7 +352,14 @@ export function CampaignWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaign_id: campaign.id }),
       });
-      if (!response.ok) throw new Error("A next move could not be prepared right now.");
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
+        throw new Error(
+          response.status === 429 && typeof body?.detail === "string"
+            ? body.detail
+            : "A next move could not be prepared right now.",
+        );
+      }
       const result = (await response.json()) as { next_action: Recommendation };
       setRecommendation(result.next_action);
     } catch (error) {

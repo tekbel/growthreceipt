@@ -44,6 +44,10 @@ In production each founder connects their own PayPal account through PayPal part
 
 Judges enter with one click. Each judge gets an anonymous session and a private seeded workspace.
 
+Model calls are capped. Each workspace can run the agent 20 times a day, and all workspaces together 300 times a day. The API records every run in `growthreceipt.agent_runs` and answers 429 with a plain message once a limit is reached. Both limits are settings (`AGENT_RUNS_PER_WORKSPACE_DAY`, `AGENT_RUNS_PER_DAY`).
+
+Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`.
+
 ## Using it in the demo video
 
 Show the diagram for about ten seconds right after the opening problem statement. Point at the numbered loop on the right, then cut to the live product and follow the same numbers in order.

@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,9 +16,12 @@ from app.workspaces import Workspace
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 
+WorkspaceMode = Literal["local", "judge", "user"]
+
+
 class WorkspaceSession(BaseModel):
     workspace_id: UUID
-    mode: Literal["local", "judge", "user"]
+    mode: WorkspaceMode
     display_name: str
     is_anonymous: bool
 
@@ -49,7 +52,7 @@ async def bootstrap_workspace(
             )
         ).one_or_none()
         if row is None:
-            mode = "judge" if actor.is_anonymous else "user"
+            mode: WorkspaceMode = "judge" if actor.is_anonymous else "user"
             name = "Judge demo" if actor.is_anonymous else "My workspace"
             workspace_id = await session.scalar(
                 text(
@@ -80,7 +83,7 @@ async def bootstrap_workspace(
         else:
             workspace_id = row.id
             name = row.name
-            mode = row.mode
+            mode = cast(WorkspaceMode, row.mode)
     return WorkspaceSession(
         workspace_id=workspace_id,
         mode=mode,
