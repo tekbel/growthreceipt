@@ -82,6 +82,9 @@ export function AuthShell() {
       if (session) void bootstrap(session.access_token);
       else {
         setApiAccessToken(null);
+        // A finished sign in leaves the buttons busy, so clear that on sign out.
+        setSubmitting(false);
+        setEmailSent(false);
         setState("signed-out");
       }
     });
