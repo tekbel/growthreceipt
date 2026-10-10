@@ -95,14 +95,35 @@ async def create_order(
     if offer is None:
         raise HTTPException(status_code=404, detail="Offer not found")
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
-    if campaign is None or all(post.id != request.content_id for post in campaign.posts):
+    posts = campaign.posts if campaign else []
+    post = next((post for post in posts if post.id == request.content_id), None)
+    # Customers only ever arrive from approved posts, so only those can take a payment.
+    if post is None or post.status != "approved":
         raise HTTPException(status_code=404, detail="Campaign content not found")
-    attribution_id = f"{request.campaign_id}:{request.content_id}"
+    return await open_order(
+        gateway=gateway,
+        store=store,
+        workspace_id=workspace_id,
+        offer=offer,
+        campaign_id=request.campaign_id,
+        content_id=request.content_id,
+    )
+
+
+async def open_order(
+    *,
+    gateway: PayPalGateway,
+    store: PaymentStore,
+    workspace_id: UUID,
+    offer: Offer,
+    campaign_id: UUID,
+    content_id: UUID,
+) -> OrderResponse:
     request_id = uuid4()
     try:
         order = await gateway.create_order(
             offer=offer,
-            attribution_id=attribution_id,
+            attribution_id=f"{campaign_id}:{content_id}",
             request_id=str(request_id),
         )
     except PayPalAPIError as error:
@@ -110,8 +131,8 @@ async def create_order(
     await store.record_order(
         workspace_id=workspace_id,
         offer=offer,
-        campaign_id=request.campaign_id,
-        content_id=request.content_id,
+        campaign_id=campaign_id,
+        content_id=content_id,
         paypal_order_id=order.id,
         idempotency_key=request_id,
     )
@@ -127,6 +148,12 @@ async def capture_order(
 ) -> CaptureResponse:
     if not await store.owns_order(workspace_id=workspace_id, paypal_order_id=order_id):
         raise HTTPException(status_code=404, detail="PayPal order not found")
+    return await settle_order(gateway=gateway, store=store, order_id=order_id)
+
+
+async def settle_order(
+    *, gateway: PayPalGateway, store: PaymentStore, order_id: str
+) -> CaptureResponse:
     try:
         capture = await gateway.capture_order(order_id=order_id, request_id=str(uuid4()))
     except PayPalAPIError as error:

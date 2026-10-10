@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -18,6 +19,23 @@ from app.campaigns.models import (
     PostUpdate,
     review_transition,
 )
+from app.config import get_settings
+
+
+@dataclass(frozen=True)
+class PostLocation:
+    workspace_id: UUID
+    campaign: Campaign
+    post: Post
+
+
+def _locate(workspace_id: UUID, campaign: Campaign | None, content_id: UUID) -> PostLocation | None:
+    if campaign is None:
+        return None
+    post = next((post for post in campaign.posts if post.id == content_id), None)
+    if post is None:
+        return None
+    return PostLocation(workspace_id=workspace_id, campaign=campaign, post=post)
 
 
 class CampaignStore(Protocol):
@@ -34,6 +52,8 @@ class CampaignStore(Protocol):
     async def get(self, *, workspace_id: UUID, campaign_id: UUID) -> Campaign | None: ...
 
     async def latest(self, *, workspace_id: UUID) -> Campaign | None: ...
+
+    async def find_post(self, *, content_id: UUID) -> PostLocation | None: ...
 
     async def update_post(
         self,
@@ -166,6 +186,28 @@ class PostgresCampaignStore:
             if campaign_id is None:
                 return None
             return await self._load(workspace_id=workspace_id, campaign_id=campaign_id)
+
+    async def find_post(self, *, content_id: UUID) -> PostLocation | None:
+        async with self._session.begin():
+            row = (
+                await self._session.execute(
+                    text(
+                        """
+                        select campaign.workspace_id, campaign.id as campaign_id
+                        from growthreceipt.campaign_posts post
+                        join growthreceipt.campaigns campaign on campaign.id = post.campaign_id
+                        where post.id = :content_id
+                        """
+                    ),
+                    {"content_id": content_id},
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            campaign = await self._load(
+                workspace_id=row.workspace_id, campaign_id=row.campaign_id
+            )
+        return _locate(row.workspace_id, campaign, content_id)
 
     async def update_post(
         self,
@@ -355,6 +397,10 @@ class FakeCampaignStore:
         self.campaigns: dict[UUID, Campaign] = {
             campaign.id: campaign for campaign in campaigns or []
         }
+        # Seeded campaigns belong to the local demo workspace, like unauthenticated requests.
+        self.workspaces: dict[UUID, UUID] = {
+            campaign_id: get_settings().demo_workspace_id for campaign_id in self.campaigns
+        }
         self.event_log: list[tuple[UUID, CampaignEvent]] = []
 
     async def create(
@@ -366,7 +412,6 @@ class FakeCampaignStore:
         session_id: str,
         turn_id: str,
     ) -> Campaign:
-        del workspace_id
         campaign = Campaign(
             id=uuid4(),
             name=draft.campaign_name,
@@ -386,6 +431,7 @@ class FakeCampaignStore:
             ],
         )
         self.campaigns[campaign.id] = campaign
+        self.workspaces[campaign.id] = workspace_id
         self._log(
             campaign.id,
             None,
@@ -402,6 +448,13 @@ class FakeCampaignStore:
     async def latest(self, *, workspace_id: UUID) -> Campaign | None:
         del workspace_id
         return max(self.campaigns.values(), key=lambda item: item.created_at, default=None)
+
+    async def find_post(self, *, content_id: UUID) -> PostLocation | None:
+        for campaign in self.campaigns.values():
+            location = _locate(self.workspaces[campaign.id], campaign, content_id)
+            if location is not None:
+                return location
+        return None
 
     async def update_post(
         self,

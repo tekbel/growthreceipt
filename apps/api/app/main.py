@@ -7,6 +7,7 @@ from app.routes.auth import router as auth_router
 from app.routes.campaigns import router as campaigns_router
 from app.routes.health import router as health_router
 from app.routes.paypal import router as paypal_router
+from app.routes.public import router as public_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -26,6 +27,7 @@ app.include_router(auth_router)
 app.include_router(agents_router)
 app.include_router(campaigns_router)
 app.include_router(paypal_router)
+app.include_router(public_router)
 
 
 @app.get("/v1")

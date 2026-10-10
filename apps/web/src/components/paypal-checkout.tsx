@@ -1,15 +1,24 @@
 "use client";
 
-import { Check, Copy, LockKeyhole, X } from "lucide-react";
+import { Check, Copy, LockKeyhole } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
-import { apiFetch } from "@/lib/campaign";
+import { API_URL } from "@/lib/campaign";
 
-type PayPalConfig = {
+// The customer side of GrowthReceipt. It needs no sign in: the post id in the
+// buy link decides the campaign and the offer on the server.
+
+type PublicOffer = {
+  content_id: string;
+  product_name: string;
+  product_icon_url: string | null;
+  offer_name: string;
+  offer_description: string;
+  amount: string;
+  currency: string;
   client_id: string;
   environment: string;
-  currency: string;
   sandbox_buyer_email: string | null;
   sandbox_buyer_password: string | null;
 };
@@ -47,21 +56,16 @@ declare global {
   }
 }
 
-export function PayPalCheckout({
-  campaignId,
-  contentId,
-  onClose,
-  onCaptured,
-  onSeeResults,
-}: {
-  campaignId: string;
-  contentId: string;
-  onClose: () => void;
-  onCaptured: () => void;
-  onSeeResults: () => void;
-}) {
+function publicFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (init?.body) headers.set("Content-Type", "application/json");
+  return fetch(`${API_URL}${path}`, { ...init, headers });
+}
+
+export function BuyCheckout({ contentId }: { contentId: string }) {
   const buttonContainer = useRef<HTMLDivElement>(null);
-  const [config, setConfig] = useState<PayPalConfig | null>(null);
+  const [offer, setOffer] = useState<PublicOffer | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState("Preparing secure checkout…");
   const [error, setError] = useState<string | null>(null);
@@ -72,43 +76,33 @@ export function PayPalCheckout({
   } | null>(null);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [onClose]);
-
-  useEffect(() => {
     const controller = new AbortController();
-    async function loadConfig() {
+    async function loadOffer() {
       try {
-        const response = await apiFetch("/v1/paypal/config", {
+        const response = await publicFetch(`/v1/public/offers/${contentId}`, {
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error("PayPal checkout is not configured.");
-        const value = (await response.json()) as PayPalConfig;
-        setConfig(value);
+        if (response.status === 404 || response.status === 422) {
+          setUnavailable(true);
+          return;
+        }
+        if (!response.ok) throw new Error("Checkout could not be loaded. Please try again.");
+        setOffer((await response.json()) as PublicOffer);
         setStatus("Loading PayPal…");
       } catch (loadError) {
         if (controller.signal.aborted) return;
         setError(loadError instanceof Error ? loadError.message : "Checkout could not be loaded.");
       }
     }
-    void loadConfig();
+    void loadOffer();
     return () => controller.abort();
-  }, []);
+  }, [contentId]);
 
   useEffect(() => {
     const container = buttonContainer.current;
     const paypal = window.paypal;
-    if (!sdkReady || !config || !container || !paypal || receipt) return;
-    const checkoutConfig = config;
+    if (!sdkReady || !offer || !container || !paypal || receipt) return;
+    const checkoutOffer = offer;
     const checkoutContainer = container;
     const sdkNamespace: PayPalNamespace = paypal;
 
@@ -117,16 +111,14 @@ export function PayPalCheckout({
 
     async function createOrder(): Promise<{ orderId: string }> {
       setError(null);
-      setStatus("Creating your sandbox order…");
-      const response = await apiFetch("/v1/paypal/orders", {
+      setStatus("Creating your order…");
+      const response = await publicFetch("/v1/public/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          offer_id: "launchcheck-scan-pack",
-          campaign_id: campaignId,
-          content_id: contentId,
-        }),
+        body: JSON.stringify({ content_id: contentId }),
       });
+      if (response.status === 429) {
+        throw new Error("Too many checkout attempts. Please try again later.");
+      }
       if (!response.ok) throw new Error("PayPal could not create the order.");
       const order = (await response.json()) as { order_id: string };
       setStatus("Complete approval in PayPal.");
@@ -136,7 +128,7 @@ export function PayPalCheckout({
     async function captureOrder(orderId: string) {
       setError(null);
       setStatus("Capturing your payment…");
-      const response = await apiFetch(`/v1/paypal/orders/${orderId}/capture`, {
+      const response = await publicFetch(`/v1/public/orders/${orderId}/capture`, {
         method: "POST",
       });
       if (!response.ok) throw new Error("The approved order could not be captured.");
@@ -151,21 +143,20 @@ export function PayPalCheckout({
         amount: capture.amount,
         currency: capture.currency,
       });
-      onCaptured();
-      setStatus("Sandbox payment completed.");
+      setStatus("Payment complete.");
     }
 
     async function initializeCheckout() {
       try {
         setStatus("Checking PayPal availability…");
         const sdk = await sdkNamespace.createInstance({
-          clientId: checkoutConfig.client_id,
+          clientId: checkoutOffer.client_id,
           components: ["paypal-payments"],
           pageType: "checkout",
           clientMetadataId: crypto.randomUUID(),
         });
         if (!sdk || disposed) return;
-        const methods = await sdk.findEligibleMethods({ currencyCode: checkoutConfig.currency });
+        const methods = await sdk.findEligibleMethods({ currencyCode: checkoutOffer.currency });
         if (disposed) return;
         if (!methods.isEligible("paypal")) {
           throw new Error("PayPal is not available for this sandbox account.");
@@ -211,35 +202,36 @@ export function PayPalCheckout({
       disposed = true;
       paypalButton?.remove();
     };
-  }, [campaignId, config, contentId, onCaptured, receipt, sdkReady]);
+  }, [contentId, offer, receipt, sdkReady]);
+
+  if (unavailable) {
+    return (
+      <main className="buy-page">
+        <section className="buy-unavailable" role="alert">
+          <h1>This offer is not available</h1>
+          <p>The link may be out of date, or the post it came from is not approved yet.</p>
+        </section>
+      </main>
+    );
+  }
+
+  const productName = offer?.product_name ?? "LaunchCheck";
 
   return (
-    <div className="checkout-backdrop">
-      <section
-        className="checkout-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="checkout-title"
-      >
-        <button
-          className="checkout-close"
-          type="button"
-          onClick={onClose}
-          aria-label="Close checkout"
-        >
-          <X aria-hidden="true" />
-        </button>
-
+    <main className="buy-page">
+      <section className="checkout-dialog" aria-labelledby="checkout-title">
         <div className="checkout-product">
-          <div className="checkout-product-mark">L</div>
+          <div className="checkout-product-mark" aria-hidden="true">
+            {productName[0]?.toUpperCase()}
+          </div>
           <div>
-            <span className="checkout-label">Sandbox checkout</span>
-            <h2 id="checkout-title">LaunchCheck scan pack</h2>
+            <span className="checkout-label">{productName}</span>
+            <h1 id="checkout-title">{offer?.offer_name ?? "LaunchCheck scan pack"}</h1>
             <p>Find what breaks a launch before your visitors do.</p>
           </div>
           <div className="checkout-price">
-            <strong>$9.00</strong>
-            <span>USD · sandbox purchase</span>
+            <strong>${offer?.amount ?? "9.00"}</strong>
+            <span>{offer?.currency ?? "USD"} · one payment</span>
           </div>
           <ul className="checkout-benefits">
             <li>
@@ -260,8 +252,11 @@ export function PayPalCheckout({
               <span className="success-icon">
                 <Check aria-hidden="true" />
               </span>
-              <h3>Payment complete</h3>
-              <p>Your PayPal Sandbox capture was successful.</p>
+              <h2>Thanks for your purchase</h2>
+              <p>
+                Your payment is complete. This was a sandbox purchase, so no scans are delivered. In
+                a live store {productName} would deliver them now.
+              </p>
               <dl>
                 <div>
                   <dt>Amount</dt>
@@ -270,34 +265,35 @@ export function PayPalCheckout({
                   </dd>
                 </div>
                 <div>
-                  <dt>Capture ID</dt>
+                  <dt>PayPal receipt</dt>
                   <dd>{receipt.captureId}</dd>
                 </div>
               </dl>
-              <button className="button primary checkout-done" type="button" onClick={onSeeResults}>
-                See results on Today
-              </button>
+              <p className="buy-founder-note">
+                Testing as the founder? Go back to your GrowthReceipt tab. This purchase is already
+                credited to the post that brought it.
+              </p>
             </div>
           ) : (
             <>
               <div className="checkout-payment-head">
-                <h3>Pay securely</h3>
-                <p>Use a PayPal personal sandbox account. No real money will move.</p>
+                <h2>Pay securely</h2>
+                <p>Pay with a PayPal sandbox account. No real money moves.</p>
               </div>
-              {config?.sandbox_buyer_email && config.sandbox_buyer_password ? (
+              {offer?.sandbox_buyer_email && offer.sandbox_buyer_password ? (
                 <div className="test-buyer">
                   <p className="test-buyer-title">Test buyer login</p>
                   <p>When PayPal asks you to log in, use this sandbox account.</p>
                   <dl>
-                    <CopyRow label="Email" value={config.sandbox_buyer_email} />
-                    <CopyRow label="Password" value={config.sandbox_buyer_password} />
+                    <CopyRow label="Email" value={offer.sandbox_buyer_email} />
+                    <CopyRow label="Password" value={offer.sandbox_buyer_password} />
                   </dl>
                 </div>
               ) : null}
-              {config ? (
+              {offer ? (
                 <Script
                   id="paypal-web-sdk-v6"
-                  src={`${config.environment === "sandbox" ? "https://www.sandbox.paypal.com" : "https://www.paypal.com"}/web-sdk/v6/core`}
+                  src={`${offer.environment === "sandbox" ? "https://www.sandbox.paypal.com" : "https://www.paypal.com"}/web-sdk/v6/core`}
                   strategy="afterInteractive"
                   onReady={() => {
                     setSdkReady(true);
@@ -318,7 +314,7 @@ export function PayPalCheckout({
           )}
         </div>
       </section>
-    </div>
+    </main>
   );
 }
 

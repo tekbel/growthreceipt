@@ -7,7 +7,9 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Copy,
   CreditCard,
+  ExternalLink,
   FileText,
   FlaskConical,
   LayoutDashboard,
@@ -29,7 +31,6 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
-import { PayPalCheckout } from "@/components/paypal-checkout";
 import {
   apiFetch,
   type Campaign,
@@ -181,7 +182,6 @@ export function CampaignWorkspace({
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueError, setRevenueError] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
@@ -275,6 +275,45 @@ export function CampaignWorkspace({
     setRecommendation(null);
     void loadRevenue();
   }, [loadRevenue]);
+
+  // Customers pay on the public buy page, often in another tab or on a phone.
+  // Refresh results when the founder comes back, and every 15 seconds while visible.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadRevenue();
+    };
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loadRevenue]);
+
+  const seenOrders = useRef<{ campaignId: string; count: number } | null>(null);
+  useEffect(() => {
+    if (!revenue || !campaignId) return;
+    const previous = seenOrders.current;
+    seenOrders.current = { campaignId, count: revenue.completed_orders };
+    if (previous?.campaignId !== campaignId || revenue.completed_orders <= previous.count) return;
+    setRecommendation(null);
+    setToast({
+      message: "New PayPal purchase verified and credited to this campaign.",
+      action: { label: "Find next move", view: "experiment" },
+    });
+    window.setTimeout(() => setToast(null), 7000);
+  }, [revenue, campaignId]);
+
+  function openBuyPage(contentId: string) {
+    window.open(buyLink(contentId), "_blank", "noopener");
+  }
+
+  function openCustomerView() {
+    if (checkoutPost) openBuyPage(checkoutPost.id);
+    else navigate("checkout");
+  }
 
   function notify(message: string, action?: Toast["action"]) {
     setToast({ message, action });
@@ -426,13 +465,14 @@ export function CampaignWorkspace({
             saving={saving}
             navigate={navigate}
             approveCampaign={approveCampaign}
+            openCustomerView={openCustomerView}
           />
         );
       case "content":
         return (
           <ContentPage
             campaign={campaign}
-            openCheckout={() => navigate("checkout")}
+            openCheckout={() => (selected ? openBuyPage(selected.id) : navigate("checkout"))}
             counts={counts}
             posts={filteredPosts}
             filter={filter}
@@ -474,7 +514,7 @@ export function CampaignWorkspace({
             recommendationError={recommendationError}
             recommendationLoading={recommendationLoading}
             findNextMove={findNextMove}
-            openCheckout={() => setCheckoutOpen(true)}
+            openCheckout={openCustomerView}
             navigate={navigate}
           />
         );
@@ -497,8 +537,11 @@ export function CampaignWorkspace({
         return (
           <CheckoutPage
             post={checkoutPost}
+            posts={posts}
             revenue={revenue}
-            openCheckout={() => setCheckoutOpen(true)}
+            openBuyPage={openBuyPage}
+            navigate={navigate}
+            notify={notify}
           />
         );
       default:
@@ -554,28 +597,6 @@ export function CampaignWorkspace({
             </button>
           ) : null}
         </div>
-      ) : null}
-      {checkoutOpen && campaign && checkoutPost ? (
-        <PayPalCheckout
-          campaignId={campaign.id}
-          contentId={checkoutPost.id}
-          onClose={() => setCheckoutOpen(false)}
-          onCaptured={async () => {
-            await loadRevenue();
-            setRecommendation(null);
-          }}
-          onSeeResults={() => {
-            setCheckoutOpen(false);
-            navigate("today");
-            notify(
-              "Payment verified and credited to this campaign. The agent can learn from it now.",
-              {
-                label: "Find next move",
-                view: "experiment",
-              },
-            );
-          }}
-        />
       ) : null}
       {helpOpen ? (
         <HelpPanel
@@ -1686,6 +1707,7 @@ function CampaignsPage({
   saving,
   navigate,
   approveCampaign,
+  openCustomerView,
 }: {
   campaign: Campaign;
   counts: Record<Filter, number>;
@@ -1693,6 +1715,7 @@ function CampaignsPage({
   saving: boolean;
   navigate: (view: View) => void;
   approveCampaign: () => void;
+  openCustomerView: () => void;
 }) {
   return (
     <>
@@ -1743,7 +1766,7 @@ function CampaignsPage({
             Review content
           </button>
           {campaign.status === "approved" ? (
-            <TestPurchaseButton className="button accent" onClick={() => navigate("checkout")} />
+            <TestPurchaseButton className="button accent" onClick={openCustomerView} />
           ) : (
             <button
               className="button accent"
@@ -2184,7 +2207,7 @@ function ResultsPage({
               : "Complete a sandbox checkout to verify attribution from campaign to revenue."}
           </p>
           <button className="button dark" type="button" onClick={openCheckout}>
-            Preview checkout
+            Open as customer
           </button>
         </div>
         <div className="plain-panel">
@@ -2408,21 +2431,42 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
   );
 }
 
+function buyLink(contentId: string) {
+  return `${window.location.origin}/buy/${contentId}`;
+}
+
 function CheckoutPage({
   post,
+  posts,
   revenue,
-  openCheckout,
+  openBuyPage,
+  navigate,
+  notify,
 }: {
   post: Post | null;
+  posts: Post[];
   revenue: RevenueSummary | null;
-  openCheckout: () => void;
+  openBuyPage: (contentId: string) => void;
+  navigate: (view: View) => void;
+  notify: (message: string) => void;
 }) {
+  const approved = posts.filter((item) => item.status === "approved");
+
+  async function copyLink(contentId: string) {
+    try {
+      await navigator.clipboard.writeText(buyLink(contentId));
+      notify("Buy link copied.");
+    } catch {
+      notify("Copy is blocked in this browser. Open the link and copy it from the address bar.");
+    }
+  }
+
   return (
     <>
       <PageHeader
         eyebrow="Customer view"
         title="Buy as your customer"
-        description="This is what a customer sees after clicking one of your posts. Pay with a PayPal sandbox account. The payment goes to you, and GrowthReceipt credits it to the post that brought it."
+        description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page and never sees GrowthReceipt. Open a link as your customer to make a test purchase. The payment goes to you and is credited to the post that brought it."
       />
       <section className="checkout-preview-card">
         <div>
@@ -2447,21 +2491,61 @@ function CheckoutPage({
           <strong>{formatMoney("9.00", "USD")}</strong>
           <p>Sandbox only. No real money moves.</p>
           {post ? (
-            <small>
-              Credited to day {post.day} · {post.channel} · {post.theme}
-            </small>
-          ) : null}
-          <button className="button dark" type="button" onClick={openCheckout} disabled={!post}>
-            Pay with PayPal
-          </button>
-          {post ? null : (
-            <small>Approve a post first. Customers arrive from posts you approved.</small>
+            <>
+              <small>
+                Opens the buy link for day {post.day} · {post.channel}
+              </small>
+              <button className="button dark" type="button" onClick={() => openBuyPage(post.id)}>
+                <ExternalLink aria-hidden="true" /> Open as customer
+              </button>
+            </>
+          ) : (
+            <>
+              <small>Approve a post first. Each approved post gets its own buy link.</small>
+              <button className="button dark" type="button" onClick={() => navigate("content")}>
+                Review posts
+              </button>
+            </>
           )}
           {revenue?.latest_capture_id ? (
-            <small>Latest capture: {revenue.latest_capture_id}</small>
+            <small>Latest PayPal receipt: {revenue.latest_capture_id}</small>
           ) : null}
         </div>
       </section>
+      {approved.length ? (
+        <section className="buy-links" aria-labelledby="buy-links-title">
+          <h2 id="buy-links-title">Buy links</h2>
+          <p>Put each link in its post. Purchases are credited to the post whose link was used.</p>
+          <ul>
+            {approved.map((item) => (
+              <li key={item.id}>
+                <div>
+                  <strong>
+                    Day {item.day} · {item.channel}
+                  </strong>
+                  <span>{item.theme}</span>
+                </div>
+                <div className="buy-link-actions">
+                  <button
+                    className="button outline"
+                    type="button"
+                    onClick={() => void copyLink(item.id)}
+                  >
+                    <Copy aria-hidden="true" /> Copy link
+                  </button>
+                  <button
+                    className="button outline"
+                    type="button"
+                    onClick={() => openBuyPage(item.id)}
+                  >
+                    <ExternalLink aria-hidden="true" /> Open
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </>
   );
 }
@@ -2493,8 +2577,8 @@ function TestPurchaseButton({ className, onClick }: { className: string; onClick
         <CreditCard aria-hidden="true" /> Make a test purchase
       </button>
       <span className="tip" id={tipId} role="tooltip">
-        You act as your own customer. Pay with a PayPal sandbox account, so no real money moves. The
-        payment is credited to the post it came from.
+        Opens your buy page in a new tab, where you act as your own customer. Pay with a PayPal
+        sandbox account, so no real money moves. The payment is credited to the post it came from.
       </span>
     </span>
   );

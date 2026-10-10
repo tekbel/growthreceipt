@@ -1,11 +1,15 @@
 import json
+from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Generator
 from decimal import Decimal
+from uuid import UUID
 
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.campaigns.models import PostStatus
+from app.campaigns.store import FakeCampaignStore
 from app.main import app
 from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import FakePayPalGateway, HttpPayPalGateway, Offer
@@ -20,6 +24,20 @@ CONTENT_ID = "22222222-2222-4222-8222-222222222222"
 def clear_overrides() -> Generator[None, None, None]:
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def approved_first_post(campaign_store: FakeCampaignStore) -> None:
+    set_post_status(campaign_store, CONTENT_ID, "approved")
+
+
+def set_post_status(store: FakeCampaignStore, content_id: str, status: PostStatus) -> None:
+    campaign = store.campaigns[UUID(CAMPAIGN_ID)]
+    posts = [
+        post.model_copy(update={"status": status}) if str(post.id) == content_id else post
+        for post in campaign.posts
+    ]
+    store.campaigns[campaign.id] = campaign.model_copy(update={"posts": posts})
 
 
 @pytest.fixture
@@ -205,3 +223,94 @@ async def test_http_gateway_sends_catalog_price_and_idempotency_key() -> None:
     assert order.id == "ORDER-123"
     assert requests[1].headers["PayPal-Request-Id"] == "request-123"
     assert body["purchase_units"][0]["amount"]["value"] == "9.00"
+
+
+@pytest.mark.asyncio
+async def test_create_order_rejects_a_post_that_is_not_approved(
+    client: AsyncClient, campaign_store: FakeCampaignStore
+) -> None:
+    set_post_status(campaign_store, CONTENT_ID, "needs_review")
+    response = await client.post(
+        "/v1/paypal/orders",
+        json={
+            "offer_id": "launchcheck-scan-pack",
+            "campaign_id": CAMPAIGN_ID,
+            "content_id": CONTENT_ID,
+        },
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_public_offer_shows_an_approved_post_without_sign_in(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("PAYPAL_CLIENT_ID", "sandbox-client-id")
+    get_settings.cache_clear()
+    response = await client.get(f"/v1/public/offers/{CONTENT_ID}")
+    get_settings.cache_clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["amount"] == "9.00"
+    assert body["currency"] == "USD"
+    assert body["client_id"] == "sandbox-client-id"
+    assert "secret" not in response.text.lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content_id", ["33333333-3333-4333-8333-333333333333", "99999999-9999-4999-8999-999999999999"]
+)
+async def test_public_offer_hides_unapproved_and_unknown_posts(
+    client: AsyncClient, content_id: str
+) -> None:
+    offer = await client.get(f"/v1/public/offers/{content_id}")
+    order = await client.post("/v1/public/orders", json={"content_id": content_id})
+
+    assert offer.status_code == 404
+    assert order.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_public_purchase_is_attributed_to_the_post() -> None:
+    store = FakePaymentStore()
+    app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
+    app.dependency_overrides[get_payment_store] = lambda: store
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+        order_id = order.json()["order_id"]
+        capture = await client.post(f"/v1/public/orders/{order_id}/capture")
+
+    assert capture.status_code == 200
+    assert capture.json()["amount"] == "9.00"
+    workspace_id, campaign_id, content_id = store.orders[order_id]
+    assert (str(campaign_id), str(content_id)) == (CAMPAIGN_ID, CONTENT_ID)
+    assert workspace_id is not None
+
+
+@pytest.mark.asyncio
+async def test_public_capture_refuses_orders_this_server_did_not_open(
+    client: AsyncClient,
+) -> None:
+    response = await client.post("/v1/public/orders/UNKNOWN-ORDER-1/capture")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_public_orders_are_rate_limited(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routes import public
+
+    monkeypatch.setattr(public.order_rate_limit, "limit", 1)
+    monkeypatch.setattr(public.order_rate_limit, "hits", defaultdict(deque))
+    first = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+    second = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+
+    assert first.status_code == 200
+    assert second.status_code == 429

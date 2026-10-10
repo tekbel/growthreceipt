@@ -13,7 +13,7 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 1. **Brief.** The founder gives the product, price, audience and channels in the web app.
 2. **Agent drafts.** The API calls the OpenAI agent, which returns typed campaign output. Progress streams to the browser as each real step finishes.
 3. **Founder approves.** Every post can be edited, and nothing goes out without approval. Each change is logged as a campaign event.
-4. **Buyer checks out.** The buyer opens the campaign's checkout. The API creates a PayPal order tied to that campaign, and the buyer pays in PayPal through the JavaScript SDK v6.
+4. **Buyer checks out.** Each approved post carries a public buy link. The buyer opens it without signing in and never sees GrowthReceipt. The API finds the campaign from the post, refuses posts that are not approved, creates a PayPal order tied to that post, and the buyer pays in PayPal through the JavaScript SDK v6. Public order creation is limited to 20 an hour per address.
 5. **Capture.** The API captures the order with a request ID, so a repeated capture is never counted twice.
 6. **Webhook verified.** PayPal sends the capture event. The API checks its signature with PayPal before trusting it.
 7. **Revenue attributed.** The captured amount is stored against the campaign in Postgres.

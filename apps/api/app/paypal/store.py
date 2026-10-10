@@ -37,6 +37,8 @@ class PaymentStore(Protocol):
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool: ...
 
+    async def order_workspace(self, *, paypal_order_id: str) -> UUID | None: ...
+
     async def record_webhook(
         self,
         *,
@@ -168,6 +170,19 @@ class PostgresPaymentStore:
             )
         return bool(found)
 
+    async def order_workspace(self, *, paypal_order_id: str) -> UUID | None:
+        async with self._session.begin():
+            workspace_id: UUID | None = await self._session.scalar(
+                text(
+                    """
+                    select workspace_id from growthreceipt.payment_orders
+                    where paypal_order_id = :paypal_order_id
+                    """
+                ),
+                {"paypal_order_id": paypal_order_id},
+            )
+        return workspace_id
+
     async def record_webhook(
         self,
         *,
@@ -244,6 +259,10 @@ class FakePaymentStore:
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
         order = self.orders.get(paypal_order_id)
         return order is not None and order[0] == workspace_id
+
+    async def order_workspace(self, *, paypal_order_id: str) -> UUID | None:
+        order = self.orders.get(paypal_order_id)
+        return order[0] if order else None
 
     async def record_capture(self, capture: PayPalCapture) -> None:
         if capture.order_id not in self.orders:
