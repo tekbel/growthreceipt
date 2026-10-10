@@ -25,6 +25,13 @@ export function AuthShell() {
   });
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const captcha = useTurnstile();
@@ -115,6 +122,10 @@ export function AuthShell() {
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await requestLink();
+  }
+
+  async function requestLink() {
     const supabase = getSupabase();
     if (!supabase || !email.trim()) return;
     setSubmitting(true);
@@ -128,7 +139,11 @@ export function AuthShell() {
     });
     captcha.reset();
     if (signInError) setError("The sign in email could not be sent.");
-    else setEmailSent(true);
+    else {
+      setEmailSent(true);
+      // Supabase allows one link per address every 60 seconds.
+      setResendIn(60);
+    }
     setSubmitting(false);
   }
 
@@ -217,33 +232,59 @@ export function AuthShell() {
               Continue with Google
             </button>
           ) : null}
-          <form className="auth-email" onSubmit={sendMagicLink}>
-            <label htmlFor="sign-in-email">Email address</label>
-            <div>
-              <Mail aria-hidden="true" />
-              <input
-                id="sign-in-email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <button
-              className="button secondary"
-              type="submit"
-              disabled={submitting || captchaPending}
-            >
-              Email me a sign in link
-            </button>
-          </form>
           {emailSent ? (
-            <p className="auth-success" role="status">
-              Check your inbox for the sign in link.
-            </p>
-          ) : null}
+            <div className="auth-sent" role="status">
+              <span className="auth-sent-mark">
+                <Mail aria-hidden="true" />
+              </span>
+              <strong>Check your email</strong>
+              <p>
+                We sent a sign in link to <b>{email.trim()}</b>. It works once and expires in one
+                hour.
+              </p>
+              <button
+                className="button secondary"
+                type="button"
+                disabled={submitting || captchaPending || resendIn > 0}
+                onClick={() => void requestLink()}
+              >
+                {resendIn > 0 ? `Resend link in ${resendIn}s` : "Resend link"}
+              </button>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => {
+                  setEmailSent(false);
+                  setResendIn(0);
+                }}
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <form className="auth-email" onSubmit={sendMagicLink}>
+              <label htmlFor="sign-in-email">Email address</label>
+              <div>
+                <Mail aria-hidden="true" />
+                <input
+                  id="sign-in-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+              <button
+                className="button secondary"
+                type="submit"
+                disabled={submitting || captchaPending}
+              >
+                Email me a sign in link
+              </button>
+            </form>
+          )}
           {error ? (
             <p className="inline-error" role="alert">
               {error}

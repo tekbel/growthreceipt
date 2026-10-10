@@ -129,6 +129,13 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-email > div:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .auth-email svg { width: 16px; justify-self: center; color: var(--muted); }
 .auth-email input { width: 100%; min-width: 0; height: 46px; padding: 0 14px 0 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: var(--type-md); }
+.auth-sent { display: grid; justify-items: center; gap: 10px; margin-top: 18px; padding: 24px 20px; border-radius: var(--corner-md); background: var(--surface-subtle); text-align: center; }
+.auth-sent-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--success-soft); color: var(--success); }
+.auth-sent-mark svg { width: 18px; height: 18px; }
+.auth-sent strong { font-size: var(--type-md); font-weight: 600; }
+.auth-sent p { margin: 0 0 6px; color: var(--muted); font-size: var(--type-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.auth-sent b { color: var(--ink); font-weight: 600; }
+.auth-sent .button { width: 100%; min-height: 44px; }
 .auth-success { margin: 16px 0 0; padding: 11px 13px; border-radius: var(--corner-sm); background: var(--success-soft); color: var(--success); font-size: var(--type-sm); }
 .auth-note { margin: 22px 0 0; color: var(--muted); font-size: var(--type-xs); text-align: center; }
 .auth-error { width: min(430px, calc(100% - 40px)); grid-column: 1 / -1; align-self: center; justify-self: center; padding: 36px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); text-align: center; }
