@@ -319,10 +319,10 @@ function AuthLoading({ copy }: { copy: string }) {
 
 // Mirrors the seeded judge demo, so every line here is something the demo really does.
 const flowSteps = [
-  { label: "Brief", detail: "Scribe, a writing keyboard", actor: "You" },
+  { label: "Brief", detail: "LaunchCheck, a launch page scanner", actor: "You" },
   { label: "Campaign drafted", detail: "7 posts for 3 channels", actor: "Agent" },
   { label: "Approved", detail: "Nothing publishes without you", actor: "You" },
-  { label: "PayPal checkout", detail: "Scribe Pro at 12.00 USD", actor: "Buyer" },
+  { label: "PayPal checkout", detail: "10 scan pack at 9.00 USD", actor: "Buyer" },
   { label: "Payment verified", detail: "Capture and webhook match", actor: "PayPal" },
   { label: "Next move", detail: "Learned from the sale", actor: "Agent" },
 ];
@@ -356,7 +356,7 @@ function SampleFlow() {
       <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
         <BadgeCheck aria-hidden="true" />
         <span>Attributed revenue</span>
-        <strong>12.00 USD</strong>
+        <strong>9.00 USD</strong>
       </div>
     </figure>
   );

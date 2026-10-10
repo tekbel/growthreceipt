@@ -6,54 +6,82 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 CAMPAIGN = {
     "name": "Launch week",
-    "positioning": "Clear writing without another place to work.",
-    "product_name": "Scribe",
+    "positioning": "Find what breaks a launch before your visitors do.",
+    "product_name": "LaunchCheck",
     "product_description": (
-        "A writing keyboard that helps professionals turn rough thoughts into clear "
-        "messages wherever they type."
+        "Checks a public page and finds launch problems in speed, SEO and page structure, "
+        "with clear fixes for indie builders."
     ),
-    "audience": "Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.",
-    "objective": "Increase qualified app installs",
+    "audience": "Indie builders and small teams about to launch a product page.",
+    "objective": "Sell the 10 scan pack to builders preparing a launch",
     "channels": ["LinkedIn", "X", "Instagram"],
-    "brand_voice": "Clear, confident, useful",
-    "product_icon_url": "/products/scribe.png",
+    "brand_voice": "Direct, practical, encouraging",
+    "product_icon_url": "/products/launchcheck.svg",
 }
 
+# (channel, theme, content, call to action, status, review note)
 POSTS = [
     (
         "LinkedIn",
-        "A clearer way to write at work",
-        "Clear writing is a professional advantage.\n\nScribe helps you rewrite messages "
-        "without leaving the app you are using. Turn a rough thought into a clear update "
-        "in seconds.\n\n#Productivity #BetterCommunication",
-        "Write with confidence. Anywhere you work.",
+        "Launch day is the worst time to find a slow page",
+        "You spent months on the product. Visitors decide in seconds.\n\nLaunchCheck scans "
+        "your public page and shows what slows it down, what search engines miss, and what "
+        "to fix first.\n\n#IndieHackers #Launch",
+        "Check your page before you ship.",
         "needs_review",
         None,
     ),
     (
         "LinkedIn",
-        "Turn ideas into clear messages",
-        "Good ideas deserve clear words.\n\nScribe helps you turn thoughts into polished, "
-        "professional messages faster and with less friction.",
-        "Write with confidence. Anywhere you work.",
+        "Three things we see on almost every launch page",
+        "Missing page titles. Huge images. No clear call to action.\n\nLaunchCheck finds "
+        "all three in one scan and explains each fix in plain words.",
+        "Run a scan on your launch page.",
         "changes_requested",
-        "Make the opening more specific to the moment of interruption.",
+        "Open with one real example from a scan instead of a list.",
     ),
     (
         "X",
-        "Write with confidence, anywhere",
-        "Your next work message can be clearer before you press send. Scribe rewrites it "
-        "where you already type.",
-        "Try Scribe free.",
+        "Ship with fewer surprises",
+        "Before you post your launch link, paste it into LaunchCheck. Speed, SEO and "
+        "structure checked in one go.",
+        "Scan your page.",
         "approved",
         None,
     ),
     (
+        "X",
+        "A launch checklist that checks itself",
+        "Checklists tell you what to look for. LaunchCheck looks for you and shows the "
+        "fixes that matter most.",
+        "Get the 10 scan pack.",
+        "needs_review",
+        None,
+    ),
+    (
         "Instagram",
-        "From messy to meaningful",
-        "Messy first draft? Keep it. Scribe can help you turn it into a message "
-        "you are ready to send.",
+        "Before and after one scan",
+        "Same page, three fixes, a faster first impression. LaunchCheck shows you where "
+        "to start.",
         "Link in bio.",
+        "needs_review",
+        None,
+    ),
+    (
+        "LinkedIn",
+        "Every relaunch deserves a check",
+        "New pricing page? New landing page? Scan it again. Ten scans cover a whole "
+        "launch week.",
+        "Get 10 scans for 9 USD.",
+        "needs_review",
+        None,
+    ),
+    (
+        "Instagram",
+        "Your page, reviewed in a minute",
+        "Paste a link, get a clear list of fixes. Built for builders who would rather "
+        "ship than guess.",
+        "Try LaunchCheck.",
         "needs_review",
         None,
     ),

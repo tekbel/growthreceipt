@@ -23,12 +23,12 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 
 The PayPal payment is a buyer paying the founder for the founder's product. It is not a fee for using GrowthReceipt.
 
-In the demo, the founder is Scribe and the product is Scribe Pro at 12 USD. A buyer who arrives from a campaign post pays 12 USD, and GrowthReceipt credits that revenue to the campaign.
+In the demo, the founder sells LaunchCheck (launchcheck.addisstack.com), a scanner that finds launch problems on a public page. The offer is a one time pack of 10 scans for 9 USD. A buyer who arrives from a campaign post pays 9 USD, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and the demo shows the same pack sold through PayPal.
 
 Hosted demo limits:
 
 * All checkouts run through one PayPal sandbox merchant account owned by GrowthReceipt. No real money moves.
-* The checkout offer is fixed to Scribe Pro at 12 USD.
+* The checkout offer is fixed to the LaunchCheck 10 scan pack at 9 USD.
 
 In production each founder connects their own PayPal account through PayPal partner onboarding (the Partner Referrals API), so buyers pay the founder directly and GrowthReceipt only reads the order and capture events it needs for attribution.
 

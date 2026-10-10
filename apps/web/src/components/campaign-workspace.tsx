@@ -2350,9 +2350,9 @@ function CheckoutPage({
       />
       <section className="checkout-preview-card">
         <div>
-          <span className="eyebrow">Scribe Pro</span>
+          <span className="eyebrow">LaunchCheck scan pack</span>
           <h2>Clearer writing, wherever you type.</h2>
-          <p>200 writing actions every day inside the Scribe keyboard.</p>
+          <p>10 extra page scans, paid once. Use them across your launch week.</p>
           <ul>
             <li>
               <Check aria-hidden="true" /> 200 actions every day
@@ -2368,7 +2368,7 @@ function CheckoutPage({
         <div className="checkout-offer">
           <SiPaypal aria-hidden="true" />
           <span>PayPal Sandbox</span>
-          <strong>{formatMoney("12.00", "USD")}</strong>
+          <strong>{formatMoney("9.00", "USD")}</strong>
           <p>No live money is charged in Sandbox.</p>
           {post ? (
             <small>

@@ -118,7 +118,7 @@ export function PayPalCheckout({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          offer_id: "scribe-pro",
+          offer_id: "launchcheck-scan-pack",
           campaign_id: campaignId,
           content_id: contentId,
         }),
@@ -230,11 +230,11 @@ export function PayPalCheckout({
           <div className="checkout-product-mark">S</div>
           <div>
             <span className="checkout-label">Sandbox checkout</span>
-            <h2 id="checkout-title">Scribe Pro</h2>
+            <h2 id="checkout-title">LaunchCheck scan pack</h2>
             <p>200 writing actions every day wherever you type.</p>
           </div>
           <div className="checkout-price">
-            <strong>$12.00</strong>
+            <strong>$9.00</strong>
             <span>USD · sandbox purchase</span>
           </div>
           <ul className="checkout-benefits">

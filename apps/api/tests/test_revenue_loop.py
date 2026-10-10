@@ -29,12 +29,12 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                 channel="LinkedIn",
                 theme="Keep the thought",
                 content="Write clearly without breaking your flow.",
-                call_to_action="Try Scribe Pro.",
+                call_to_action="Try LaunchCheck scan pack.",
             )
         ],
     )
     next_action = NextAction(
-        evidence_summary="One PayPal order produced 12.00 USD in verified revenue.",
+        evidence_summary="One PayPal order produced 9.00 USD in verified revenue.",
         recommendation="Test the approved message with a more specific professional audience.",
         rationale=(
             "The first verified purchase supports a narrow follow-up test, not a broad claim."
@@ -64,7 +64,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                     "product_name": "Scribe",
                     "product_description": "A writing keyboard for clear professional messages.",
                     "audience": "Busy professionals",
-                    "objective": "Sell Scribe Pro subscriptions",
+                    "objective": "Sell LaunchCheck scan pack subscriptions",
                     "channels": ["LinkedIn"],
                     "days": 1,
                     "brand_voice": "Clear, specific, calm",
@@ -82,7 +82,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             order = await client.post(
                 "/v1/paypal/orders",
                 json={
-                    "offer_id": "scribe-pro",
+                    "offer_id": "launchcheck-scan-pack",
                     "campaign_id": campaign_id,
                     "content_id": content_id,
                 },
@@ -99,7 +99,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             assert revenue.json() == {
                 "campaign_id": campaign_id,
                 "completed_orders": 1,
-                "gross_revenue": "12.00",
+                "gross_revenue": "9.00",
                 "currency": "USD",
                 "latest_capture_id": "TEST-CAPTURE-001",
             }
@@ -111,7 +111,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             result = recommendation.json()
             assert result["evidence"] == {
                 "completed_orders": 1,
-                "gross_revenue": "12.00",
+                "gross_revenue": "9.00",
                 "currency": "USD",
                 "latest_capture_id": "TEST-CAPTURE-001",
             }
@@ -125,6 +125,6 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             "campaign_approved",
             "campaign_generated",
         ]
-        assert events[0].detail["evidence"]["gross_revenue"] == "12.00"
+        assert events[0].detail["evidence"]["gross_revenue"] == "9.00"
     finally:
         app.dependency_overrides.clear()

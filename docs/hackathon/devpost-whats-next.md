@@ -22,7 +22,7 @@ The hosted demo runs every checkout through one PayPal sandbox merchant. In prod
 
 ## Offers from the product
 
-The demo offer is fixed to Scribe Pro at 12 USD. Next, the offer comes from the founder's brief: product, plan, price and currency, with several offers per campaign so the agent can compare them.
+The demo offer is fixed to the LaunchCheck 10 scan pack at 9 USD. Next, the offer comes from the founder's brief: product, plan, price and currency, with several offers per campaign so the agent can compare them.
 
 ## Publishing
 

@@ -6,108 +6,16 @@ import json
 
 import asyncpg
 from app.config import get_settings
+from app.demo import CAMPAIGN as DEMO_CAMPAIGN
+from app.demo import POSTS as DEMO_POSTS
 
 CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"
 # The first post keeps the content ID used by earlier PayPal sandbox orders.
 FIRST_POST_ID = "22222222-2222-4222-8222-222222222222"
 
-CAMPAIGN = {
-    "name": "Launch week",
-    "positioning": "Clear writing without another place to work.",
-    "product_name": "Scribe",
-    "product_description": (
-        "A writing keyboard that helps professionals turn rough thoughts into clear "
-        "messages wherever they type."
-    ),
-    "audience": "Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.",
-    "objective": "Increase qualified app installs",
-    "channels": ["LinkedIn", "X", "Instagram"],
-    "brand_voice": "Clear, confident, useful",
-    "product_icon_url": "/products/scribe.png",
-}
-
-# (channel, theme, content, call to action, status, review note)
-POSTS = [
-    (
-        "LinkedIn",
-        "A clearer way to write at work",
-        (
-            "Clear writing is a professional advantage.\n\nScribe helps you rewrite messages "
-            "without leaving the app you are using. Turn a rough thought into a clear update "
-            "in seconds.\n\n#Productivity #BetterCommunication"
-        ),
-        "Write with confidence. Anywhere you work.",
-        "needs_review",
-        None,
-    ),
-    (
-        "LinkedIn",
-        "Turn ideas into clear messages",
-        (
-            "Good ideas deserve clear words.\n\nScribe helps you turn thoughts into polished, "
-            "professional messages faster and with less friction. Whether it is a quick reply "
-            "or a complex update, you can sound like you, only clearer."
-        ),
-        "Write with confidence. Anywhere you work.",
-        "changes_requested",
-        "Make the opening more specific to the moment of interruption. Keep the final sentence.",
-    ),
-    (
-        "X",
-        "Write with confidence, anywhere",
-        (
-            "Your next work message can be clearer before you press send. Scribe rewrites it "
-            "where you already type."
-        ),
-        "Try Scribe free.",
-        "approved",
-        None,
-    ),
-    (
-        "LinkedIn",
-        "Real time, real impact",
-        (
-            "Clear writing matters most when the message matters. Scribe works inside your "
-            "keyboard, so clarity is always one tap away."
-        ),
-        "Install Scribe today.",
-        "needs_review",
-        None,
-    ),
-    (
-        "Instagram",
-        "From messy to meaningful",
-        (
-            "Messy first draft? Keep it. Scribe can help you turn it into a message you are "
-            "ready to send."
-        ),
-        "Link in bio.",
-        "needs_review",
-        None,
-    ),
-    (
-        "X",
-        "Your thoughts, better wording",
-        (
-            "Keep your meaning. Improve the wording. Scribe helps your messages sound clear "
-            "without losing your voice."
-        ),
-        "Try Scribe free.",
-        "needs_review",
-        None,
-    ),
-    (
-        "LinkedIn",
-        "Small changes, bigger progress",
-        (
-            "One clearer message will not change your career. A habit of clear communication "
-            "might. Start with the next thing you send."
-        ),
-        "Start with Scribe.",
-        "needs_review",
-        None,
-    ),
-]
+# Same campaign and posts as the hosted judge workspace.
+CAMPAIGN = DEMO_CAMPAIGN
+POSTS = DEMO_POSTS
 
 
 async def seed(reset: bool) -> None:

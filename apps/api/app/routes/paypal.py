@@ -17,11 +17,11 @@ from app.workspaces import WorkspaceId
 router = APIRouter(prefix="/v1/paypal", tags=["paypal"])
 
 OFFERS = {
-    "scribe-pro": Offer(
-        id="scribe-pro",
-        name="Scribe Pro",
-        description="Scribe Monthly Pro with 200 writing actions per day",
-        amount=Decimal("12.00"),
+    "launchcheck-scan-pack": Offer(
+        id="launchcheck-scan-pack",
+        name="LaunchCheck scan pack",
+        description="10 extra page scans, paid once",
+        amount=Decimal("9.00"),
         currency="USD",
     )
 }

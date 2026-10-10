@@ -75,15 +75,15 @@ export type PostUpdate = {
 };
 
 export const exampleBrief: CampaignBrief = {
-  product_name: "Scribe",
-  product_icon_url: "/products/scribe.png",
+  product_name: "LaunchCheck",
+  product_icon_url: "/products/launchcheck.svg",
   product_description:
-    "A writing keyboard that helps professionals turn rough thoughts into clear messages wherever they type.",
-  audience: "Knowledge workers aged 25 to 40 who value speed, clarity, and a natural voice.",
-  objective: "Turn readers into paying Scribe Pro subscribers",
+    "Checks a public page and finds launch problems in speed, SEO and page structure, with clear fixes for indie builders.",
+  audience: "Indie builders and small teams about to launch a product page.",
+  objective: "Sell the 10 scan pack to builders preparing a launch",
   channels: ["LinkedIn", "X", "Instagram"],
   days: 7,
-  brand_voice: "Clear, confident, useful",
+  brand_voice: "Direct, practical, encouraging",
 };
 
 export type DraftStage =

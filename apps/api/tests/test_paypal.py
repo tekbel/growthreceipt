@@ -36,7 +36,7 @@ async def test_create_order_uses_server_owned_offer(client: AsyncClient) -> None
     response = await client.post(
         "/v1/paypal/orders",
         json={
-            "offer_id": "scribe-pro",
+            "offer_id": "launchcheck-scan-pack",
             "campaign_id": CAMPAIGN_ID,
             "content_id": CONTENT_ID,
             "amount": "0.01",
@@ -72,7 +72,7 @@ async def test_create_order_rejects_unknown_campaign_content(client: AsyncClient
     response = await client.post(
         "/v1/paypal/orders",
         json={
-            "offer_id": "scribe-pro",
+            "offer_id": "launchcheck-scan-pack",
             "campaign_id": CAMPAIGN_ID,
             "content_id": "99999999-9999-4999-8999-999999999999",
         },
@@ -86,7 +86,7 @@ async def test_capture_order_returns_normalized_capture(client: AsyncClient) -> 
     await client.post(
         "/v1/paypal/orders",
         json={
-            "offer_id": "scribe-pro",
+            "offer_id": "launchcheck-scan-pack",
             "campaign_id": CAMPAIGN_ID,
             "content_id": CONTENT_ID,
         },
@@ -95,7 +95,7 @@ async def test_capture_order_returns_normalized_capture(client: AsyncClient) -> 
 
     assert response.status_code == 200
     assert response.json()["capture_id"] == "TEST-CAPTURE-001"
-    assert response.json()["amount"] == "12.00"
+    assert response.json()["amount"] == "9.00"
 
 
 @pytest.mark.asyncio
@@ -120,7 +120,7 @@ async def test_capture_is_attributed_to_campaign() -> None:
         create_response = await client.post(
             "/v1/paypal/orders",
             json={
-                "offer_id": "scribe-pro",
+                "offer_id": "launchcheck-scan-pack",
                 "campaign_id": CAMPAIGN_ID,
                 "content_id": CONTENT_ID,
             },
@@ -133,7 +133,7 @@ async def test_capture_is_attributed_to_campaign() -> None:
     assert summary_response.json() == {
         "campaign_id": CAMPAIGN_ID,
         "completed_orders": 1,
-        "gross_revenue": "12.00",
+        "gross_revenue": "9.00",
         "currency": "USD",
         "latest_capture_id": "TEST-CAPTURE-001",
     }
@@ -161,10 +161,10 @@ async def test_http_gateway_sends_catalog_price_and_idempotency_key() -> None:
         client=client,
     )
     offer = Offer(
-        id="scribe-pro",
-        name="Scribe Pro",
+        id="launchcheck-scan-pack",
+        name="LaunchCheck scan pack",
         description="Scribe subscription",
-        amount=Decimal("12.00"),
+        amount=Decimal("9.00"),
         currency="USD",
     )
 
@@ -178,4 +178,4 @@ async def test_http_gateway_sends_catalog_price_and_idempotency_key() -> None:
     body = json.loads(requests[1].content)
     assert order.id == "ORDER-123"
     assert requests[1].headers["PayPal-Request-Id"] == "request-123"
-    assert body["purchase_units"][0]["amount"]["value"] == "12.00"
+    assert body["purchase_units"][0]["amount"]["value"] == "9.00"

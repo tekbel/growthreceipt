@@ -229,7 +229,7 @@ class FakePayPalGateway:
             order_id=order_id,
             capture_id="TEST-CAPTURE-001",
             status="COMPLETED",
-            amount="12.00",
+            amount="9.00",
             currency="USD",
         )
 
