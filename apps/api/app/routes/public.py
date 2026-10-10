@@ -4,12 +4,10 @@ The post id in the buy link decides the campaign, the workspace and the
 offer on the server. Only approved posts can take a payment.
 """
 
-import time
-from collections import defaultdict, deque
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 
 from app.campaigns.dependencies import get_campaign_store
@@ -19,6 +17,7 @@ from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import PayPalGateway
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
+from app.rate_limit import RateLimit
 from app.routes.paypal import OFFERS, CaptureResponse, OrderResponse, open_order, settle_order
 
 router = APIRouter(prefix="/v1/public", tags=["public"])
@@ -45,29 +44,11 @@ class PublicOrderRequest(BaseModel):
     content_id: UUID
 
 
-class OrderRateLimit:
-    """Caps order creation per client address. One process, so memory is enough."""
-
-    def __init__(self, limit: int, window_seconds: float = 3600) -> None:
-        self.limit = limit
-        self.window = window_seconds
-        self.hits: dict[str, deque[float]] = defaultdict(deque)
-
-    def __call__(self, request: Request) -> None:
-        key = request.client.host if request.client else "unknown"
-        now = time.monotonic()
-        hits = self.hits[key]
-        while hits and now - hits[0] > self.window:
-            hits.popleft()
-        if len(hits) >= self.limit:
-            raise HTTPException(
-                status_code=429,
-                detail="Too many checkout attempts. Please try again later.",
-            )
-        hits.append(now)
-
-
-order_rate_limit = OrderRateLimit(ORDERS_PER_HOUR)
+order_rate_limit = RateLimit(
+    ORDERS_PER_HOUR,
+    window_seconds=3600,
+    detail="Too many checkout attempts. Please try again later.",
+)
 
 
 async def approved_post(content_id: UUID, campaigns: CampaignStore) -> PostLocation:
