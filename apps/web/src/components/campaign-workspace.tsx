@@ -65,6 +65,7 @@ type View = (typeof views)[number];
 type Filter = "All" | "Needs review" | "Changes requested" | "Approved";
 type ReviewStatus = Exclude<Filter, "All">;
 type Stage = "Approval" | "Publishing" | "Measurement";
+type Toast = { message: string; action?: { label: string; view: View } };
 
 // The current page lives in the URL hash so refresh, back, and links work.
 function viewFromHash(): View | null {
@@ -178,7 +179,7 @@ export function CampaignWorkspace({
   const [filter, setFilter] = useState<Filter>("All");
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueError, setRevenueError] = useState(false);
@@ -270,9 +271,10 @@ export function CampaignWorkspace({
     void loadRevenue();
   }, [loadRevenue]);
 
-  function notify(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2800);
+  function notify(message: string, action?: Toast["action"]) {
+    setToast({ message, action });
+    // Leave time to reach the button when the toast offers a next step.
+    window.setTimeout(() => setToast(null), action ? 7000 : 2800);
   }
 
   function navigate(nextView: View) {
@@ -290,11 +292,11 @@ export function CampaignWorkspace({
     setEditingBody(null);
   }
 
-  async function mutate(action: () => Promise<Campaign>, message: string) {
+  async function mutate(action: () => Promise<Campaign>, message: string, next?: Toast["action"]) {
     setSaving(true);
     try {
       setCampaign(await action());
-      notify(message);
+      notify(message, next);
       return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : "That change could not be saved.");
@@ -326,6 +328,7 @@ export function CampaignWorkspace({
     void mutate(
       () => campaignApi.approve(campaign.id),
       "Campaign approved. Next, make a test purchase as your customer.",
+      { label: "Open checkout", view: "checkout" },
     );
   }
 
@@ -424,6 +427,7 @@ export function CampaignWorkspace({
         return (
           <ContentPage
             campaign={campaign}
+            openCheckout={() => navigate("checkout")}
             counts={counts}
             posts={filteredPosts}
             filter={filter}
@@ -526,7 +530,18 @@ export function CampaignWorkspace({
       </div>
       {toast ? (
         <div className="toast" role="status">
-          {toast}
+          <span>{toast.message}</span>
+          {toast.action ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (toast.action) navigate(toast.action.view);
+                setToast(null);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {checkoutOpen && campaign && checkoutPost ? (
@@ -1703,15 +1718,20 @@ function CampaignsPage({
           <button className="button outline" type="button" onClick={() => navigate("content")}>
             Review content
           </button>
-          <button
-            className="button accent"
-            type="button"
-            onClick={approveCampaign}
-            disabled={saving || campaign.status === "approved"}
-          >
-            <Check aria-hidden="true" />{" "}
-            {campaign.status === "approved" ? "Campaign approved" : "Approve campaign"}
-          </button>
+          {campaign.status === "approved" ? (
+            <button className="button accent" type="button" onClick={() => navigate("checkout")}>
+              <CreditCard aria-hidden="true" /> Make a test purchase
+            </button>
+          ) : (
+            <button
+              className="button accent"
+              type="button"
+              onClick={approveCampaign}
+              disabled={saving}
+            >
+              <Check aria-hidden="true" /> Approve campaign
+            </button>
+          )}
         </div>
       </section>
       <ActivityPanel campaign={campaign} />
@@ -1784,8 +1804,10 @@ function ContentPage({
   selectFilter,
   selectPost,
   setEditingBody,
+  openCheckout,
 }: {
   campaign: Campaign;
+  openCheckout: () => void;
   counts: Record<Filter, number>;
   posts: Post[];
   filter: Filter;
@@ -1907,6 +1929,7 @@ function ContentPage({
           requestChanges={requestChanges}
           startEditing={() => setEditingBody(selected.content)}
           saveEdits={saveEdits}
+          openCheckout={openCheckout}
         />
       </section>
     </>
@@ -1923,11 +1946,13 @@ function ReviewActions({
   requestChanges,
   startEditing,
   saveEdits,
+  openCheckout,
 }: {
   campaign: Campaign;
   post: Post;
   editing: boolean;
   saving: boolean;
+  openCheckout: () => void;
   approveCampaign: () => void;
   approvePost: () => void;
   requestChanges: (note: string) => Promise<boolean>;
@@ -2005,14 +2030,20 @@ function ReviewActions({
           <Check aria-hidden="true" />{" "}
           {post.status === "approved" ? "Post approved" : "Approve post"}
         </button>
-        <button
-          className="button dark"
-          type="button"
-          onClick={approveCampaign}
-          disabled={saving || editing || campaign.status === "approved"}
-        >
-          <Check aria-hidden="true" /> Approve campaign
-        </button>
+        {campaign.status === "approved" ? (
+          <button className="button dark" type="button" onClick={openCheckout}>
+            <CreditCard aria-hidden="true" /> Make a test purchase
+          </button>
+        ) : (
+          <button
+            className="button dark"
+            type="button"
+            onClick={approveCampaign}
+            disabled={saving || editing}
+          >
+            <Check aria-hidden="true" /> Approve campaign
+          </button>
+        )}
       </div>
     </aside>
   );
