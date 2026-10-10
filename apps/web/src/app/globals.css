@@ -118,6 +118,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-demo-button, .auth-provider-button, .auth-email > .button { width: 100%; min-height: 48px; }
 .auth-demo-button { justify-content: space-between; margin-top: 28px; padding-right: 16px; padding-left: 18px; }
 .auth-demo-button svg { width: 17px; }
+.auth-captcha { min-height: 65px; margin-top: 16px; }
 .auth-divider { display: flex; align-items: center; gap: 13px; margin: 24px 0; color: var(--muted); font-size: var(--type-xs); }
 .auth-divider::before, .auth-divider::after { height: 1px; flex: 1; background: var(--line); content: ""; }
 .auth-provider-button { justify-content: center; }

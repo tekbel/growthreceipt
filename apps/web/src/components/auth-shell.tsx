@@ -11,7 +11,14 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
-import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { SiPaypal } from "react-icons/si";
 
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
@@ -31,6 +38,8 @@ export function AuthShell() {
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const captcha = useTurnstile();
+  const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
   const bootstrap = useCallback(async (accessToken: string) => {
     setState("bootstrapping");
@@ -87,7 +96,10 @@ export function AuthShell() {
     if (!supabase) return;
     setSubmitting(true);
     setError(null);
-    const { error: signInError } = await supabase.auth.signInAnonymously();
+    const { error: signInError } = await supabase.auth.signInAnonymously({
+      options: { captchaToken: captcha.token ?? undefined },
+    });
+    captcha.reset();
     if (signInError) {
       setError("The judge demo could not be opened. Please try again.");
       setSubmitting(false);
@@ -117,8 +129,12 @@ export function AuthShell() {
     setError(null);
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        captchaToken: captcha.token ?? undefined,
+      },
     });
+    captcha.reset();
     if (signInError) setError("The sign in email could not be sent.");
     else setEmailSent(true);
     setSubmitting(false);
@@ -189,12 +205,13 @@ export function AuthShell() {
           <button
             className="button primary auth-demo-button"
             type="button"
-            disabled={submitting}
+            disabled={submitting || captchaPending}
             onClick={() => void enterJudgeDemo()}
           >
             {submitting ? "Opening demo" : "Try the judge demo"}
             <ArrowRight aria-hidden="true" />
           </button>
+          {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
           <div className="auth-divider">
             <span>or keep your workspace</span>
           </div>
@@ -202,7 +219,7 @@ export function AuthShell() {
             <button
               className="button secondary auth-provider-button"
               type="button"
-              disabled={submitting}
+              disabled={submitting || captchaPending}
               onClick={() => void signInWithGoogle()}
             >
               Continue with Google
@@ -222,7 +239,11 @@ export function AuthShell() {
                 required
               />
             </div>
-            <button className="button secondary" type="submit" disabled={submitting}>
+            <button
+              className="button secondary"
+              type="submit"
+              disabled={submitting || captchaPending}
+            >
               Email me a sign in link
             </button>
           </form>
@@ -307,4 +328,60 @@ function SampleReceipt() {
       </div>
     </figure>
   );
+}
+
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+type Turnstile = {
+  render: (element: HTMLElement, options: Record<string, unknown>) => string;
+  reset: (widgetId: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+// Supabase requires a Turnstile token for sign ins on this project. Tokens are single use.
+function useTurnstile() {
+  // Callback ref, because the widget slot only mounts once the sign in card shows.
+  const [element, ref] = useState<HTMLDivElement | null>(null);
+  const widget = useRef<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!turnstileSiteKey || !element) return;
+    const render = () => {
+      const turnstile = (window as unknown as { turnstile?: Turnstile }).turnstile;
+      if (!turnstile || widget.current) return;
+      widget.current = turnstile.render(element, {
+        sitekey: turnstileSiteKey,
+        theme: "auto",
+        size: "flexible",
+        callback: (value: string) => setToken(value),
+        "expired-callback": () => setToken(null),
+        "error-callback": () => setToken(null),
+      });
+    };
+    let script = document.querySelector<HTMLScriptElement>("script[data-turnstile]");
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.dataset.turnstile = "";
+      document.head.append(script);
+    }
+    script.addEventListener("load", render);
+    render();
+    return () => {
+      script?.removeEventListener("load", render);
+      const turnstile = (window as unknown as { turnstile?: Turnstile }).turnstile;
+      if (widget.current) turnstile?.remove(widget.current);
+      widget.current = null;
+    };
+  }, [element]);
+
+  const reset = useCallback(() => {
+    const turnstile = (window as unknown as { turnstile?: Turnstile }).turnstile;
+    if (widget.current) turnstile?.reset(widget.current);
+    setToken(null);
+  }, []);
+
+  return { ref, token, reset };
 }
