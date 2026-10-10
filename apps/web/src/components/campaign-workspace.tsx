@@ -562,6 +562,13 @@ export function CampaignWorkspace({
           onCaptured={async () => {
             await loadRevenue();
             setRecommendation(null);
+            notify(
+              "Payment verified and credited to this campaign. The agent can learn from it now.",
+              {
+                label: "Find next move",
+                view: "experiment",
+              },
+            );
           }}
         />
       ) : null}
@@ -1175,19 +1182,21 @@ function FocusCard({
   const waiting = campaign.posts.find((post) => post.status !== "approved");
   const next = campaign.posts.find((post) => post.status === "approved");
   const focus: { label: string; title: string; note?: string; action: string; view: View } =
-    needsReview
+    // A verified purchase is the moment the loop closes, so it outranks pending reviews.
+    sales
       ? {
-          label: "Next decision",
-          title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
-          action: "Review posts",
-          view: "content" as View,
+          label: "Next move",
+          title: "Results are in. Choose the next experiment",
+          note: `${sales} verified PayPal purchase${sales === 1 ? "" : "s"} so far. The agent reads this payment evidence and proposes one next experiment for you to approve.`,
+          action: "Find next move",
+          view: "experiment" as View,
         }
-      : sales
+      : needsReview
         ? {
-            label: "Next move",
-            title: "Results are in. Choose the next experiment",
-            action: "Find next move",
-            view: "experiment" as View,
+            label: "Next decision",
+            title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
+            action: "Review posts",
+            view: "content" as View,
           }
         : stage === "Publishing"
           ? {
