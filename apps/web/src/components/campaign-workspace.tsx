@@ -189,7 +189,11 @@ export function CampaignWorkspace({
 
   const posts = useMemo(() => campaign?.posts ?? [], [campaign]);
   const selected = posts.find((post) => post.id === selectedId) ?? posts[0] ?? null;
-  const checkoutPost = posts.find((post) => post.status === "approved") ?? posts[0] ?? null;
+  // A customer can only arrive from a post the founder approved. Prefer the post in view.
+  const checkoutPost =
+    selected?.status === "approved"
+      ? selected
+      : (posts.find((post) => post.status === "approved") ?? null);
   const filteredPosts = useMemo(
     () => posts.filter((post) => filter === "All" || statusFor(post) === filter),
     [posts, filter],
@@ -306,9 +310,9 @@ export function CampaignWorkspace({
     }
   }
 
-  async function updateSelected(update: PostUpdate, message: string) {
+  async function updateSelected(update: PostUpdate, message: string, next?: Toast["action"]) {
     if (!campaign || !selected) return false;
-    return mutate(() => campaignApi.updatePost(campaign.id, selected.id, update), message);
+    return mutate(() => campaignApi.updatePost(campaign.id, selected.id, update), message, next);
   }
 
   async function saveEdits() {
@@ -436,7 +440,13 @@ export function CampaignWorkspace({
             editingBody={editingBody}
             saving={saving}
             approveCampaign={approveCampaign}
-            approvePost={() => void updateSelected({ status: "approved" }, "Post approved.")}
+            approvePost={() =>
+              void updateSelected(
+                { status: "approved" },
+                "Post approved. You can make a test purchase from it now.",
+                { label: "Open checkout", view: "checkout" },
+              )
+            }
             requestChanges={(note) =>
               updateSelected(
                 { status: "changes_requested", review_note: note },
@@ -2021,27 +2031,28 @@ function ReviewActions({
         >
           <FileText aria-hidden="true" /> Request changes
         </button>
-        <button
-          className="button accent"
-          type="button"
-          onClick={approvePost}
-          disabled={saving || editing || post.status === "approved"}
-        >
-          <Check aria-hidden="true" />{" "}
-          {post.status === "approved" ? "Post approved" : "Approve post"}
-        </button>
-        {campaign.status === "approved" ? (
-          <button className="button dark" type="button" onClick={openCheckout}>
+        {post.status === "approved" ? (
+          <button className="button accent" type="button" onClick={openCheckout}>
             <CreditCard aria-hidden="true" /> Make a test purchase
           </button>
         ) : (
+          <button
+            className="button accent"
+            type="button"
+            onClick={approvePost}
+            disabled={saving || editing}
+          >
+            <Check aria-hidden="true" /> Approve post
+          </button>
+        )}
+        {campaign.status === "approved" ? null : (
           <button
             className="button dark"
             type="button"
             onClick={approveCampaign}
             disabled={saving || editing}
           >
-            <Check aria-hidden="true" /> Approve campaign
+            <Check aria-hidden="true" /> Approve all posts
           </button>
         )}
       </div>
@@ -2426,6 +2437,9 @@ function CheckoutPage({
           <button className="button dark" type="button" onClick={openCheckout} disabled={!post}>
             Pay with PayPal
           </button>
+          {post ? null : (
+            <small>Approve a post first. Customers arrive from posts you approved.</small>
+          )}
           {revenue?.latest_capture_id ? (
             <small>Latest capture: {revenue.latest_capture_id}</small>
           ) : null}
