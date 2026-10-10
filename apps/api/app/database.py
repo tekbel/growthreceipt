@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 
 from sqlalchemy import text
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
 _engine: AsyncEngine | None = None
 
 
@@ -30,6 +32,7 @@ async def database_is_ready() -> bool:
     try:
         async with get_engine().connect() as connection:
             await connection.execute(text("select 1"))
-    except Exception:
+    except Exception as error:
+        logger.warning("Database not ready: %s: %s", type(error).__name__, error)
         return False
     return True
