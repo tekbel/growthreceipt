@@ -26,7 +26,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { PayPalCheckout } from "@/components/paypal-checkout";
@@ -1729,9 +1729,7 @@ function CampaignsPage({
             Review content
           </button>
           {campaign.status === "approved" ? (
-            <button className="button accent" type="button" onClick={() => navigate("checkout")}>
-              <CreditCard aria-hidden="true" /> Make a test purchase
-            </button>
+            <TestPurchaseButton className="button accent" onClick={() => navigate("checkout")} />
           ) : (
             <button
               className="button accent"
@@ -2032,9 +2030,7 @@ function ReviewActions({
           <FileText aria-hidden="true" /> Request changes
         </button>
         {post.status === "approved" ? (
-          <button className="button accent" type="button" onClick={openCheckout}>
-            <CreditCard aria-hidden="true" /> Make a test purchase
-          </button>
+          <TestPurchaseButton className="button accent" onClick={openCheckout} />
         ) : (
           <button
             className="button accent"
@@ -2446,6 +2442,21 @@ function CheckoutPage({
         </div>
       </section>
     </>
+  );
+}
+
+function TestPurchaseButton({ className, onClick }: { className: string; onClick: () => void }) {
+  const tipId = useId();
+  return (
+    <span className="tip-anchor">
+      <button className={className} type="button" onClick={onClick} aria-describedby={tipId}>
+        <CreditCard aria-hidden="true" /> Make a test purchase
+      </button>
+      <span className="tip" id={tipId} role="tooltip">
+        You act as your own customer. Pay with a PayPal sandbox account, so no real money moves. The
+        payment is credited to the post it came from.
+      </span>
+    </span>
   );
 }
 
