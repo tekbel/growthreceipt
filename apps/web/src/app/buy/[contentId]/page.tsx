@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { BuyCheckout } from "@/components/paypal-checkout";
 
@@ -8,7 +9,18 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function BuyPage({ params }: { params: Promise<{ contentId: string }> }) {
+type Params = Promise<{ contentId: string }>;
+
+// The post id is only known per request, so it is read inside a Suspense boundary.
+export default function BuyPage({ params }: { params: Params }) {
+  return (
+    <Suspense fallback={<main className="buy-page" aria-busy="true" />}>
+      <BuyForPost params={params} />
+    </Suspense>
+  );
+}
+
+async function BuyForPost({ params }: { params: Params }) {
   const { contentId } = await params;
   return <BuyCheckout contentId={contentId} />;
 }
