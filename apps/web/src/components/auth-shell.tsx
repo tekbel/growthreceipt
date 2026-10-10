@@ -324,7 +324,7 @@ const flowSteps = [
   { label: "Approved", detail: "Nothing publishes without you", actor: "You" },
   { label: "PayPal checkout", detail: "10 scan pack at 9.00 USD", actor: "Buyer" },
   { label: "Payment verified", detail: "Capture and webhook match", actor: "PayPal" },
-  { label: "Next move", detail: "Learned from the sale", actor: "Agent" },
+  { label: "Next move", detail: "Learned from the purchase", actor: "Agent" },
 ];
 
 function SampleFlow() {

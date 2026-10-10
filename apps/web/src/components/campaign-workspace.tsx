@@ -101,7 +101,7 @@ const workspaceNavigation = [
 const systemNavigation = [
   ["integrations", "Integrations", Network],
   ["settings", "Settings", SlidersHorizontal],
-  ["checkout", "Checkout preview", CreditCard],
+  ["checkout", "Customer checkout", CreditCard],
 ] as const;
 const viewLabels: Record<View, string> = {
   today: "Today",
@@ -114,7 +114,7 @@ const viewLabels: Record<View, string> = {
   experiment: "Next experiment",
   integrations: "Integrations",
   settings: "Settings",
-  checkout: "Checkout preview",
+  checkout: "Customer checkout",
 };
 const reviewLabels: Record<PostStatus, ReviewStatus> = {
   needs_review: "Needs review",
@@ -325,7 +325,7 @@ export function CampaignWorkspace({
     if (!campaign) return;
     void mutate(
       () => campaignApi.approve(campaign.id),
-      "Campaign approved. Connect a channel when you are ready to publish.",
+      "Campaign approved. Next, make a test purchase as your customer.",
     );
   }
 
@@ -1030,8 +1030,8 @@ function TodayPage({
           }
           detail={
             sales
-              ? `${sales} PayPal sale${sales === 1 ? "" : "s"} verified`
-              : "Waiting for the first PayPal sale"
+              ? `${sales} PayPal purchase${sales === 1 ? "" : "s"} verified`
+              : "Waiting for the first PayPal purchase"
           }
           tone={sales ? "success" : "neutral"}
         />
@@ -1149,34 +1149,44 @@ function FocusCard({
 }) {
   const waiting = campaign.posts.find((post) => post.status !== "approved");
   const next = campaign.posts.find((post) => post.status === "approved");
-  const post = needsReview ? waiting : next;
-  const focus = needsReview
-    ? {
-        label: "Next decision",
-        title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
-        action: "Review posts",
-        view: "content" as View,
-      }
-    : sales
+  const focus: { label: string; title: string; note?: string; action: string; view: View } =
+    needsReview
       ? {
-          label: "Next move",
-          title: "Results are in. Choose the next experiment",
-          action: "Find next move",
-          view: "experiment" as View,
+          label: "Next decision",
+          title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
+          action: "Review posts",
+          view: "content" as View,
         }
-      : {
-          label: "Next up",
-          title: next
-            ? `Day ${next.day} goes out ${postDate(campaign, next)} on ${next.channel}`
-            : "Approve a post to schedule it",
-          action: "Connect channels",
-          view: "integrations" as View,
-        };
+      : sales
+        ? {
+            label: "Next move",
+            title: "Results are in. Choose the next experiment",
+            action: "Find next move",
+            view: "experiment" as View,
+          }
+        : stage === "Publishing"
+          ? {
+              label: "Next up",
+              title: "Your campaign is approved. Now be your own customer",
+              note: `You are the founder of ${campaign.product_name}. Picture a customer who saw one of your posts and bought the 10 scan pack for 9 USD. Make that purchase yourself with a PayPal sandbox account. The 9 USD is credited to this campaign as revenue, and the agent learns from it to plan posts around what people paid for, not what they liked.`,
+              action: "Open checkout",
+              view: "checkout" as View,
+            }
+          : {
+              label: "Next up",
+              title: next
+                ? `Day ${next.day} goes out ${postDate(campaign, next)} on ${next.channel}`
+                : "Approve a post to schedule it",
+              action: "Review posts",
+              view: "content" as View,
+            };
+  const post = focus.note ? null : needsReview ? waiting : next;
   return (
     <section className="panel focus-card" aria-label={focus.label}>
       <div className="focus-body">
         <span className="focus-label">{focus.label}</span>
         <h2>{focus.title}</h2>
+        {focus.note ? <p className="focus-note">{focus.note}</p> : null}
         {post ? (
           <figure className="focus-post">
             <figcaption>
@@ -2351,24 +2361,24 @@ function CheckoutPage({
   return (
     <>
       <PageHeader
-        eyebrow="System"
-        title="Checkout preview"
-        description="Test the exact PayPal Sandbox purchase flow connected to this campaign."
+        eyebrow="Customer view"
+        title="Buy as your customer"
+        description="This is what a customer sees after clicking one of your posts. Pay with a PayPal sandbox account. The payment goes to you, and GrowthReceipt credits it to the post that brought it."
       />
       <section className="checkout-preview-card">
         <div>
           <span className="eyebrow">LaunchCheck scan pack</span>
-          <h2>Clearer writing, wherever you type.</h2>
+          <h2>Find what breaks a launch before your visitors do.</h2>
           <p>10 extra page scans, paid once. Use them across your launch week.</p>
           <ul>
             <li>
-              <Check aria-hidden="true" /> 200 actions every day
+              <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
             </li>
             <li>
-              <Check aria-hidden="true" /> Works inside your keyboard
+              <Check aria-hidden="true" /> A clear fix for every problem found
             </li>
             <li>
-              <Check aria-hidden="true" /> Monthly Pro plan
+              <Check aria-hidden="true" /> One payment, no subscription
             </li>
           </ul>
         </div>
@@ -2376,14 +2386,14 @@ function CheckoutPage({
           <SiPaypal aria-hidden="true" />
           <span>PayPal Sandbox</span>
           <strong>{formatMoney("9.00", "USD")}</strong>
-          <p>No live money is charged in Sandbox.</p>
+          <p>Sandbox only. No real money moves.</p>
           {post ? (
             <small>
-              Attributed to day {post.day} · {post.channel} · {post.theme}
+              Credited to day {post.day} · {post.channel} · {post.theme}
             </small>
           ) : null}
           <button className="button dark" type="button" onClick={openCheckout} disabled={!post}>
-            Open secure checkout
+            Pay with PayPal
           </button>
           {revenue?.latest_capture_id ? (
             <small>Latest capture: {revenue.latest_capture_id}</small>
