@@ -1,0 +1,21 @@
+{{ if eq .RedirectTo "https://growthreceipt.addisstack.com" }}
+<div style="margin:0;padding:32px 16px;background:#f5f8fa;font-family:Figtree,Helvetica,Arial,sans-serif;color:#22282f;">
+  <div style="max-width:480px;margin:0 auto;padding:36px 32px;background:#ffffff;border:1px solid #e3e7ec;border-radius:18px;">
+    <p style="margin:0 0 28px;font-size:18px;font-weight:600;">GrowthReceipt</p>
+    <h1 style="margin:0 0 12px;font-size:24px;font-weight:500;letter-spacing:-0.02em;">Sign in to your workspace</h1>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#515e71;">
+      Use the button below to open your GrowthReceipt workspace. Your campaigns, approvals and PayPal results stay saved to this email address.
+    </p>
+    <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 22px;background:#3a5bc7;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Sign in to GrowthReceipt</a>
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#66768a;">
+      The link works once and expires in one hour. If you did not ask to sign in, you can ignore this email.
+    </p>
+    <p style="margin:28px 0 0;padding-top:20px;border-top:1px solid #e3e7ec;font-size:12px;line-height:1.6;color:#66768a;">
+      GrowthReceipt is a marketing agent that learns from verified PayPal payments.<br>
+      <a href="https://growthreceipt.addisstack.com" style="color:#3a5bc7;">growthreceipt.addisstack.com</a>
+    </p>
+  </div>
+</div>
+{{ else }}
+<!-- Paste the website's current Magic Link template here, unchanged. -->
+{{ end }}
