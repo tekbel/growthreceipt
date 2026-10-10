@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID, uuid4
@@ -10,7 +11,7 @@ from app.campaigns.store import CampaignStore
 from app.config import get_settings
 from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import Offer, PayPalAPIError, PayPalGateway
-from app.paypal.store import PaymentStore
+from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
 from app.workspaces import WorkspaceId
 
@@ -66,6 +67,48 @@ class RevenueSummaryResponse(BaseModel):
     gross_revenue: str
     currency: str
     latest_capture_id: str | None
+
+
+class WebhookProofResponse(BaseModel):
+    event_id: str
+    event_type: str
+    received_at: datetime
+
+
+class ReceiptResponse(BaseModel):
+    order_id: str
+    capture_id: str
+    content_id: UUID
+    amount: str
+    currency: str
+    ordered_at: datetime
+    captured_at: datetime
+    webhooks: list[WebhookProofResponse]
+
+    @classmethod
+    def of(cls, receipt: Receipt) -> "ReceiptResponse":
+        return cls(
+            order_id=receipt.paypal_order_id,
+            capture_id=receipt.paypal_capture_id,
+            content_id=receipt.content_id,
+            amount=f"{receipt.amount:.2f}",
+            currency=receipt.currency,
+            ordered_at=receipt.ordered_at,
+            captured_at=receipt.captured_at,
+            webhooks=[
+                WebhookProofResponse(
+                    event_id=proof.event_id,
+                    event_type=proof.event_type,
+                    received_at=proof.received_at,
+                )
+                for proof in receipt.webhooks
+            ],
+        )
+
+
+class ReceiptsResponse(BaseModel):
+    campaign_id: UUID
+    receipts: list[ReceiptResponse]
 
 
 @router.get("/config", response_model=PayPalConfigResponse)
@@ -218,4 +261,21 @@ async def get_revenue_summary(
         gross_revenue=f"{summary.gross_revenue:.2f}",
         currency=summary.currency,
         latest_capture_id=summary.latest_capture_id,
+    )
+
+
+@router.get("/receipts/{campaign_id}", response_model=ReceiptsResponse)
+async def get_receipts(
+    campaign_id: UUID,
+    store: Annotated[PaymentStore, Depends(get_payment_store)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
+) -> ReceiptsResponse:
+    """Each completed purchase with its post and the verified PayPal events, newest first."""
+    if await campaigns.get(workspace_id=workspace_id, campaign_id=campaign_id) is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    receipts = await store.receipts(campaign_id=campaign_id)
+    return ReceiptsResponse(
+        campaign_id=campaign_id,
+        receipts=[ReceiptResponse.of(receipt) for receipt in receipts],
     )

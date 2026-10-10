@@ -314,3 +314,44 @@ async def test_public_orders_are_rate_limited(
 
     assert first.status_code == 200
     assert second.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_receipt_links_post_capture_and_verified_webhooks(client: AsyncClient) -> None:
+    order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+    order_id = order.json()["order_id"]
+    await client.post(f"/v1/public/orders/{order_id}/capture")
+    # PayPal sends the capture event with the capture id and the order it belongs to.
+    await client.post(
+        "/v1/paypal/webhooks",
+        json={
+            "id": "WH-CAPTURE",
+            "event_type": "PAYMENT.CAPTURE.COMPLETED",
+            "resource": {
+                "id": "TEST-CAPTURE-001",
+                "supplementary_data": {"related_ids": {"order_id": order_id}},
+            },
+        },
+    )
+    await client.post(
+        "/v1/paypal/webhooks",
+        json={"id": "WH-OTHER", "event_type": "PAYMENT.CAPTURE.COMPLETED", "resource": {"id": "X"}},
+    )
+
+    response = await client.get(f"/v1/paypal/receipts/{CAMPAIGN_ID}")
+
+    assert response.status_code == 200
+    [receipt] = response.json()["receipts"]
+    assert receipt["order_id"] == order_id
+    assert receipt["capture_id"] == "TEST-CAPTURE-001"
+    assert receipt["content_id"] == CONTENT_ID
+    assert receipt["amount"] == "9.00"
+    assert [event["event_id"] for event in receipt["webhooks"]] == ["WH-CAPTURE"]
+    assert receipt["ordered_at"] <= receipt["captured_at"]
+
+
+@pytest.mark.asyncio
+async def test_receipts_hide_unknown_campaigns(client: AsyncClient) -> None:
+    response = await client.get("/v1/paypal/receipts/99999999-9999-4999-8999-999999999999")
+
+    assert response.status_code == 404

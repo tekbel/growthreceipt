@@ -730,3 +730,70 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @keyframes spin { to { transform: rotate(360deg); } }
 /* Keep the spinner turning under reduced motion, only slower, so progress stays visible. */
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.6s !important; } }
+
+/* Receipt chain. One purchase traced from the post to the founder's decision. */
+.today-receipt, .results-receipts { margin-top: 44px; }
+.results-receipts + .results-body { margin-top: 44px; }
+.receipt { padding-top: 22px; border-top: 1px solid var(--line-strong); }
+.receipt-chain { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 20px; }
+.receipt-chain li { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 36px; animation: rise var(--duration-base) var(--ease) both; }
+.receipt-chain li:nth-child(2) { animation-delay: 45ms; }
+.receipt-chain li:nth-child(3) { animation-delay: 90ms; }
+.receipt-chain li:nth-child(4) { animation-delay: 135ms; }
+.receipt-chain li:nth-child(5) { animation-delay: 180ms; }
+.receipt-chain li::before { content: ""; position: absolute; top: 11px; left: 30px; right: -12px; height: 1px; background: var(--line-strong); }
+.receipt-chain li.done::before { background: var(--success); opacity: .45; }
+.receipt-chain li:last-child::before { display: none; }
+.receipt-marker { position: absolute; top: 0; left: 0; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); }
+.receipt-chain li.done .receipt-marker { border-color: transparent; background: var(--success-soft); color: var(--success); }
+.receipt-marker svg { width: 13px; height: 13px; }
+.receipt-chain strong { color: var(--ink); font-size: var(--type-sm); font-weight: 600; line-height: 1.35; }
+.receipt-chain li > span:not(.eyebrow, .receipt-marker) { color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
+.receipt-chain .receipt-amount { font-size: var(--type-xl); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.receipt-chain .text-button { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-sm); }
+.receipt-chain .text-button svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
+.receipt-chain .text-button:hover svg { transform: translateX(2px); }
+.receipt-chain .text-button:disabled { color: var(--muted); text-decoration: none; cursor: progress; }
+
+.receipt-proof { margin-top: 18px; border-top: 1px solid var(--line); }
+.receipt-proof summary { min-height: 48px; display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; list-style: none; cursor: pointer; transition: color var(--duration-fast) var(--ease); }
+.receipt-proof summary::-webkit-details-marker { display: none; }
+.receipt-proof summary:hover { color: var(--ink); }
+.receipt-proof summary svg { width: 16px; height: 16px; }
+.receipt-proof-chevron { margin-left: auto; transition: transform var(--duration-base) var(--ease); }
+.receipt-proof[open] .receipt-proof-chevron { transform: rotate(180deg); }
+.proof-timeline { margin: 6px 0 0; padding: 0; list-style: none; max-width: 760px; }
+.proof-timeline li { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 14px; padding-bottom: 20px; animation: rise var(--duration-base) var(--ease) both; }
+.proof-timeline li::before { content: ""; position: absolute; top: 26px; bottom: 4px; left: 11px; width: 1px; background: var(--line); }
+.proof-timeline li:last-child::before { display: none; }
+.proof-dot { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--success-soft); color: var(--success); }
+.proof-dot svg { width: 12px; height: 12px; }
+.proof-timeline li.pending .proof-dot { background: var(--surface-hover); color: var(--muted); }
+.proof-timeline li.pending strong { color: var(--muted); }
+.proof-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 14px; }
+.proof-head strong { color: var(--ink); font-size: var(--type-sm); font-weight: 600; }
+.proof-head time { color: var(--muted); font-size: var(--type-xs); font-variant-numeric: tabular-nums; }
+.proof-timeline p { margin: 4px 0 0; color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
+.proof-id { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: var(--muted); font-size: var(--type-xs); }
+.proof-id code, .earlier-receipts code { padding: 2px 6px; border-radius: var(--corner-sm); background: var(--surface-subtle); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--type-xs); overflow-wrap: anywhere; user-select: all; }
+.proof-note { margin: 0 0 20px 36px; color: var(--muted); font-size: var(--type-xs); }
+
+.earlier-receipts { margin-top: 28px; }
+.earlier-receipts h3 { margin: 0 0 4px; font-size: var(--type-sm); font-weight: 600; }
+.earlier-receipts ul { margin: 0; padding: 0; list-style: none; }
+.earlier-receipts li { min-height: 46px; display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); font-size: var(--type-sm); }
+.earlier-receipts time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.earlier-receipts strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+  .receipt-chain { grid-template-columns: minmax(0, 1fr); }
+  .receipt-chain li { padding: 0 0 20px 36px; }
+  .receipt-chain li::before { top: 26px; bottom: 4px; left: 11px; right: auto; width: 1px; height: auto; }
+}
+@media (max-width: 640px) {
+  .earlier-receipts li { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0; }
+  .earlier-receipts code { display: none; }
+  .earlier-receipts span { grid-column: 1; }
+  .proof-note { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .receipt-chain li { animation-delay: 0ms; } }

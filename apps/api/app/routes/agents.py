@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -41,11 +42,22 @@ class NextAction(BaseModel):
     human_approval_required: bool
 
 
+class PaidPostEvidence(BaseModel):
+    content_id: UUID
+    day: int
+    channel: str
+    theme: str
+    content: str
+    completed_orders: int
+    revenue: str
+
+
 class RevenueEvidence(BaseModel):
     completed_orders: int
     gross_revenue: str
     currency: str
     latest_capture_id: str | None
+    paid_posts: list[PaidPostEvidence] = []
 
 
 class NextActionResponse(BaseModel):
@@ -69,6 +81,8 @@ evidence_summary, rationale and expected_signal are one or two short sentences e
 Never use semicolons, dashes or jargon such as bounded, causality or attributed.
 Use low confidence when there are fewer than 10 completed orders.
 If there are no completed orders, recommend the smallest action needed to collect useful evidence.
+paid_posts lists the posts whose buy link took the payments. When it is not empty,
+name the post that earned the most by its day and channel, and build the experiment on it.
 """
 
 
@@ -104,11 +118,29 @@ async def create_next_action(
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
     summary = await store.revenue_summary(campaign_id=campaign.id)
+    receipts = await store.receipts(campaign_id=campaign.id)
+    paid_posts = []
+    for post in campaign.posts:
+        paid = [receipt for receipt in receipts if receipt.content_id == post.id]
+        if paid:
+            paid_posts.append(
+                PaidPostEvidence(
+                    content_id=post.id,
+                    day=post.day,
+                    channel=post.channel,
+                    theme=post.theme,
+                    content=post.content,
+                    completed_orders=len(paid),
+                    revenue=f"{sum((receipt.amount for receipt in paid), Decimal('0')):.2f}",
+                )
+            )
+    paid_posts.sort(key=lambda paid: Decimal(paid.revenue), reverse=True)
     evidence = RevenueEvidence(
         completed_orders=summary.completed_orders,
         gross_revenue=f"{summary.gross_revenue:.2f}",
         currency=summary.currency,
         latest_capture_id=summary.latest_capture_id,
+        paid_posts=paid_posts,
     )
     prompt = json.dumps(
         {
@@ -123,7 +155,7 @@ async def create_next_action(
                 "approved_posts": sum(post.status == "approved" for post in campaign.posts),
                 "total_posts": len(campaign.posts),
             },
-            "verified_revenue_evidence": evidence.model_dump(),
+            "verified_revenue_evidence": evidence.model_dump(mode="json"),
         },
         indent=2,
     )
@@ -157,7 +189,7 @@ async def create_next_action(
         detail={
             "session_id": run.session_id,
             "turn_id": run.turn_id,
-            "evidence": evidence.model_dump(),
+            "evidence": evidence.model_dump(mode="json"),
             "next_action": run.output.model_dump(),
         },
     )

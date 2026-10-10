@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol, cast
 from uuid import UUID
@@ -19,6 +20,27 @@ class RevenueSummary:
     gross_revenue: Decimal
     currency: str
     latest_capture_id: str | None
+
+
+@dataclass(frozen=True)
+class WebhookProof:
+    event_id: str
+    event_type: str
+    received_at: datetime
+
+
+@dataclass(frozen=True)
+class Receipt:
+    """A completed order with the post it came from and the verified PayPal events about it."""
+
+    paypal_order_id: str
+    paypal_capture_id: str
+    content_id: UUID
+    amount: Decimal
+    currency: str
+    ordered_at: datetime
+    captured_at: datetime
+    webhooks: list[WebhookProof] = field(default_factory=list)
 
 
 class PaymentStore(Protocol):
@@ -48,6 +70,8 @@ class PaymentStore(Protocol):
     ) -> bool: ...
 
     async def revenue_summary(self, *, campaign_id: UUID) -> RevenueSummary: ...
+
+    async def receipts(self, *, campaign_id: UUID) -> list[Receipt]: ...
 
 
 class PostgresPaymentStore:
@@ -236,12 +260,70 @@ class PostgresPaymentStore:
             latest_capture_id=row.latest_capture_id,
         )
 
+    async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:
+        # Only verified events are stored, so a match here is a signature checked delivery.
+        # Order events carry the order id, capture events the capture id and the order id.
+        async with self._session.begin():
+            result = await self._session.execute(
+                text(
+                    """
+                    select o.paypal_order_id, o.paypal_capture_id, o.content_id,
+                           o.amount, o.currency, o.created_at, o.captured_at,
+                           coalesce((
+                             select json_agg(json_build_object(
+                                      'event_id', e.id,
+                                      'event_type', e.event_type,
+                                      'received_at', e.received_at
+                                    ) order by e.received_at)
+                             from growthreceipt.paypal_webhook_events e
+                             where e.resource->>'id' in (o.paypal_order_id, o.paypal_capture_id)
+                                or e.resource #>> '{supplementary_data,related_ids,order_id}'
+                                   = o.paypal_order_id
+                           ), '[]'::json) as webhooks
+                    from growthreceipt.payment_orders o
+                    where o.campaign_id = :campaign_id and o.status = 'completed'
+                    order by o.captured_at desc
+                    limit 50
+                    """
+                ),
+                {"campaign_id": campaign_id},
+            )
+            rows = result.all()
+        return [
+            Receipt(
+                paypal_order_id=row.paypal_order_id,
+                paypal_capture_id=row.paypal_capture_id,
+                content_id=row.content_id,
+                amount=Decimal(row.amount),
+                currency=row.currency,
+                ordered_at=row.created_at,
+                captured_at=row.captured_at,
+                webhooks=[
+                    WebhookProof(
+                        event_id=event["event_id"],
+                        event_type=event["event_type"],
+                        received_at=datetime.fromisoformat(event["received_at"]),
+                    )
+                    for event in _json_list(row.webhooks)
+                ],
+            )
+            for row in rows
+        ]
+
+
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    # The asyncpg dialect decodes json, but a plain driver hands back text.
+    return cast(list[dict[str, Any]], json.loads(value) if isinstance(value, str) else value)
+
 
 class FakePaymentStore:
     def __init__(self) -> None:
         self.orders: dict[str, tuple[UUID, UUID, UUID]] = {}
         self.captures: dict[str, PayPalCapture] = {}
         self.webhook_ids: set[str] = set()
+        self.webhooks: list[tuple[WebhookProof, dict[str, Any]]] = []
+        self.ordered_at: dict[str, datetime] = {}
+        self.captured_at: dict[str, datetime] = {}
 
     async def record_order(
         self,
@@ -255,6 +337,7 @@ class FakePaymentStore:
     ) -> None:
         del offer, idempotency_key
         self.orders[paypal_order_id] = (workspace_id, campaign_id, content_id)
+        self.ordered_at[paypal_order_id] = datetime.now(UTC)
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
         order = self.orders.get(paypal_order_id)
@@ -268,6 +351,7 @@ class FakePaymentStore:
         if capture.order_id not in self.orders:
             raise LookupError("PayPal order attribution was not found")
         self.captures[capture.order_id] = capture
+        self.captured_at[capture.order_id] = datetime.now(UTC)
 
     async def record_webhook(
         self,
@@ -276,8 +360,12 @@ class FakePaymentStore:
         event_type: str,
         resource: dict[str, Any],
     ) -> bool:
-        del event_type, resource
         is_new = event_id not in self.webhook_ids
+        if is_new:
+            proof = WebhookProof(
+                event_id=event_id, event_type=event_type, received_at=datetime.now(UTC)
+            )
+            self.webhooks.append((proof, resource))
         self.webhook_ids.add(event_id)
         return is_new
 
@@ -294,3 +382,31 @@ class FakePaymentStore:
             currency=captures[-1].currency if captures else "USD",
             latest_capture_id=captures[-1].capture_id if captures else None,
         )
+
+    async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:
+        receipts = []
+        for order_id, capture in self.captures.items():
+            _workspace_id, order_campaign_id, content_id = self.orders[order_id]
+            if order_campaign_id != campaign_id:
+                continue
+            related = {order_id, capture.capture_id}
+            webhooks = [
+                proof
+                for proof, resource in self.webhooks
+                if resource.get("id") in related
+                or resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id")
+                == order_id
+            ]
+            receipts.append(
+                Receipt(
+                    paypal_order_id=order_id,
+                    paypal_capture_id=capture.capture_id,
+                    content_id=content_id,
+                    amount=Decimal(capture.amount),
+                    currency=capture.currency,
+                    ordered_at=self.ordered_at[order_id],
+                    captured_at=self.captured_at[order_id],
+                    webhooks=webhooks,
+                )
+            )
+        return sorted(receipts, key=lambda receipt: receipt.captured_at, reverse=True)

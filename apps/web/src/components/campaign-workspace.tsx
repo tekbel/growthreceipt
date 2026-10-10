@@ -32,6 +32,11 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import {
+  type Receipt as PayPalReceipt,
+  type ProvenMove,
+  ReceiptChain,
+} from "@/components/receipt-proof";
+import {
   apiFetch,
   type Campaign,
   type CampaignBrief,
@@ -185,6 +190,8 @@ export function CampaignWorkspace({
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueError, setRevenueError] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [recommendedAt, setRecommendedAt] = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
@@ -261,9 +268,13 @@ export function CampaignWorkspace({
   const loadRevenue = useCallback(async () => {
     if (!campaignId) return;
     try {
-      const response = await apiFetch(`/v1/paypal/revenue/${campaignId}`);
-      if (!response.ok) throw new Error("Results are unavailable");
-      setRevenue((await response.json()) as RevenueSummary);
+      const [summary, proof] = await Promise.all([
+        apiFetch(`/v1/paypal/revenue/${campaignId}`),
+        apiFetch(`/v1/paypal/receipts/${campaignId}`),
+      ]);
+      if (!summary.ok || !proof.ok) throw new Error("Results are unavailable");
+      setRevenue((await summary.json()) as RevenueSummary);
+      setReceipts(((await proof.json()) as { receipts: PayPalReceipt[] }).receipts);
       setRevenueError(false);
     } catch {
       setRevenueError(true);
@@ -272,9 +283,32 @@ export function CampaignWorkspace({
 
   useEffect(() => {
     setRevenue(null);
+    setReceipts(null);
     setRecommendation(null);
+    setRecommendedAt(null);
     void loadRevenue();
   }, [loadRevenue]);
+
+  // Bring back the last next move after a reload. Every recommendation is a recorded event.
+  useEffect(() => {
+    if (!campaignId) return;
+    let active = true;
+    campaignApi
+      .events(campaignId)
+      .then((events) => {
+        const latest = events.find((event) => event.action === "next_action_recommended");
+        const nextAction = latest?.detail.next_action as Recommendation | undefined;
+        if (!active || !latest || !nextAction) return;
+        setRecommendation((current) => current ?? nextAction);
+        setRecommendedAt((current) => current ?? latest.created_at);
+      })
+      .catch(() => {
+        // Activity is optional here. The next move can still be requested.
+      });
+    return () => {
+      active = false;
+    };
+  }, [campaignId]);
 
   // Customers pay on the public buy page, often in another tab or on a phone.
   // Refresh results when the founder comes back, and every 15 seconds while visible.
@@ -299,12 +333,18 @@ export function CampaignWorkspace({
     seenOrders.current = { campaignId, count: revenue.completed_orders };
     if (previous?.campaignId !== campaignId || revenue.completed_orders <= previous.count) return;
     setRecommendation(null);
+    setRecommendedAt(null);
     setToast({
       message: "New PayPal purchase verified and credited to this campaign.",
       action: { label: "Find next move", view: "experiment" },
     });
     window.setTimeout(() => setToast(null), 7000);
   }, [revenue, campaignId]);
+
+  const provenMove: ProvenMove | null =
+    recommendation && recommendedAt
+      ? { headline: recommendation.headline, at: recommendedAt }
+      : null;
 
   function openBuyPage(contentId: string) {
     window.open(buyLink(contentId), "_blank", "noopener");
@@ -409,6 +449,9 @@ export function CampaignWorkspace({
       }
       const result = (await response.json()) as { next_action: Recommendation };
       setRecommendation(result.next_action);
+      // Never earlier than the newest capture, so a small clock difference cannot hide it.
+      const newest = Math.max(0, ...(receipts ?? []).map((item) => Date.parse(item.captured_at)));
+      setRecommendedAt(new Date(Math.max(Date.now(), newest)).toISOString());
     } catch (error) {
       setRecommendationError(
         error instanceof Error ? error.message : "A next move could not be prepared right now.",
@@ -449,6 +492,10 @@ export function CampaignWorkspace({
             campaign={campaign}
             revenue={revenue}
             revenueError={revenueError}
+            receipts={receipts}
+            move={provenMove}
+            moveLoading={recommendationLoading}
+            findNextMove={findNextMove}
             stage={stage}
             needsReview={counts["Needs review"] + counts["Changes requested"]}
             navigate={navigate}
@@ -508,8 +555,11 @@ export function CampaignWorkspace({
       case "results":
         return (
           <ResultsPage
+            campaign={campaign}
             revenue={revenue}
             revenueError={revenueError}
+            receipts={receipts}
+            move={provenMove}
             recommendation={recommendation}
             recommendationError={recommendationError}
             recommendationLoading={recommendationLoading}
@@ -1011,6 +1061,10 @@ function TodayPage({
   campaign,
   revenue,
   revenueError,
+  receipts,
+  move,
+  moveLoading,
+  findNextMove,
   stage,
   needsReview,
   navigate,
@@ -1018,6 +1072,10 @@ function TodayPage({
   campaign: Campaign;
   revenue: RevenueSummary | null;
   revenueError: boolean;
+  receipts: PayPalReceipt[] | null;
+  move: ProvenMove | null;
+  moveLoading: boolean;
+  findNextMove: () => Promise<void>;
   stage: Stage;
   needsReview: number;
   navigate: (view: View) => void;
@@ -1157,37 +1215,48 @@ function TodayPage({
           )}
         </article>
       </section>
-      <section className="today-grid">
-        <article>
-          <SectionTitle title="Recent results" />
-          {sales && revenue ? (
-            <div className="result-summary">
-              <strong>{formatMoney(revenue.gross_revenue, revenue.currency)}</strong>
-              <span>
-                {sales} verified PayPal sandbox purchase{sales === 1 ? "" : "s"}
-              </span>
-            </div>
-          ) : (
+      {receipts?.length ? (
+        <section className="today-receipt" aria-label="Latest purchase">
+          <SectionTitle
+            title="Latest purchase"
+            action="See the PayPal proof"
+            onAction={() => navigate("results")}
+          />
+          <ReceiptChain
+            receipt={receipts[0]}
+            receipts={receipts}
+            posts={campaign.posts}
+            move={move}
+            moveLoading={moveLoading}
+            onFindNextMove={() => void findNextMove()}
+            onReview={() => navigate("experiment")}
+            proof={false}
+          />
+        </section>
+      ) : (
+        <section className="today-grid">
+          <article>
+            <SectionTitle title="Recent results" />
             <QuietState
               icon={<BarChart3 aria-hidden="true" />}
               title="No results yet"
-              copy="A PayPal sandbox purchase shows up here as verified revenue."
+              copy="A PayPal sandbox purchase shows up here, linked to the post that earned it."
               action="Open checkout"
               onAction={() => navigate("checkout")}
             />
-          )}
-        </article>
-        <article>
-          <SectionTitle title="Next experiment" />
-          <QuietState
-            icon={<FlaskConical aria-hidden="true" />}
-            title="No recommendation yet"
-            copy="GrowthReceipt picks a test once it has verified results."
-            action="See what is needed"
-            onAction={() => navigate("experiment")}
-          />
-        </article>
-      </section>
+          </article>
+          <article>
+            <SectionTitle title="Next experiment" />
+            <QuietState
+              icon={<FlaskConical aria-hidden="true" />}
+              title="No recommendation yet"
+              copy="GrowthReceipt picks a test once it has verified results."
+              action="See what is needed"
+              onAction={() => navigate("experiment")}
+            />
+          </article>
+        </section>
+      )}
     </>
   );
 }
@@ -2122,8 +2191,11 @@ function CalendarPage({ campaign }: { campaign: Campaign }) {
 }
 
 function ResultsPage({
+  campaign,
   revenue,
   revenueError,
+  receipts,
+  move,
   recommendation,
   recommendationError,
   recommendationLoading,
@@ -2131,8 +2203,11 @@ function ResultsPage({
   openCheckout,
   navigate,
 }: {
+  campaign: Campaign;
   revenue: RevenueSummary | null;
   revenueError: boolean;
+  receipts: PayPalReceipt[] | null;
+  move: ProvenMove | null;
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -2194,6 +2269,48 @@ function ResultsPage({
           muted
         />
       </section>
+      {receipts?.length ? (
+        <section className="results-receipts" aria-labelledby="receipts-title">
+          <div className="column-heading">
+            <h2 id="receipts-title">From post to payment to next move</h2>
+            <span>Every step below is a recorded PayPal or GrowthReceipt event</span>
+          </div>
+          <ReceiptChain
+            receipt={receipts[0]}
+            receipts={receipts}
+            posts={campaign.posts}
+            move={move}
+            moveLoading={recommendationLoading}
+            onFindNextMove={() => void findNextMove()}
+            onReview={() => navigate("experiment")}
+          />
+          {receipts.length > 1 ? (
+            <div className="earlier-receipts">
+              <h3>Earlier purchases</h3>
+              <ul>
+                {receipts.slice(1, 11).map((item) => {
+                  const post = campaign.posts.find((entry) => entry.id === item.content_id);
+                  return (
+                    <li key={item.order_id}>
+                      <time dateTime={item.captured_at}>
+                        {new Intl.DateTimeFormat("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }).format(new Date(item.captured_at))}
+                      </time>
+                      <span>{post ? `Day ${post.day} · ${post.channel}` : "Campaign post"}</span>
+                      <code>{item.order_id}</code>
+                      <strong>{formatMoney(item.amount, item.currency)}</strong>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       <section className="results-body">
         <div className="plain-panel">
           <div className="provider-heading">

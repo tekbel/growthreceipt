@@ -56,9 +56,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
     )
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
                 "/v1/campaigns",
                 json={
@@ -90,9 +88,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             )
             assert order.status_code == 200
 
-            captured = await client.post(
-                f"/v1/paypal/orders/{order.json()['order_id']}/capture"
-            )
+            captured = await client.post(f"/v1/paypal/orders/{order.json()['order_id']}/capture")
             assert captured.status_code == 200
             assert captured.json()["capture_id"] == "TEST-CAPTURE-001"
 
@@ -115,12 +111,21 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                 "gross_revenue": "9.00",
                 "currency": "USD",
                 "latest_capture_id": "TEST-CAPTURE-001",
+                "paid_posts": [
+                    {
+                        "content_id": content_id,
+                        "day": 1,
+                        "channel": campaign["posts"][0]["channel"],
+                        "theme": campaign["posts"][0]["theme"],
+                        "content": campaign["posts"][0]["content"],
+                        "completed_orders": 1,
+                        "revenue": "9.00",
+                    }
+                ],
             }
             assert result["next_action"]["human_approval_required"] is True
 
-        events = await campaign_store.events(
-            workspace_id=uuid4(), campaign_id=UUID(campaign_id)
-        )
+        events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(campaign_id))
         assert [event.action for event in events] == [
             "next_action_recommended",
             "campaign_approved",
