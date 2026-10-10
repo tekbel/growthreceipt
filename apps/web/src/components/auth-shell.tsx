@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  ArrowRight,
-  BadgeCheck,
-  Check,
-  Compass,
-  FileText,
-  Mail,
-  ReceiptText,
-  Sparkles,
-  UserCheck,
-} from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, Mail, ReceiptText } from "lucide-react";
 import {
   type CSSProperties,
   type FormEvent,
@@ -19,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { SiPaypal } from "react-icons/si";
 
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
@@ -195,7 +184,7 @@ export function AuthShell() {
             <h1>Know what to do next.</h1>
             <p>An AI marketing agent that learns from what people paid for, not what they liked.</p>
           </div>
-          <SampleReceipt />
+          <SampleFlow />
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
@@ -288,45 +277,44 @@ function AuthLoading({ copy }: { copy: string }) {
 }
 
 // Mirrors the seeded judge demo, so every line here is something the demo really does.
-const receiptLines = [
-  { icon: FileText, label: "Brief", detail: "Scribe, a writing keyboard", value: "You" },
-  { icon: Sparkles, label: "Campaign drafted", detail: "7 posts for 3 channels", value: "Agent" },
-  { icon: UserCheck, label: "Approved", detail: "Nothing publishes without you", value: "You" },
-  { icon: SiPaypal, label: "PayPal checkout", detail: "Scribe Pro", value: "12.00 USD" },
-  {
-    icon: BadgeCheck,
-    label: "Payment verified",
-    detail: "Capture and webhook match",
-    value: "PayPal",
-  },
-  { icon: Compass, label: "Next move", detail: "Learned from the sale", value: "Agent" },
+const flowSteps = [
+  { label: "Brief", detail: "Scribe, a writing keyboard", actor: "You" },
+  { label: "Campaign drafted", detail: "7 posts for 3 channels", actor: "Agent" },
+  { label: "Approved", detail: "Nothing publishes without you", actor: "You" },
+  { label: "PayPal checkout", detail: "Scribe Pro at 12.00 USD", actor: "Buyer" },
+  { label: "Payment verified", detail: "Capture and webhook match", actor: "PayPal" },
+  { label: "Next move", detail: "Learned from the sale", actor: "Agent" },
 ];
 
-function SampleReceipt() {
+function SampleFlow() {
+  const last = flowSteps.length - 1;
   return (
-    <figure className="receipt" aria-labelledby="receipt-caption">
-      <figcaption id="receipt-caption" className="receipt-head">
-        <span>Growth receipt</span>
+    <figure className="flow" aria-labelledby="flow-caption">
+      <figcaption id="flow-caption" className="flow-head">
+        <span>How it works</span>
         <span>Sample from the judge demo</span>
       </figcaption>
-      <ol className="receipt-lines">
-        {receiptLines.map(({ icon: Icon, label, detail, value }, index) => (
-          <li key={label} className="receipt-line" style={{ "--i": index } as CSSProperties}>
-            <span className="receipt-icon">
-              <Icon aria-hidden="true" />
+      <ol className="flow-steps">
+        {flowSteps.map(({ label, detail, actor }, index) => (
+          <li
+            key={label}
+            className={index === last ? "flow-step current" : "flow-step"}
+            style={{ "--i": index } as CSSProperties}
+          >
+            <span className="flow-mark">
+              {index === last ? index + 1 : <Check aria-hidden="true" />}
             </span>
-            <span className="receipt-copy">
+            <span className="flow-copy">
               <strong>{label}</strong>
               <span>{detail}</span>
             </span>
-            <span className="receipt-value">{value}</span>
+            <span className="flow-actor">{actor}</span>
           </li>
         ))}
       </ol>
-      <div className="receipt-total" style={{ "--i": receiptLines.length } as CSSProperties}>
-        <span>
-          <Check aria-hidden="true" /> Attributed revenue
-        </span>
+      <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
+        <BadgeCheck aria-hidden="true" />
+        <span>Attributed revenue</span>
         <strong>12.00 USD</strong>
       </div>
     </figure>
