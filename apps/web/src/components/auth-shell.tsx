@@ -1,7 +1,18 @@
 "use client";
 
-import { ArrowRight, Check, Mail, ReceiptText } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Compass,
+  FileText,
+  Mail,
+  ReceiptText,
+  Sparkles,
+  UserCheck,
+} from "lucide-react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from "react";
+import { SiPaypal } from "react-icons/si";
 
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
@@ -163,22 +174,9 @@ export function AuthShell() {
           <div className="auth-promise">
             <span className="eyebrow">Marketing backed by payments</span>
             <h1>Know what to do next.</h1>
-            <p>
-              Plan a campaign, approve the work, verify the purchase, and turn the result into one
-              clear next move.
-            </p>
+            <p>An AI marketing agent that learns from what people paid for, not what they liked.</p>
           </div>
-          <ol className="auth-proof">
-            <li>
-              <Check aria-hidden="true" /> Nothing publishes without approval
-            </li>
-            <li>
-              <Check aria-hidden="true" /> Revenue comes from verified PayPal captures
-            </li>
-            <li>
-              <Check aria-hidden="true" /> Every judge receives a private demo workspace
-            </li>
-          </ol>
+          <SampleReceipt />
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
@@ -262,5 +260,51 @@ function AuthLoading({ copy }: { copy: string }) {
       <div className="skeleton-line short" />
       <span className="visually-hidden">{copy}</span>
     </main>
+  );
+}
+
+// Mirrors the seeded judge demo, so every line here is something the demo really does.
+const receiptLines = [
+  { icon: FileText, label: "Brief", detail: "Scribe, a writing keyboard", value: "You" },
+  { icon: Sparkles, label: "Campaign drafted", detail: "7 posts for 3 channels", value: "Agent" },
+  { icon: UserCheck, label: "Approved", detail: "Nothing publishes without you", value: "You" },
+  { icon: SiPaypal, label: "PayPal checkout", detail: "Scribe Pro", value: "12.00 USD" },
+  {
+    icon: BadgeCheck,
+    label: "Payment verified",
+    detail: "Capture and webhook match",
+    value: "PayPal",
+  },
+  { icon: Compass, label: "Next move", detail: "Learned from the sale", value: "Agent" },
+];
+
+function SampleReceipt() {
+  return (
+    <figure className="receipt" aria-labelledby="receipt-caption">
+      <figcaption id="receipt-caption" className="receipt-head">
+        <span>Growth receipt</span>
+        <span>Sample from the judge demo</span>
+      </figcaption>
+      <ol className="receipt-lines">
+        {receiptLines.map(({ icon: Icon, label, detail, value }, index) => (
+          <li key={label} className="receipt-line" style={{ "--i": index } as CSSProperties}>
+            <span className="receipt-icon">
+              <Icon aria-hidden="true" />
+            </span>
+            <span className="receipt-copy">
+              <strong>{label}</strong>
+              <span>{detail}</span>
+            </span>
+            <span className="receipt-value">{value}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="receipt-total" style={{ "--i": receiptLines.length } as CSSProperties}>
+        <span>
+          <Check aria-hidden="true" /> Attributed revenue
+        </span>
+        <strong>12.00 USD</strong>
+      </div>
+    </figure>
   );
 }
