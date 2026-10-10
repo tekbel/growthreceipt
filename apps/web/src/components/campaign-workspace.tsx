@@ -371,8 +371,8 @@ export function CampaignWorkspace({
     if (loadState === "error") {
       return (
         <EmptyState
-          title="GrowthReceipt cannot reach its API"
-          copy="Start the API with make dev-api, then try again."
+          title="Your workspace did not load"
+          copy="Something went wrong on our side. Please try again in a moment."
           action="Try again"
           onAction={() => void loadCampaign()}
           boxed
