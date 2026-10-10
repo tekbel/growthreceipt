@@ -12,6 +12,10 @@ The repository contains the first application foundation: a responsive campaign-
 
 The active competition build is **GrowthReceipt: marketing backed by payments**. It is being prepared for the 2026 PayPal AI Hackathon. See [the hackathon strategy](./docs/hackathon/paypal-ai-2026.md).
 
+![GrowthReceipt architecture](./docs/architecture/overview.png)
+
+The loop and who pays whom are explained in [docs/hackathon/architecture.md](./docs/hackathon/architecture.md).
+
 ## Current implementation
 
 ```text
@@ -76,6 +80,7 @@ Open the campaign workspace and select **Preview checkout**. The buyer-facing mo
 - [PROMPTS.md](./PROMPTS.md) contains sequential implementation prompts for a coding agent. Run them in order.
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
+- [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) records the deferred LinkedIn OAuth, publishing, security, and review plan.
 
 ## Recommended build order
