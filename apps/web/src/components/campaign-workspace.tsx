@@ -563,6 +563,10 @@ export function CampaignWorkspace({
           onCaptured={async () => {
             await loadRevenue();
             setRecommendation(null);
+          }}
+          onSeeResults={() => {
+            setCheckoutOpen(false);
+            navigate("today");
             notify(
               "Payment verified and credited to this campaign. The agent can learn from it now.",
               {

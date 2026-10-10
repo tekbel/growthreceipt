@@ -52,11 +52,13 @@ export function PayPalCheckout({
   contentId,
   onClose,
   onCaptured,
+  onSeeResults,
 }: {
   campaignId: string;
   contentId: string;
   onClose: () => void;
   onCaptured: () => void;
+  onSeeResults: () => void;
 }) {
   const buttonContainer = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<PayPalConfig | null>(null);
@@ -272,8 +274,8 @@ export function PayPalCheckout({
                   <dd>{receipt.captureId}</dd>
                 </div>
               </dl>
-              <button className="button primary checkout-done" type="button" onClick={onClose}>
-                Done
+              <button className="button primary checkout-done" type="button" onClick={onSeeResults}>
+                See results on Today
               </button>
             </div>
           ) : (
