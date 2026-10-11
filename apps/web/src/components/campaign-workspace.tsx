@@ -60,6 +60,7 @@ import {
   postDate,
   scheduleRange,
 } from "@/lib/campaign";
+import { shareTarget, shareText, xLength } from "@/lib/share";
 import {
   allTimeZones,
   browserTimeZone,
@@ -825,6 +826,7 @@ export function CampaignWorkspace({
           <ContentPage
             campaign={campaign}
             openCheckout={() => (selected ? openBuyPage(selected.id) : navigate("checkout"))}
+            notify={notify}
             counts={counts}
             posts={filteredPosts}
             filter={filter}
@@ -2465,9 +2467,11 @@ function ContentPage({
   selectPost,
   setEditingBody,
   openCheckout,
+  notify,
 }: {
   campaign: Campaign;
   openCheckout: () => void;
+  notify: (message: string) => void;
   counts: Record<Filter, number>;
   posts: Post[];
   filter: Filter;
@@ -2599,6 +2603,7 @@ function ContentPage({
           startEditing={() => setEditingBody(selected.content)}
           saveEdits={saveEdits}
           openCheckout={openCheckout}
+          notify={notify}
         />
       </section>
     </>
@@ -2618,12 +2623,14 @@ function ReviewActions({
   startEditing,
   saveEdits,
   openCheckout,
+  notify,
 }: {
   campaign: Campaign;
   post: Post;
   editing: boolean;
   saving: boolean;
   openCheckout: () => void;
+  notify: (message: string) => void;
   approveCampaign: () => void;
   approvePost: () => void;
   requestChanges: (note: string) => Promise<boolean>;
@@ -2707,7 +2714,10 @@ function ReviewActions({
           <FileText aria-hidden="true" /> Request changes
         </button>
         {post.status === "approved" ? (
-          <TestPurchaseButton className="button accent" onClick={openCheckout} />
+          <>
+            <PublishButton className="button secondary" post={post} notify={notify} />
+            <TestPurchaseButton className="button accent" onClick={openCheckout} />
+          </>
         ) : (
           <button
             className="button accent"
@@ -3334,7 +3344,7 @@ function IntegrationsPage({ navigate }: { navigate: (view: View) => void }) {
             provider={channel}
             description={channelIntegration[channel]}
             icon={<ChannelIcon channel={channel} />}
-            status="Planned"
+            status={channel === "Instagram" ? "Planned" : "Share link"}
           />
         ))}
       </section>
@@ -3581,7 +3591,10 @@ function CheckoutPage({
       {approved.length ? (
         <section className="buy-links" aria-labelledby="buy-links-title">
           <h2 id="buy-links-title">Buy links</h2>
-          <p>Put each link in its post. Purchases are credited to the post whose link was used.</p>
+          <p>
+            Publish opens the channel with the post and its link filled in, and you press Post.
+            Purchases are credited to the post whose link was used.
+          </p>
           <ul>
             {approved.map((item) => (
               <li key={item.id}>
@@ -3592,6 +3605,7 @@ function CheckoutPage({
                   <span>{item.theme}</span>
                 </div>
                 <div className="buy-link-actions">
+                  <PublishButton className="button outline" post={item} notify={notify} />
                   <button
                     className="button outline"
                     type="button"
@@ -3631,6 +3645,62 @@ function BusyLabel({ text, elapsed = false }: { text: string; elapsed?: boolean 
     <span className="busy-label">
       <span className="spinner" aria-hidden="true" />
       {text}…{elapsed ? <ElapsedSeconds /> : null}
+    </span>
+  );
+}
+
+/** Opens the channel's own composer with the post and its buy link. The founder presses Post. */
+function PublishButton({
+  className,
+  post,
+  notify,
+}: {
+  className: string;
+  post: Post;
+  notify: (message: string) => void;
+}) {
+  const tipId = useId();
+  const link = buyLink(post.id);
+  const text = shareText(post, link);
+  const target = shareTarget(post.channel, text, link);
+
+  async function publish() {
+    // Start the copy while this page has focus, then open the composer inside the same click.
+    const copied = target.copyFirst ? navigator.clipboard.writeText(text) : null;
+    if (target.url) window.open(target.url, "_blank", "noopener");
+    if (!copied) {
+      if (post.channel === "X" && xLength(text) > 280)
+        notify("This post is longer than 280 characters. Shorten it in X before posting.");
+      return;
+    }
+    try {
+      await copied;
+      notify(
+        target.url
+          ? `Post copied. Paste it into ${post.channel}, then press Post.`
+          : "Post copied with its buy link. Paste it into a new Instagram post in the app.",
+      );
+    } catch {
+      notify("Copy is blocked in this browser. Select the post text and copy it yourself.");
+    }
+  }
+
+  const label = target.url ? `Publish on ${post.channel}` : "Copy for Instagram";
+  return (
+    <span className="tip-anchor">
+      <button
+        className={className}
+        type="button"
+        onClick={() => void publish()}
+        aria-describedby={tipId}
+      >
+        <ChannelIcon channel={post.channel} /> {label}
+      </button>
+      <span className="tip" id={tipId} role="tooltip">
+        {target.url
+          ? `Opens ${post.channel} with this post and its buy link filled in. You review it and press Post. GrowthReceipt never posts for you.`
+          : "Instagram has no web composer, so the post and its buy link are copied for the Instagram app."}
+      </span>
     </span>
   );
 }
@@ -3788,7 +3858,7 @@ function Integration({
   provider: string;
   description: string;
   icon: React.ReactNode;
-  status: "Connected" | "Planned";
+  status: "Connected" | "Share link" | "Planned";
   action?: string;
   onAction?: () => void;
 }) {
@@ -3799,7 +3869,9 @@ function Integration({
         <h2>{provider}</h2>
         <p>{description}</p>
       </div>
-      <span className={`status-tag ${status === "Connected" ? "success" : "neutral"}`}>
+      <span
+        className={`status-tag ${status === "Connected" ? "success" : status === "Share link" ? "review" : "neutral"}`}
+      >
         {status}
       </span>
       {action && onAction ? (
@@ -3879,10 +3951,12 @@ function ProductMark({
 }
 
 const channelIntegration: Record<Channel, string> = {
-  LinkedIn: "Publish approved posts and collect delivery results.",
-  Facebook: "Publish approved posts to Pages and collect delivery results.",
-  X: "Publish approved posts and collect delivery results.",
-  Instagram: "Publish approved posts and collect delivery results.",
+  LinkedIn:
+    "Publish from Content opens LinkedIn with the post and its buy link filled in. Automatic posting is planned.",
+  Facebook:
+    "Publish from Content opens Facebook with the buy link and copies the post for you to paste.",
+  X: "Publish from Content opens X with the post and its buy link filled in. Automatic posting is planned.",
+  Instagram: "Instagram has no web composer. Content copies the post and its link for the app.",
 };
 
 function ChannelIcon({ channel }: { channel: Channel }) {

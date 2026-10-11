@@ -75,6 +75,8 @@ Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tes
 
 ### PayPal sandbox checkout
 
+Approved posts also get **Publish on LinkedIn** or **Publish on X**. It opens that channel's official share composer with the post and its buy link filled in, and the founder presses Post. GrowthReceipt never posts on its own. Facebook's sharer takes only the link, so the text is copied for pasting, and Instagram gets a copy button because it has no web composer.
+
 Approve a post, then select **Make a test purchase** or open **Customer checkout**. Each approved post has a public buy page at `/buy/{post id}` that needs no sign in. It loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the public API (`/v1/public/...`), captures it after approval, and shows the receipt. The server resolves the campaign from the post and refuses posts that are not approved. Use a Personal account from PayPal's Sandbox Accounts page. Set `PAYPAL_SANDBOX_BUYER_EMAIL` and `PAYPAL_SANDBOX_BUYER_PASSWORD` to show that login on the buy page, which is how judges pay on the hosted demo. The API only shares them in sandbox mode. No real money moves in sandbox mode.
 
 ## Documents
