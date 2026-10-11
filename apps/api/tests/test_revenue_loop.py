@@ -107,6 +107,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             )
             assert recommendation.status_code == 200
             result = recommendation.json()
+            assert result["evidence"].pop("evidence_through") is not None
             assert result["evidence"] == {
                 "completed_orders": 1,
                 "gross_revenue": "9.00",
@@ -123,6 +124,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                         "revenue": "9.00",
                     }
                 ],
+                "signal": "early",
             }
             assert result["next_action"]["human_approval_required"] is True
 

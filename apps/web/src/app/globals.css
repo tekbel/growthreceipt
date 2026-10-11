@@ -876,6 +876,8 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @media (prefers-reduced-motion: reduce) { .button[aria-busy="true"]::after { display: none; } }
 .move-run { margin: 10px 0 0; color: var(--muted); font-size: var(--type-xs); }
 .experiment-stage p.move-run { font-size: var(--type-xs); }
+.move-stale { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 0; padding: 10px 12px; border-radius: var(--corner-sm); background: var(--warning-soft); color: var(--ink); font-size: var(--type-sm); }
+.experiment-stage .move-stale p { margin: 0; }
 .move-run code { padding: 1px 6px; border-radius: var(--corner-sm); background: var(--surface-subtle); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--type-xs); }
 
 /* Info tips. A quiet "i" beside a control, explaining it without adding copy to the page. */

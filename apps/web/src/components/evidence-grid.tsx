@@ -59,8 +59,19 @@ type EvidenceRow = {
   purchases: number;
   revenue: number;
   attribution: string;
+  signal: string;
   nextAction: string;
 };
+
+// Mirrors classify_evidence in the API: a leader needs 3 purchases and more revenue than any other post.
+const LEADER_MIN_ORDERS = 3;
+
+function signalFor(row: EvidenceRow, top: number, topCount: number): string {
+  if (!row.purchases) return "";
+  if (row.revenue < top) return "Smaller signal";
+  if (topCount > 1) return "Tied for most";
+  return row.purchases >= LEADER_MIN_ORDERS ? "Strongest signal" : "Early signal";
+}
 
 const approvalLabels: Record<Campaign["posts"][number]["status"], string> = {
   approved: "Approved",
@@ -98,40 +109,42 @@ export function EvidenceGrid({
     return () => query.removeEventListener("change", update);
   }, []);
 
-  const rows = useMemo<EvidenceRow[]>(
-    () =>
-      campaign.posts.map((post) => {
-        const paid = receipts.filter((receipt) => receipt.content_id === post.id);
-        const confirmed = paid.filter((receipt) =>
-          receipt.webhooks.some((event) => event.event_type === "PAYMENT.CAPTURE.COMPLETED"),
-        );
-        const payment: Payment = confirmed.length
-          ? "Verified revenue"
+  const rows = useMemo<EvidenceRow[]>(() => {
+    const built = campaign.posts.map((post) => {
+      const paid = receipts.filter((receipt) => receipt.content_id === post.id);
+      const confirmed = paid.filter((receipt) =>
+        receipt.webhooks.some((event) => event.event_type === "PAYMENT.CAPTURE.COMPLETED"),
+      );
+      const payment: Payment = confirmed.length
+        ? "Verified revenue"
+        : paid.length
+          ? "Captured"
+          : post.status === "approved"
+            ? "Awaiting payment"
+            : "Not live";
+      return {
+        id: post.id,
+        day: post.day,
+        date: postDate(campaign, post),
+        channel: post.channel,
+        post: post.theme,
+        approval: approvalLabels[post.status],
+        payment,
+        purchases: paid.length,
+        revenue: paid.reduce((sum, receipt) => sum + Number(receipt.amount), 0),
+        attribution: confirmed.length
+          ? "Verified by PayPal webhook"
           : paid.length
-            ? "Captured"
-            : post.status === "approved"
-              ? "Awaiting payment"
-              : "Not live";
-        return {
-          id: post.id,
-          day: post.day,
-          date: postDate(campaign, post),
-          channel: post.channel,
-          post: post.theme,
-          approval: approvalLabels[post.status],
-          payment,
-          purchases: paid.length,
-          revenue: paid.reduce((sum, receipt) => sum + Number(receipt.amount), 0),
-          attribution: confirmed.length
-            ? "Verified by PayPal webhook"
-            : paid.length
-              ? "Capture recorded, webhook pending"
-              : "",
-          nextAction: nextActions[post.id] ?? "",
-        };
-      }),
-    [campaign, receipts, nextActions],
-  );
+            ? "Capture recorded, webhook pending"
+            : "",
+        signal: "",
+        nextAction: nextActions[post.id] ?? "",
+      };
+    });
+    const top = Math.max(0, ...built.filter((row) => row.purchases).map((row) => row.revenue));
+    const topCount = built.filter((row) => row.purchases && row.revenue === top).length;
+    return built.map((row) => ({ ...row, signal: signalFor(row, top, topCount) }));
+  }, [campaign, receipts, nextActions]);
 
   const money = useMemo(
     () => new Intl.NumberFormat("en-US", { style: "currency", currency }),
@@ -170,6 +183,7 @@ export function EvidenceGrid({
               ? "evidence-pending"
               : "evidence-muted",
       },
+      { field: "signal", headerName: "Evidence strength", width: 160 },
       { field: "attribution", headerName: "Attribution", width: 230 },
       { field: "approval", headerName: "Approval", width: 160 },
       {

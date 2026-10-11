@@ -115,7 +115,12 @@ type MoveEvidence = {
     completed_orders: number;
     revenue: string;
   }[];
+  // Missing on runs recorded before the signal existed.
+  signal?: EvidenceSignal;
+  evidence_through?: string | null;
 };
+
+type EvidenceSignal = "none" | "early" | "leader" | "tie";
 
 type MoveContext = {
   evidence: MoveEvidence | null;
@@ -3114,6 +3119,12 @@ function WhyThisMove({
             </dd>
           </div>
         ) : null}
+        {evidence?.signal ? (
+          <div>
+            <dt>Evidence strength</dt>
+            <dd>{signalCopy[evidence.signal]}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Confidence</dt>
           <dd>
@@ -3141,6 +3152,14 @@ function WhyThisMove({
     </details>
   );
 }
+
+const signalCopy: Record<EvidenceSignal, string> = {
+  none: "No purchases yet. The agent suggests the smallest step toward a first one.",
+  early:
+    "Early signal. The leading post has fewer than 3 purchases, so the agent repeats its angle with care.",
+  leader: "Clear leader. One post earned the most from at least 3 purchases.",
+  tie: "Tied. Posts earned the same amount, so the agent compares them instead of picking one.",
+};
 
 const confidenceCopy: Record<Recommendation["confidence"], string> = {
   low: "Low. Fewer than 10 purchases is too small a sample to rely on.",
@@ -3326,7 +3345,7 @@ function ExperimentPage({
     <>
       <PageHeader
         title="Next experiment"
-        description="One next experiment, chosen from what customers actually paid for."
+        description="One next experiment, chosen from verified purchase signals."
       />
       <section className="experiment-stage">
         {recommendation ? (
@@ -3348,6 +3367,38 @@ function ExperimentPage({
                   turn ID, and it is also saved in the campaign activity.
                 </InfoTip>
               </p>
+            ) : null}
+            {context?.evidence?.evidence_through ? (
+              <p className="move-run">
+                Generated from verified purchases through{" "}
+                <time dateTime={context.evidence.evidence_through}>
+                  {formatMoment(context.evidence.evidence_through)}
+                </time>
+              </p>
+            ) : null}
+            {context?.evidence &&
+            revenue &&
+            revenue.completed_orders > context.evidence.completed_orders ? (
+              <div className="move-stale" role="status">
+                <p>
+                  {revenue.completed_orders - context.evidence.completed_orders} new purchase
+                  {revenue.completed_orders - context.evidence.completed_orders === 1 ? "" : "s"}{" "}
+                  since this recommendation.
+                </p>
+                <button
+                  className="button outline"
+                  type="button"
+                  disabled={recommendationLoading}
+                  aria-busy={recommendationLoading}
+                  onClick={() => void findNextMove()}
+                >
+                  {recommendationLoading ? (
+                    <BusyLabel text="Reviewing results" elapsed />
+                  ) : (
+                    "Refresh recommendation"
+                  )}
+                </button>
+              </div>
             ) : null}
             <p className="experiment-plan">{recommendation.recommendation}</p>
             <p>{recommendation.rationale}</p>
@@ -3386,7 +3437,7 @@ function ExperimentPage({
             <p>
               {ready
                 ? "There is a verified purchase to learn from. Ask the agent for one next experiment."
-                : "Recommendations begin with real purchases, not assumptions."}
+                : "Recommendations begin after a verified purchase. Once there is evidence to compare, the agent selects one focused next experiment."}
             </p>
             <div className="form-actions">
               {!ready ? (

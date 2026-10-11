@@ -55,12 +55,41 @@ class PaidPostEvidence(BaseModel):
     revenue: str
 
 
+EvidenceSignal = Literal["none", "early", "leader", "tie"]
+
+# A post needs this many purchases before it counts as a leader rather than an early signal.
+LEADER_MIN_ORDERS = 3
+
+
 class RevenueEvidence(BaseModel):
     completed_orders: int
     gross_revenue: str
     currency: str
     latest_capture_id: str | None
     paid_posts: list[PaidPostEvidence] = []
+    # Older recorded runs lack these, so they default.
+    signal: EvidenceSignal = "none"
+    evidence_through: datetime | None = None
+
+
+def rank_paid_posts(paid_posts: list[PaidPostEvidence]) -> list[PaidPostEvidence]:
+    """Most revenue first, then most purchases, then the earliest day, so ties stay stable."""
+    return sorted(
+        paid_posts,
+        key=lambda paid: (-Decimal(paid.revenue), -paid.completed_orders, paid.day),
+    )
+
+
+def classify_evidence(ranked: list[PaidPostEvidence]) -> EvidenceSignal:
+    """Decide in code how strong the purchase evidence is, so the agent never has to guess."""
+    if not ranked:
+        return "none"
+    leader = ranked[0]
+    if len(ranked) > 1 and Decimal(ranked[1].revenue) == Decimal(leader.revenue):
+        return "tie"
+    if leader.completed_orders < LEADER_MIN_ORDERS:
+        return "early"
+    return "leader"
 
 
 class NextActionResponse(BaseModel):
@@ -103,9 +132,15 @@ recommendation says what to do in at most 3 short sentences.
 evidence_summary, rationale and expected_signal are one or two short sentences each.
 Never use semicolons, dashes or jargon such as bounded, causality or attributed.
 Use low confidence when there are fewer than 10 completed orders.
-If there are no completed orders, recommend the smallest action needed to collect useful evidence.
-paid_posts lists the posts whose buy link took the payments. When it is not empty,
-name the post that earned the most by its day and channel, and build the experiment on it.
+paid_posts lists the posts whose buy link took the payments, the strongest first.
+Name posts by their day and channel.
+signal is computed by the application. Follow it exactly.
+none: there are no purchases yet. Recommend the smallest action needed to collect a first purchase.
+early: one post leads on fewer than 3 purchases. Call it an early signal, recommend a cautious
+follow up that repeats its angle, and set needs_more_data to true.
+leader: one post earned the most from at least 3 purchases. Build the experiment on that post.
+tie: two or more posts earned the same amount. Do not pick a winner. Recommend a controlled
+comparison of the tied posts and set needs_more_data to true.
 """
 
 
@@ -157,13 +192,15 @@ async def create_next_action(
                     revenue=f"{sum((receipt.amount for receipt in paid), Decimal('0')):.2f}",
                 )
             )
-    paid_posts.sort(key=lambda paid: Decimal(paid.revenue), reverse=True)
+    paid_posts = rank_paid_posts(paid_posts)
     evidence = RevenueEvidence(
         completed_orders=summary.completed_orders,
         gross_revenue=f"{summary.gross_revenue:.2f}",
         currency=summary.currency,
         latest_capture_id=summary.latest_capture_id,
         paid_posts=paid_posts,
+        signal=classify_evidence(paid_posts),
+        evidence_through=max((receipt.captured_at for receipt in receipts), default=None),
     )
     prompt = json.dumps(
         {

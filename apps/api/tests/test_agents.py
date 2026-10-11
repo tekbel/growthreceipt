@@ -11,7 +11,7 @@ from app.campaigns.store import FakeCampaignStore
 from app.main import app
 from app.paypal.store import FakePaymentStore
 from app.paypal.store_dependencies import get_payment_store
-from app.routes.agents import NextAction
+from app.routes.agents import NextAction, PaidPostEvidence, classify_evidence, rank_paid_posts
 
 
 @pytest.fixture
@@ -124,6 +124,8 @@ async def test_next_action_returns_verified_evidence_and_approval_boundary(
     assert response.status_code == 200
     body = response.json()
     assert body["evidence"]["gross_revenue"] == "0.00"
+    assert body["evidence"]["signal"] == "none"
+    assert body["evidence"]["evidence_through"] is None
     assert body["next_action"]["confidence"] == "low"
     assert body["next_action"]["human_approval_required"] is True
     events = await campaign_store.events(
@@ -277,3 +279,31 @@ async def test_agent_revises_a_post_from_the_review_note(
     assert events[0].actor == "agent"
     assert events[0].detail["review_note"] == "Add one more hashtag."
     assert events[0].detail["before"] == post.content
+
+
+def paid(day: int, orders: int, revenue: str) -> PaidPostEvidence:
+    return PaidPostEvidence(
+        content_id=uuid4(),
+        day=day,
+        channel="X",
+        theme="Theme",
+        content="Post",
+        completed_orders=orders,
+        revenue=revenue,
+    )
+
+
+def test_one_purchase_is_only_an_early_signal() -> None:
+    assert classify_evidence(rank_paid_posts([paid(3, 1, "9.00")])) == "early"
+
+
+def test_a_post_with_three_purchases_and_the_most_revenue_leads() -> None:
+    ranked = rank_paid_posts([paid(1, 1, "9.00"), paid(5, 3, "27.00")])
+    assert ranked[0].day == 5
+    assert classify_evidence(ranked) == "leader"
+
+
+def test_equal_revenue_is_a_tie_in_a_stable_order() -> None:
+    ranked = rank_paid_posts([paid(6, 2, "18.00"), paid(2, 2, "18.00")])
+    assert [post.day for post in ranked] == [2, 6]
+    assert classify_evidence(ranked) == "tie"

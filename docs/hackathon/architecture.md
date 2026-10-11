@@ -17,7 +17,7 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 5. **Capture.** The API captures the order with a request ID, so a repeated capture is never counted twice.
 6. **Webhook verified.** PayPal sends the capture event. The API checks its signature with PayPal before trusting it.
 7. **Revenue attributed.** The captured amount is stored against the campaign in Postgres.
-8. **Next move.** The agent reads the payment evidence and proposes one next action with its confidence. The founder approves it.
+8. **Next move.** The agent reads the payment evidence and proposes one next action with its confidence. The founder approves it. Code, not the model, ranks the paying posts and labels the evidence: none, early signal (the leading post has fewer than 3 purchases), clear leader, or tie. A tie asks for a controlled comparison instead of a winner. Each recommendation shows the time of the latest purchase it read, and the Next experiment page flags new purchases that arrived after it.
 
 ## Who pays whom
 
