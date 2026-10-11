@@ -76,6 +76,15 @@ export function EvidenceGrid({
   const grid = useRef<AgGridReact<EvidenceRow>>(null);
   const [view, setView] = useState<ViewFilter>("All posts");
   const [channel, setChannel] = useState("All channels");
+  // Pinned columns would fill a phone screen, so they only pin on wider screens.
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 700px)");
+    const update = () => setWide(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   const rows = useMemo<EvidenceRow[]>(
     () =>
@@ -119,15 +128,29 @@ export function EvidenceGrid({
 
   const columns = useMemo<ColDef<EvidenceRow>[]>(
     () => [
-      { field: "day", headerName: "Day", width: 76 },
-      { field: "date", headerName: "Date", width: 104 },
-      { field: "channel", headerName: "Channel", width: 116 },
-      { field: "post", headerName: "Post", flex: 2, minWidth: 220, tooltipField: "post" },
-      { field: "approval", headerName: "Approval", width: 156 },
+      // The deciding facts come first, the rest scrolls in on narrow screens.
+      { field: "day", headerName: "Day", width: 74, pinned: wide ? "left" : null },
+      {
+        field: "post",
+        headerName: "Post",
+        width: wide ? 230 : 180,
+        pinned: wide ? "left" : null,
+        tooltipField: "post",
+      },
+      { field: "channel", headerName: "Channel", width: 110 },
+      {
+        field: "revenue",
+        headerName: "Revenue",
+        width: 112,
+        type: "numericColumn",
+        sort: "desc",
+        valueFormatter: (params) => money.format(params.value ?? 0),
+      },
+      { field: "purchases", headerName: "Orders", width: 96, type: "numericColumn" },
       {
         field: "payment",
         headerName: "Payment",
-        width: 168,
+        width: 166,
         cellClass: (params) =>
           params.value === "Verified revenue"
             ? "evidence-verified"
@@ -135,25 +158,18 @@ export function EvidenceGrid({
               ? "evidence-pending"
               : "evidence-muted",
       },
-      { field: "purchases", headerName: "Purchases", width: 118, type: "numericColumn" },
-      {
-        field: "revenue",
-        headerName: "Revenue",
-        width: 118,
-        type: "numericColumn",
-        sort: "desc",
-        valueFormatter: (params) => money.format(params.value ?? 0),
-      },
-      { field: "attribution", headerName: "Attribution", flex: 1, minWidth: 200 },
+      { field: "attribution", headerName: "Attribution", width: 230 },
+      { field: "approval", headerName: "Approval", width: 160 },
       {
         field: "nextAction",
         headerName: "Next action",
-        flex: 1.4,
-        minWidth: 220,
+        flex: 1,
+        minWidth: 240,
         tooltipField: "nextAction",
       },
+      { field: "date", headerName: "Date", width: 100 },
     ],
-    [money],
+    [money, wide],
   );
 
   const channels = useMemo(
