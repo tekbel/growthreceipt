@@ -226,6 +226,20 @@ export function AuthShell() {
               </li>
             </ul>
           </div>
+          <aside className="auth-example" aria-label="About the example product">
+            <span className="auth-example-mark" aria-hidden="true">
+              {/* biome-ignore lint/performance/noImgElement: a small static icon. */}
+              <img src="/products/launchcheck.svg" alt="" width={36} height={36} decoding="async" />
+            </span>
+            <p>
+              The demo markets <strong>LaunchCheck</strong>, an example SaaS product that scans a
+              launch page for speed, search and structure problems. Every campaign, post and
+              purchase you see is for it.{" "}
+              <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
+                launchcheck.addisstack.com
+              </a>
+            </p>
+          </aside>
           <SampleFlow />
           <section className="auth-next" aria-labelledby="auth-next-title">
             <h2 id="auth-next-title">

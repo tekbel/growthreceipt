@@ -1117,8 +1117,9 @@ function JudgeBar({
       <p>
         PayPal sandbox. No real money moves.
         <InfoTip label="About the judge demo" align="end">
-          This workspace is yours alone and is seeded with a sample campaign. Purchases use PayPal
-          sandbox accounts, and every agent run is a real model call.
+          This workspace is yours alone and is seeded with a campaign for LaunchCheck, an example
+          SaaS product at launchcheck.addisstack.com. Purchases use PayPal sandbox accounts, and
+          every agent run is a real model call.
         </InfoTip>
       </p>
       {confirming ? (
