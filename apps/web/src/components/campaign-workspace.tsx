@@ -86,6 +86,30 @@ type RevenueSummary = {
   latest_capture_id: string | null;
 };
 
+type MoveEvidence = {
+  completed_orders: number;
+  gross_revenue: string;
+  currency: string;
+  paid_posts?: {
+    content_id: string;
+    day: number;
+    channel: string;
+    theme: string;
+    completed_orders: number;
+    revenue: string;
+  }[];
+};
+
+type MoveContext = { evidence: MoveEvidence | null; model: string | null };
+
+type MoveDecision = {
+  decision: "approved" | "rejected";
+  headline: string;
+  recommendation: string;
+  edited: boolean;
+  decided_at: string;
+};
+
 type Recommendation = {
   headline: string;
   evidence_summary: string;
@@ -142,6 +166,8 @@ const eventLabels: Record<string, string> = {
   changes_requested: "Changes requested",
   campaign_approved: "Campaign approved",
   next_action_recommended: "Next move recommended from PayPal revenue",
+  next_action_approved: "Next move approved",
+  next_action_rejected: "Next move rejected",
 };
 
 const draftSteps: [DraftStage, string][] = [
@@ -191,6 +217,9 @@ export function CampaignWorkspace({
   const [revenueError, setRevenueError] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recommendedAt, setRecommendedAt] = useState<string | null>(null);
+  const [moveContext, setMoveContext] = useState<MoveContext | null>(null);
+  const [moveDecision, setMoveDecision] = useState<MoveDecision | null>(null);
+  const [deciding, setDeciding] = useState(false);
   const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -286,6 +315,8 @@ export function CampaignWorkspace({
     setReceipts(null);
     setRecommendation(null);
     setRecommendedAt(null);
+    setMoveContext(null);
+    setMoveDecision(null);
     void loadRevenue();
   }, [loadRevenue]);
 
@@ -296,11 +327,24 @@ export function CampaignWorkspace({
     campaignApi
       .events(campaignId)
       .then((events) => {
-        const latest = events.find((event) => event.action === "next_action_recommended");
+        const index = events.findIndex((event) => event.action === "next_action_recommended");
+        const latest = events[index];
         const nextAction = latest?.detail.next_action as Recommendation | undefined;
         if (!active || !latest || !nextAction) return;
+        // Events come newest first, so a decision on this move sits before it.
+        const decided = events
+          .slice(0, index)
+          .find((event) => event.action.startsWith("next_action_") && event.actor === "human");
         setRecommendation((current) => current ?? nextAction);
         setRecommendedAt((current) => current ?? latest.created_at);
+        setMoveContext(
+          (current) =>
+            current ?? {
+              evidence: (latest.detail.evidence as MoveEvidence | undefined) ?? null,
+              model: typeof latest.detail.model === "string" ? latest.detail.model : null,
+            },
+        );
+        if (decided) setMoveDecision((current) => current ?? (decided.detail as MoveDecision));
       })
       .catch(() => {
         // Activity is optional here. The next move can still be requested.
@@ -334,6 +378,8 @@ export function CampaignWorkspace({
     if (previous?.campaignId !== campaignId || revenue.completed_orders <= previous.count) return;
     setRecommendation(null);
     setRecommendedAt(null);
+    setMoveContext(null);
+    setMoveDecision(null);
     setToast({
       message: "New PayPal purchase verified and credited to this campaign.",
       action: { label: "Find next move", view: "experiment" },
@@ -343,8 +389,31 @@ export function CampaignWorkspace({
 
   const provenMove: ProvenMove | null =
     recommendation && recommendedAt
-      ? { headline: recommendation.headline, at: recommendedAt }
+      ? { headline: recommendation.headline, at: recommendedAt, decision: moveDecision?.decision }
       : null;
+
+  async function decideNextMove(decision: MoveDecision["decision"], edited?: string) {
+    if (!campaign) return;
+    setDeciding(true);
+    try {
+      const response = await apiFetch("/v1/agents/next-action/decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaign.id, decision, recommendation: edited }),
+      });
+      if (!response.ok) throw new Error("decision failed");
+      setMoveDecision((await response.json()) as MoveDecision);
+      notify(
+        decision === "approved"
+          ? "Next move approved. It is recorded in the campaign activity."
+          : "Next move rejected. Ask for a different one when you are ready.",
+      );
+    } catch {
+      notify("Your decision could not be saved. Please try again.");
+    } finally {
+      setDeciding(false);
+    }
+  }
 
   function openBuyPage(contentId: string) {
     window.open(buyLink(contentId), "_blank", "noopener");
@@ -447,8 +516,14 @@ export function CampaignWorkspace({
             : "A next move could not be prepared right now.",
         );
       }
-      const result = (await response.json()) as { next_action: Recommendation };
+      const result = (await response.json()) as {
+        next_action: Recommendation;
+        evidence: MoveEvidence;
+        model: string;
+      };
       setRecommendation(result.next_action);
+      setMoveContext({ evidence: result.evidence, model: result.model });
+      setMoveDecision(null);
       // Never earlier than the newest capture, so a small clock difference cannot hide it.
       const newest = Math.max(0, ...(receipts ?? []).map((item) => Date.parse(item.captured_at)));
       setRecommendedAt(new Date(Math.max(Date.now(), newest)).toISOString());
@@ -572,6 +647,10 @@ export function CampaignWorkspace({
         return (
           <ExperimentPage
             revenue={revenue}
+            context={moveContext}
+            decision={moveDecision}
+            deciding={deciding}
+            decide={decideNextMove}
             recommendation={recommendation}
             recommendationError={recommendationError}
             recommendationLoading={recommendationLoading}
@@ -2366,8 +2445,191 @@ function ResultsPage({
   );
 }
 
+function WhyThisMove({
+  recommendation,
+  context,
+}: {
+  recommendation: Recommendation;
+  context: MoveContext | null;
+}) {
+  const evidence = context?.evidence;
+  return (
+    <details className="why-move">
+      <summary>
+        Why this recommendation
+        <ChevronDown aria-hidden="true" />
+      </summary>
+      <dl>
+        <div>
+          <dt>Evidence the agent read</dt>
+          <dd>
+            {evidence
+              ? `${evidence.completed_orders} verified PayPal purchase${evidence.completed_orders === 1 ? "" : "s"}, ${formatMoney(evidence.gross_revenue, evidence.currency)} in total.`
+              : "Verified PayPal revenue for this campaign."}
+          </dd>
+        </div>
+        {evidence?.paid_posts?.length ? (
+          <div>
+            <dt>Posts that earned it</dt>
+            <dd>
+              <ul>
+                {evidence.paid_posts.map((post) => (
+                  <li key={post.content_id}>
+                    Day {post.day} · {post.channel} · {post.theme}.{" "}
+                    {formatMoney(post.revenue, evidence.currency)} from {post.completed_orders}{" "}
+                    purchase{post.completed_orders === 1 ? "" : "s"}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Confidence</dt>
+          <dd>
+            {confidenceCopy[recommendation.confidence]}
+            {recommendation.needs_more_data
+              ? " The agent asks for more purchases before you rely on it."
+              : ""}
+          </dd>
+        </div>
+        <div>
+          <dt>Model</dt>
+          <dd>
+            {context?.model ? <code>{context.model}</code> : "OpenAI"} with a fixed output schema.
+            It reads the campaign brief and these PayPal numbers, never buyer details.
+          </dd>
+        </div>
+        <div>
+          <dt>Limits</dt>
+          <dd>
+            The agent cannot publish, change a price, start a payment, or spend money. Nothing
+            happens until you approve.
+          </dd>
+        </div>
+      </dl>
+    </details>
+  );
+}
+
+const confidenceCopy: Record<Recommendation["confidence"], string> = {
+  low: "Low. Fewer than 10 purchases is too small a sample to trust fully.",
+  medium: "Medium. Several purchases point the same way. Still worth testing.",
+  high: "High. Many purchases point the same way.",
+};
+
+function MoveDecisionPanel({
+  recommendation,
+  decision,
+  deciding,
+  decide,
+  findNextMove,
+  recommendationLoading,
+}: {
+  recommendation: Recommendation;
+  decision: MoveDecision | null;
+  deciding: boolean;
+  decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
+  findNextMove: () => Promise<void>;
+  recommendationLoading: boolean;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  if (decision) {
+    const approved = decision.decision === "approved";
+    return (
+      <div className="move-decision" role="status">
+        <span className={`status-tag ${approved ? "success" : "neutral"}`}>
+          {approved ? (decision.edited ? "Approved with your edits" : "Approved") : "Rejected"}
+        </span>
+        <p>
+          {approved
+            ? decision.recommendation
+            : "This move will not run. The agent can propose a different one from the same evidence."}
+        </p>
+        {!approved ? (
+          <button
+            className="button outline"
+            type="button"
+            disabled={recommendationLoading}
+            aria-busy={recommendationLoading}
+            onClick={() => void findNextMove()}
+          >
+            {recommendationLoading ? (
+              <BusyLabel text="Reviewing results" />
+            ) : (
+              "Ask for a different move"
+            )}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+  if (draft !== null) {
+    return (
+      <div className="move-decision">
+        <label htmlFor="move-edit">Edit the plan before you approve it</label>
+        <textarea
+          id="move-edit"
+          rows={4}
+          maxLength={1200}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <div className="form-actions">
+          <button
+            className="button accent"
+            type="button"
+            disabled={deciding || !draft.trim()}
+            onClick={() => void decide("approved", draft.trim())}
+          >
+            {deciding ? <BusyLabel text="Saving" /> : "Save and approve"}
+          </button>
+          <button className="button outline" type="button" onClick={() => setDraft(null)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="move-decision">
+      <p>Nothing changes until you decide.</p>
+      <div className="form-actions">
+        <button
+          className="button accent"
+          type="button"
+          disabled={deciding}
+          onClick={() => void decide("approved")}
+        >
+          {deciding ? <BusyLabel text="Saving" /> : "Approve"}
+        </button>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={deciding}
+          onClick={() => setDraft(recommendation.recommendation)}
+        >
+          Edit
+        </button>
+        <button
+          className="button outline"
+          type="button"
+          disabled={deciding}
+          onClick={() => void decide("rejected")}
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ExperimentPage({
   revenue,
+  context,
+  decision,
+  deciding,
+  decide,
   recommendation,
   recommendationError,
   recommendationLoading,
@@ -2375,6 +2637,10 @@ function ExperimentPage({
   navigate,
 }: {
   revenue: RevenueSummary | null;
+  context: MoveContext | null;
+  decision: MoveDecision | null;
+  deciding: boolean;
+  decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -2405,6 +2671,15 @@ function ExperimentPage({
                 <dd>{recommendation.expected_signal}</dd>
               </div>
             </dl>
+            <WhyThisMove recommendation={recommendation} context={context} />
+            <MoveDecisionPanel
+              recommendation={recommendation}
+              decision={decision}
+              deciding={deciding}
+              decide={decide}
+              findNextMove={findNextMove}
+              recommendationLoading={recommendationLoading}
+            />
           </div>
         ) : (
           <div>

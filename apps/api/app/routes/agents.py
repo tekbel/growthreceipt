@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.generation import draft_campaign
 from app.campaigns.models import CampaignBrief, CampaignDraft
 from app.campaigns.store import CampaignStore
+from app.config import get_settings
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
 from app.quota import CampaignDraftRun, NextActionRun
@@ -63,8 +65,27 @@ class RevenueEvidence(BaseModel):
 class NextActionResponse(BaseModel):
     session_id: str
     turn_id: str
+    model: str
     evidence: RevenueEvidence
     next_action: NextAction
+
+
+class NextActionDecisionRequest(BaseModel):
+    campaign_id: UUID
+    decision: Literal["approved", "rejected"]
+    # The founder's edited plan. Only used when approving.
+    recommendation: str | None = Field(default=None, min_length=1, max_length=1200)
+
+
+class NextActionDecision(BaseModel):
+    decision: Literal["approved", "rejected"]
+    headline: str
+    recommendation: str
+    edited: bool
+    decided_at: datetime
+
+
+DECISION_ACTIONS = {"next_action_approved", "next_action_rejected"}
 
 
 REVENUE_LEARNING_INSTRUCTIONS = """You are GrowthReceipt's revenue learning agent.
@@ -189,6 +210,7 @@ async def create_next_action(
         detail={
             "session_id": run.session_id,
             "turn_id": run.turn_id,
+            "model": get_settings().openai_model,
             "evidence": evidence.model_dump(mode="json"),
             "next_action": run.output.model_dump(),
         },
@@ -196,6 +218,52 @@ async def create_next_action(
     return NextActionResponse(
         session_id=run.session_id,
         turn_id=run.turn_id,
+        model=get_settings().openai_model,
         evidence=evidence,
         next_action=run.output,
     )
+
+
+@router.post("/next-action/decision", response_model=NextActionDecision)
+async def decide_next_action(
+    request: NextActionDecisionRequest,
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
+) -> NextActionDecision:
+    """Records the founder's call on the latest next move. The agent never acts on its own."""
+    campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    events = await campaigns.events(workspace_id=workspace_id, campaign_id=campaign.id)
+    latest = next(
+        (
+            event
+            for event in events
+            if event.action in {"next_action_recommended", *DECISION_ACTIONS}
+        ),
+        None,
+    )
+    if latest is None:
+        raise HTTPException(status_code=409, detail="There is no next move to decide on")
+    if latest.action in DECISION_ACTIONS:
+        raise HTTPException(status_code=409, detail="This next move was already decided")
+    proposed = NextAction.model_validate(latest.detail["next_action"])
+    final = (request.recommendation or "").strip() if request.decision == "approved" else ""
+    edited = bool(final) and final != proposed.recommendation
+    decision = NextActionDecision(
+        decision=request.decision,
+        headline=proposed.headline,
+        recommendation=final or proposed.recommendation,
+        edited=edited,
+        decided_at=datetime.now(UTC),
+    )
+    detail = decision.model_dump(mode="json")
+    if edited:
+        detail["proposed_recommendation"] = proposed.recommendation
+    await campaigns.record_event(
+        campaign_id=campaign.id,
+        actor="human",
+        action=f"next_action_{request.decision}",
+        detail=detail,
+    )
+    return decision

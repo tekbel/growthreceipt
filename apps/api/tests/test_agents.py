@@ -125,3 +125,64 @@ async def test_next_action_rejects_unknown_campaign(transport: ASGITransport) ->
         )
 
     assert response.status_code == 404
+
+
+async def recommend(client: AsyncClient) -> None:
+    response = await client.post("/v1/agents/next-action", json={"campaign_id": CAMPAIGN})
+    assert response.status_code == 200
+    assert response.json()["model"]
+
+
+CAMPAIGN = "11111111-1111-4111-8111-111111111111"
+
+
+@pytest.mark.asyncio
+async def test_founder_approves_an_edited_next_move(
+    transport: ASGITransport, campaign_store: FakeCampaignStore
+) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await recommend(client)
+        response = await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "approved", "recommendation": "My plan."},
+        )
+        repeated = await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "rejected"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"] == "approved"
+    assert body["recommendation"] == "My plan."
+    assert body["edited"] is True
+    assert repeated.status_code == 409
+    events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(CAMPAIGN))
+    assert events[0].action == "next_action_approved"
+    assert events[0].actor == "human"
+    assert events[0].detail["proposed_recommendation"] != "My plan."
+
+
+@pytest.mark.asyncio
+async def test_rejecting_keeps_the_proposed_plan_on_record(transport: ASGITransport) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await recommend(client)
+        response = await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "rejected", "recommendation": "ignored"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "rejected"
+    assert response.json()["edited"] is False
+
+
+@pytest.mark.asyncio
+async def test_decision_needs_a_recommendation(transport: ASGITransport) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "approved"},
+        )
+
+    assert response.status_code == 409

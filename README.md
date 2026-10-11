@@ -65,6 +65,7 @@ The tunnel always uses `https://justify-usual-twirl.ngrok-free.dev/v1/paypal/web
 - `POST /v1/paypal/webhooks` verifies the PayPal signature before accepting an event.
 - `GET /v1/paypal/config` exposes only the browser-safe sandbox client configuration.
 - `GET /v1/paypal/revenue/{campaign_id}` returns persisted, attributed revenue evidence.
+- `POST /v1/agents/next-action/decision` records the founder approving, editing or rejecting the latest next move. Nothing runs without it.
 - `GET /v1/paypal/receipts/{campaign_id}` returns each completed purchase with its post, order and capture IDs, and the signature verified PayPal webhooks that match it.
 - `POST /v1/agents/next-action` loads the stored campaign, turns normalized PayPal revenue into one approval-gated experiment, and records it in the campaign history.
 

@@ -22,7 +22,7 @@ export type Receipt = {
   webhooks: WebhookProof[];
 };
 
-export type ProvenMove = { headline: string; at: string };
+export type ProvenMove = { headline: string; at: string; decision?: "approved" | "rejected" };
 
 const webhookLabels: Record<string, string> = {
   "CHECKOUT.ORDER.APPROVED": "PayPal reported the buyer approval",
@@ -112,8 +112,16 @@ export function ReceiptChain({
             </button>
           )}
         </ChainStep>
-        <ChainStep label="Your decision" done={false}>
-          {fresh ? (
+        <ChainStep label="Your decision" done={Boolean(fresh?.decision)}>
+          {fresh?.decision ? (
+            <>
+              <strong>{fresh.decision === "approved" ? "Approved" : "Rejected"}</strong>
+              <button className="text-button" type="button" onClick={onReview}>
+                Open the plan
+                <ArrowRight aria-hidden="true" />
+              </button>
+            </>
+          ) : fresh ? (
             <button className="text-button" type="button" onClick={onReview}>
               Review recommendation
               <ArrowRight aria-hidden="true" />
