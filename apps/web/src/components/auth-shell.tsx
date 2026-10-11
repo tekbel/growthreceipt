@@ -37,7 +37,15 @@ export function AuthShell() {
   const captcha = useTurnstile();
   const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
-  const bootstrap = useCallback(async (accessToken: string) => {
+  // The user whose workspace is loaded. Token refreshes for the same user only swap the token.
+  const loadedUser = useRef<string | null>(null);
+
+  const bootstrap = useCallback(async (accessToken: string, userId: string) => {
+    if (loadedUser.current === userId) {
+      setApiAccessToken(accessToken);
+      return;
+    }
+    loadedUser.current = userId;
     setState("bootstrapping");
     setApiAccessToken(accessToken);
     try {
@@ -56,6 +64,7 @@ export function AuthShell() {
       setError(null);
       setState("ready");
     } catch (reason) {
+      loadedUser.current = null;
       setError(reason instanceof Error ? reason.message : "Your workspace could not be prepared.");
       setState("error");
     }
@@ -67,7 +76,7 @@ export function AuthShell() {
     let active = true;
     void supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      if (data.session) void bootstrap(data.session.access_token);
+      if (data.session) void bootstrap(data.session.access_token, data.session.user.id);
       else {
         setApiAccessToken(null);
         setState("signed-out");
@@ -75,8 +84,9 @@ export function AuthShell() {
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      if (session) void bootstrap(session.access_token);
+      if (session) void bootstrap(session.access_token, session.user.id);
       else {
+        loadedUser.current = null;
         setApiAccessToken(null);
         // A finished sign in leaves the buttons busy, so clear that on sign out.
         setSubmitting(false);

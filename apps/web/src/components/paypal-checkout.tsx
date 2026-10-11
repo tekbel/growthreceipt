@@ -4,6 +4,7 @@ import { ArrowRight, Check, Copy, LockKeyhole } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
+import { InfoTip } from "@/components/info-tip";
 import { API_URL } from "@/lib/campaign";
 
 // The customer side of GrowthReceipt. It needs no sign in: the post id in the
@@ -278,10 +279,17 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
               {founderPreview ? (
                 <div className="buy-founder-note">
                   <p>This purchase is already credited to the post that brought it.</p>
-                  <a className="button dark" href="/#today">
-                    See it on Today
-                    <ArrowRight aria-hidden="true" />
-                  </a>
+                  <span className="buy-founder-action">
+                    <a className="button dark" href="/#today">
+                      See it on Today
+                      <ArrowRight aria-hidden="true" />
+                    </a>
+                    <InfoTip label="About this button" align="start">
+                      Demo only. You see this because you opened your own buy link from the
+                      workspace. A real customer's journey ends at this thank you screen and never
+                      sees your workspace.
+                    </InfoTip>
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -293,7 +301,13 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
               </div>
               {offer?.sandbox_buyer_email && offer.sandbox_buyer_password ? (
                 <div className="test-buyer">
-                  <p className="test-buyer-title">Test buyer login</p>
+                  <p className="test-buyer-title">
+                    Test buyer login
+                    <InfoTip label="About the test buyer" align="start">
+                      A PayPal sandbox account with play money, shown so judges can pay without
+                      signing up. A live store never shows this.
+                    </InfoTip>
+                  </p>
                   <p>When PayPal asks you to log in, use this sandbox account.</p>
                   <dl>
                     <CopyRow label="Email" value={offer.sandbox_buyer_email} />

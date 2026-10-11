@@ -31,6 +31,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
+import { InfoTip } from "@/components/info-tip";
 import {
   ElapsedSeconds,
   type Receipt as PayPalReceipt,
@@ -488,12 +489,24 @@ export function CampaignWorkspace({
     window.setTimeout(() => setToast(null), action ? 7000 : 2800);
   }
 
+  // After a page change, move focus to the new heading so screen readers announce it.
+  const [focusRequest, setFocusRequest] = useState(0);
+  useEffect(() => {
+    if (focusRequest === 0 || loadState !== "ready") return;
+    const heading = document.querySelector<HTMLElement>(".page-shell h1");
+    if (!heading) return;
+    heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+  }, [focusRequest, loadState]);
+
   function navigate(nextView: View) {
     if (nextView !== view) window.history.pushState(null, "", `#${nextView}`);
     setView(nextView);
     setMobileNavigationOpen(false);
     setSearchOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // A new page starts at the top at once, like any route change.
+    window.scrollTo({ top: 0, behavior: "instant" });
+    setFocusRequest((count) => count + 1);
   }
 
   function selectFilter(nextFilter: Filter) {
@@ -989,7 +1002,13 @@ function JudgeBar({
   return (
     <section className="judge-bar" aria-label="Judge demo">
       <span className="status-tag review">Judge demo</span>
-      <p>PayPal sandbox. No real money moves.</p>
+      <p>
+        PayPal sandbox. No real money moves.
+        <InfoTip label="About the judge demo">
+          This workspace is yours alone and is seeded with a sample campaign. Purchases use PayPal
+          sandbox accounts, and every agent run is a real model call.
+        </InfoTip>
+      </p>
       {confirming ? (
         <div className="judge-bar-actions">
           <span>Start over with the seeded campaign and no purchases?</span>
@@ -2479,7 +2498,14 @@ function ResultsPage({
       {receipts?.length ? (
         <section className="results-receipts" aria-labelledby="receipts-title">
           <div className="column-heading">
-            <h2 id="receipts-title">From post to payment to next move</h2>
+            <h2 id="receipts-title">
+              From post to payment to next move
+              <InfoTip label="How this is proven" align="start">
+                Each step comes from a recorded event. PayPal confirms the order and the capture,
+                PayPal webhooks are signature checked before they are stored, and the agent run is
+                logged with its ID. Nothing here is estimated.
+              </InfoTip>
+            </h2>
             <span>Every step below is a recorded PayPal or GrowthReceipt event</span>
           </div>
           <ReceiptChain
@@ -2845,6 +2871,10 @@ function ExperimentPage({
                     · run <code title={context.turnId}>{context.turnId.slice(-8)}</code>
                   </>
                 ) : null}
+                <InfoTip label="About this agent run" align="start">
+                  The time is measured on the server around the model call. The run ID is the OpenAI
+                  turn ID, also saved in the campaign activity.
+                </InfoTip>
               </p>
             ) : null}
             <p className="experiment-plan">{recommendation.recommendation}</p>

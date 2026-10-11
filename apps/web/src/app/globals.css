@@ -849,3 +849,21 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .move-run { margin: 10px 0 0; color: var(--muted); font-size: var(--type-xs); }
 .experiment-stage p.move-run { font-size: var(--type-xs); }
 .move-run code { padding: 1px 6px; border-radius: var(--corner-sm); background: var(--surface-subtle); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--type-xs); }
+
+/* Info tips. A quiet "i" beside a control, explaining it without adding copy to the page. */
+.info-tip { vertical-align: middle; margin-left: 4px; }
+.info-tip-button { width: 28px; height: 28px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: help; transition: color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease); }
+.info-tip-button:hover, .info-tip.open .info-tip-button { color: var(--accent-strong); background: var(--accent-soft); }
+.info-tip-button svg { width: 15px; height: 15px; }
+.info-tip.open .tip { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.info-tip.align-start .tip { left: -6px; transform: translate(0, 4px); }
+.info-tip.align-start:hover .tip, .info-tip.align-start:has(:focus-visible) .tip, .info-tip.align-start.open .tip { transform: translate(0, 0); }
+.info-tip.align-end .tip { left: auto; right: -6px; transform: translate(0, 4px); }
+.info-tip.align-end:hover .tip, .info-tip.align-end:has(:focus-visible) .tip, .info-tip.align-end.open .tip { transform: translate(0, 0); }
+@media (hover: none) { .info-tip .tip { display: block; } }
+.buy-founder-action { display: inline-flex; align-items: center; gap: 6px; }
+.test-buyer-title .info-tip { margin-left: 2px; }
+.page-shell h1:focus { outline: none; }
+/* A session check is usually instant, so the loading screen only fades in if it takes a moment. */
+.auth-loading { animation: auth-loading-in var(--duration-base) var(--ease) 300ms both; }
+@keyframes auth-loading-in { from { opacity: 0; } }
