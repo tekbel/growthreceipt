@@ -231,7 +231,7 @@ export function AuthShell() {
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
             <span className="eyebrow">PayPal AI Hackathon 2026</span>
-            <h2 id="sign-in-title">See the loop in 90 seconds</h2>
+            <h2 id="sign-in-title">The loop in 90 seconds</h2>
             <p>
               Approve a post, buy it through PayPal sandbox, and watch the payment change the
               agent's next recommendation.
@@ -323,7 +323,6 @@ export function AuthShell() {
               {error}
             </p>
           ) : null}
-          <p className="auth-note">The judge demo uses PayPal Sandbox. No real money moves.</p>
         </section>
       </main>
     );
