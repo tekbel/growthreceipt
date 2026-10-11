@@ -3646,24 +3646,31 @@ function ProductMark({
   onLoadResult?: (loaded: boolean) => void;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const showIcon = iconUrl && iconUrl !== failedUrl;
+  const loaded = showIcon && loadedUrl === iconUrl;
   return (
     <span className={`product-mark ${className}`} aria-hidden="true">
+      {/* The letter holds the space, and the icon fades in over it once it has loaded. */}
+      {loaded ? null : name.trim().charAt(0).toUpperCase() || "P"}
       {showIcon ? (
         // Product icons are arbitrary user links, so next/image remote patterns do not fit.
         // biome-ignore lint/performance/noImgElement: see above
         <img
+          className={loaded ? "loaded" : undefined}
           src={iconUrl}
           alt=""
-          onLoad={() => onLoadResult?.(true)}
+          decoding="async"
+          onLoad={() => {
+            setLoadedUrl(iconUrl);
+            onLoadResult?.(true);
+          }}
           onError={() => {
             setFailedUrl(iconUrl);
             onLoadResult?.(false);
           }}
         />
-      ) : (
-        name.trim().charAt(0).toUpperCase() || "P"
-      )}
+      ) : null}
     </span>
   );
 }

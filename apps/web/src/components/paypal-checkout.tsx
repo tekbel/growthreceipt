@@ -69,6 +69,8 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
   const [unavailable, setUnavailable] = useState(false);
   const [founderPreview, setFounderPreview] = useState(false);
   const [iconFailed, setIconFailed] = useState(false);
+  const [iconLoaded, setIconLoaded] = useState(false);
+  const [buttonReady, setButtonReady] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState("Preparing secure checkout…");
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +198,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
             });
         });
         checkoutContainer.replaceChildren(paypalButton);
+        setButtonReady(true);
         setStatus("Choose PayPal to continue.");
       } catch (reason) {
         if (disposed) return;
@@ -231,12 +234,20 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         <div className="checkout-product">
           <div className="checkout-product-mark" aria-hidden="true">
             {/* The founder's uploaded icon when there is one, otherwise the first letter. */}
+            {/* The letter holds the space, and the icon fades in over it once it has loaded. */}
+            {productName[0]?.toUpperCase()}
             {offer?.product_icon_url && !iconFailed ? (
               // biome-ignore lint/performance/noImgElement: icons can be any uploaded URL, so next/image is not used.
-              <img src={offer.product_icon_url} alt="" onError={() => setIconFailed(true)} />
-            ) : (
-              productName[0]?.toUpperCase()
-            )}
+              <img
+                className={iconLoaded ? "loaded" : undefined}
+                src={offer.product_icon_url}
+                alt=""
+                decoding="async"
+                fetchPriority="high"
+                onLoad={() => setIconLoaded(true)}
+                onError={() => setIconFailed(true)}
+              />
+            ) : null}
           </div>
           <div>
             <span className="checkout-label">{productName}</span>
@@ -334,7 +345,16 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                   onError={() => setError("The PayPal SDK could not be loaded.")}
                 />
               ) : null}
-              <div className="paypal-button-slot" ref={buttonContainer} />
+              {/* PayPal draws its own button. A same size placeholder holds the space until then. */}
+              <div className="paypal-button-frame">
+                <div
+                  className={`paypal-button-slot${buttonReady ? " ready" : ""}`}
+                  ref={buttonContainer}
+                />
+                {!buttonReady && !error ? (
+                  <div className="paypal-button-skeleton" aria-hidden="true" />
+                ) : null}
+              </div>
               <p className={`checkout-status ${error ? "error" : ""}`} aria-live="polite">
                 {error ?? status}
               </p>

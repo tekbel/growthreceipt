@@ -227,6 +227,25 @@ export function AuthShell() {
             </ul>
           </div>
           <SampleFlow />
+          <section className="auth-next" aria-labelledby="auth-next-title">
+            <h2 id="auth-next-title">
+              What's next <span>Planned</span>
+            </h2>
+            <ul>
+              <li>
+                <strong>More PayPal signals.</strong> Subscriptions, refunds and disputes from the
+                same verified webhooks, so the agent learns what keeps customers.
+              </li>
+              <li>
+                <strong>Real publishing.</strong> Approved posts go out to LinkedIn and X, each with
+                its own buy link.
+              </li>
+              <li>
+                <strong>Teams and agencies.</strong> Many products in one workspace, compared by the
+                revenue each post earned.
+              </li>
+            </ul>
+          </section>
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
