@@ -64,6 +64,7 @@ class PayPalConfigResponse(BaseModel):
 class RevenueSummaryResponse(BaseModel):
     campaign_id: UUID
     completed_orders: int
+    started_orders: int
     gross_revenue: str
     currency: str
     latest_capture_id: str | None
@@ -258,6 +259,7 @@ async def get_revenue_summary(
     return RevenueSummaryResponse(
         campaign_id=campaign_id,
         completed_orders=summary.completed_orders,
+        started_orders=summary.started_orders,
         gross_revenue=f"{summary.gross_revenue:.2f}",
         currency=summary.currency,
         latest_capture_id=summary.latest_capture_id,

@@ -267,7 +267,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
               <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
             </li>
             <li>
-              <Check aria-hidden="true" /> A clear fix for every problem found
+              <Check aria-hidden="true" /> A clear fix for every issue found
             </li>
             <li>
               <Check aria-hidden="true" /> One payment, no subscription

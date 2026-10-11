@@ -97,6 +97,7 @@ function viewFromHash(): View | null {
 
 type RevenueSummary = {
   completed_orders: number;
+  started_orders: number;
   gross_revenue: string;
   currency: string;
   latest_capture_id: string | null;
@@ -798,6 +799,24 @@ export function CampaignWorkspace({
         />
       );
     }
+    // These pages work before the first campaign exists.
+    if (view === "integrations") {
+      return (
+        <IntegrationsPage
+          navigate={navigate}
+          linkedin={linkedin}
+          setLinkedin={setLinkedin}
+          notify={notify}
+        />
+      );
+    }
+    if (view === "settings") {
+      return <SettingsPage notify={notify} onSaved={onIdentityChange} />;
+    }
+    // Today is the landing page, so a new workspace starts there with the brief form.
+    if ((!campaign || !selected) && view !== "today" && view !== "new-campaign") {
+      return <NoCampaignPage view={view} navigate={navigate} />;
+    }
     if (view === "new-campaign" || !campaign || !selected) {
       return (
         <NewCampaignPage
@@ -934,17 +953,6 @@ export function CampaignWorkspace({
             navigate={navigate}
           />
         );
-      case "integrations":
-        return (
-          <IntegrationsPage
-            navigate={navigate}
-            linkedin={linkedin}
-            setLinkedin={setLinkedin}
-            notify={notify}
-          />
-        );
-      case "settings":
-        return <SettingsPage notify={notify} onSaved={onIdentityChange} />;
       case "checkout":
         return (
           <CheckoutPage
@@ -1659,14 +1667,7 @@ function TodayPage({
           }
           tone={sales ? "success" : "neutral"}
         />
-        <Metric
-          icon={<TrendingUp aria-hidden="true" />}
-          label="Trial to paid"
-          value="Not connected"
-          detail="Connect PostHog to measure"
-          tone="neutral"
-          muted
-        />
+        <CheckoutsMetric revenue={revenue} />
       </section>
       <section className="today-grid">
         <article>
@@ -1933,6 +1934,45 @@ function FocusCard({
       </div>
       <CampaignProgress status={stage} />
     </section>
+  );
+}
+
+// Every PayPal order is a buyer who opened checkout from a buy link, paid or not.
+function CheckoutsMetric({ revenue }: { revenue: RevenueSummary | null }) {
+  const started = revenue?.started_orders ?? 0;
+  const paid = revenue?.completed_orders ?? 0;
+  return (
+    <Metric
+      icon={<TrendingUp aria-hidden="true" />}
+      label="Checkouts started"
+      value={String(started)}
+      detail={
+        started
+          ? `${paid} paid, ${Math.round((paid / started) * 100)}% completed`
+          : "Waiting for a buyer to open PayPal"
+      }
+      tone={paid ? "success" : "neutral"}
+    />
+  );
+}
+
+function PayingPostsMetric({
+  campaign,
+  receipts,
+}: {
+  campaign: Campaign;
+  receipts: PayPalReceipt[] | null;
+}) {
+  const paying = new Set(receipts?.map((receipt) => receipt.content_id)).size;
+  const approved = campaign.posts.filter((post) => post.status === "approved").length;
+  return (
+    <Metric
+      icon={<Send aria-hidden="true" />}
+      label="Paying posts"
+      value={`${paying} of ${approved}`}
+      detail={approved ? "Approved posts with a verified purchase" : "Approve a post first"}
+      tone={paying ? "success" : "neutral"}
+    />
   );
 }
 
@@ -2904,7 +2944,7 @@ function ResultsPage({
                 ? "Unavailable"
                 : "Loading"
           }
-          detail="PayPal Sandbox"
+          detail="PayPal sandbox"
           tone={revenue?.completed_orders ? "success" : "neutral"}
         />
         <Metric
@@ -2914,22 +2954,8 @@ function ResultsPage({
           detail={revenue?.latest_capture_id ? "Capture verified" : "No capture yet"}
           tone={revenue?.latest_capture_id ? "success" : "neutral"}
         />
-        <Metric
-          icon={<TrendingUp aria-hidden="true" />}
-          label="Trial to paid"
-          value="Not connected"
-          detail="Connect PostHog"
-          tone="neutral"
-          muted
-        />
-        <Metric
-          icon={<Send aria-hidden="true" />}
-          label="Published reach"
-          value="Not connected"
-          detail="Connect a social channel"
-          tone="neutral"
-          muted
-        />
+        <CheckoutsMetric revenue={revenue} />
+        <PayingPostsMetric campaign={campaign} receipts={receipts} />
       </section>
       {receipts?.length ? (
         <section className="results-receipts" aria-labelledby="receipts-title">
@@ -3410,7 +3436,7 @@ function IntegrationsPage({
       />
       <section className="integration-list">
         <Integration
-          provider="PayPal Sandbox"
+          provider="PayPal sandbox"
           description="Checkout, capture, and verified campaign revenue."
           icon={<SiPaypal aria-hidden="true" />}
           status="Connected"
@@ -3648,7 +3674,7 @@ function CheckoutPage({
               <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
             </li>
             <li>
-              <Check aria-hidden="true" /> A clear fix for every problem found
+              <Check aria-hidden="true" /> A clear fix for every issue found
             </li>
             <li>
               <Check aria-hidden="true" /> One payment, no subscription
@@ -3657,7 +3683,7 @@ function CheckoutPage({
         </div>
         <div className="checkout-offer">
           <SiPaypal aria-hidden="true" />
-          <span>PayPal Sandbox</span>
+          <span>PayPal sandbox</span>
           <strong>{formatMoney("9.00", "USD")}</strong>
           <p>Sandbox only. No real money moves.</p>
           {post ? (
@@ -3898,6 +3924,71 @@ function SectionTitle({
     </div>
   );
 }
+const noCampaignCopy: Partial<
+  Record<View, { eyebrow?: string; title: string; empty: string; copy: string }>
+> = {
+  products: {
+    title: "Products",
+    empty: "No product yet",
+    copy: "Describe what you sell and GrowthReceipt drafts your first campaign.",
+  },
+  campaigns: {
+    title: "Campaigns",
+    empty: "No campaign yet",
+    copy: "Write a brief and the agent drafts a week of posts for your review.",
+  },
+  content: {
+    title: "Content",
+    empty: "No posts yet",
+    copy: "Drafted posts wait here for your approval.",
+  },
+  calendar: {
+    title: "Calendar",
+    empty: "Nothing scheduled yet",
+    copy: "Approved posts appear here on the day they go out.",
+  },
+  results: {
+    title: "Results",
+    empty: "No results yet",
+    copy: "PayPal purchases appear here, linked to the post that earned them.",
+  },
+  experiment: {
+    title: "Next experiment",
+    empty: "No experiment yet",
+    copy: "The agent suggests one after your first verified purchase.",
+  },
+  checkout: {
+    eyebrow: "Customer view",
+    title: "Buy as your customer",
+    empty: "No buy links yet",
+    copy: "Every approved post gets its own buy link.",
+  },
+};
+
+function NoCampaignPage({ view, navigate }: { view: View; navigate: (view: View) => void }) {
+  const page = noCampaignCopy[view] ?? {
+    title: "Workspace",
+    empty: "No campaign yet",
+    copy: "Write a brief to start your first campaign.",
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow={page.eyebrow}
+        title={page.title}
+        description="Everything here starts from your first campaign."
+      />
+      <section className="empty-state boxed">
+        <strong>{page.empty}</strong>
+        <p>{page.copy}</p>
+        <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
+          <Plus aria-hidden="true" /> New campaign
+        </button>
+      </section>
+    </>
+  );
+}
+
 function EmptyState({
   title,
   copy,
@@ -4048,7 +4139,7 @@ function LinkedInIntegration({
           {live
             ? `Posting as ${status.member_name || "your profile"}. Access lasts until ${formatMoment(status.expires_at ?? "", { day: "numeric", month: "long", year: "numeric" })}, then reconnect.`
             : !status.can_connect
-              ? "The judge demo is shared, so it cannot hold a LinkedIn profile. Sign in with your own account to connect yours. Publish still opens the LinkedIn composer."
+              ? "The judge demo is a temporary guest workspace, so it cannot hold a LinkedIn profile. Sign in with your own account to connect yours. Publish still opens the LinkedIn composer."
               : status.expired
                 ? "The LinkedIn connection expired. Reconnect to keep posting."
                 : "Connect your profile to post approved posts directly or on their scheduled day. Until then, Publish opens the LinkedIn composer."}

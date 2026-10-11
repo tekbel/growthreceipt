@@ -95,7 +95,7 @@ Reconnect around November 25, 2026, before recording the demo video, so the toke
 4. **Claim.** An atomic update claims the post first, so two API replicas or a double click cannot post twice. A failed post is released and logged as `publish_failed`, and can be retried.
 5. **Lock.** A published post cannot be edited or sent back for changes.
 6. **Schedule.** With automatic publishing on, the API checks every five minutes and posts approved posts whose day has arrived, from 9:00 in the workspace time zone. It only covers posts dated on or after the day automatic publishing was turned on.
-7. **Judge demo.** The shared judge workspace cannot connect, change automatic posting or post. The API returns 403, and Integrations explains that a personal sign in is needed.
+7. **Judge demo.** A judge demo is a temporary guest workspace, one per visitor. It cannot connect, change automatic posting or post. The API returns 403, and Integrations explains that a personal sign in is needed.
 8. **Disconnect.** `DELETE` revokes the token with LinkedIn (best effort) and deletes the row.
 
 Code: `apps/api/app/linkedin/` (client, crypto, store, publisher), `apps/api/app/routes/linkedin.py`, `apps/web/src/lib/linkedin.ts`, and the Integrations and Content pages in `campaign-workspace.tsx`. Tests: `apps/api/tests/test_linkedin.py`.

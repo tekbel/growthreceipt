@@ -231,7 +231,7 @@ async def test_auto_publish_sends_only_due_posts_from_its_start_day(
     assert await publish_due_posts(store, linkedin, cipher, after_nine) == 0
 
 
-async def test_the_shared_judge_demo_cannot_connect_or_post(
+async def test_a_judge_demo_cannot_connect_or_post(
     client: AsyncClient, campaign_store: FakeCampaignStore, linkedin: FakeLinkedInClient
 ) -> None:
     approve(campaign_store)

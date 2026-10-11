@@ -96,6 +96,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
             assert revenue.json() == {
                 "campaign_id": campaign_id,
                 "completed_orders": 1,
+                "started_orders": 1,
                 "gross_revenue": "9.00",
                 "currency": "USD",
                 "latest_capture_id": "TEST-CAPTURE-001",

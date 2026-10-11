@@ -250,8 +250,8 @@ export function AuthShell() {
               <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
                 LaunchCheck
               </a>
-              , an example SaaS product that scans a launch page for speed, search and structure
-              problems. Every campaign, post and purchase you see is for it.
+              , an example SaaS product that scans a launch page for speed, SEO and structure
+              issues. Every campaign, post and purchase you see is for it.
             </p>
           </aside>
           <SampleFlow />

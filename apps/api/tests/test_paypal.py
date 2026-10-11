@@ -177,10 +177,32 @@ async def test_capture_is_attributed_to_campaign() -> None:
     assert summary_response.json() == {
         "campaign_id": CAMPAIGN_ID,
         "completed_orders": 1,
+        "started_orders": 1,
         "gross_revenue": "9.00",
         "currency": "USD",
         "latest_capture_id": "TEST-CAPTURE-001",
     }
+
+
+@pytest.mark.asyncio
+async def test_an_abandoned_checkout_counts_as_started_but_not_completed() -> None:
+    store = FakePaymentStore()
+    app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
+    app.dependency_overrides[get_payment_store] = lambda: store
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await client.post(
+            "/v1/paypal/orders",
+            json={
+                "offer_id": "launchcheck-scan-pack",
+                "campaign_id": CAMPAIGN_ID,
+                "content_id": CONTENT_ID,
+            },
+        )
+        summary = (await client.get(f"/v1/paypal/revenue/{CAMPAIGN_ID}")).json()
+
+    assert summary["started_orders"] == 1
+    assert summary["completed_orders"] == 0
+    assert summary["gross_revenue"] == "0.00"
 
 
 @pytest.mark.asyncio

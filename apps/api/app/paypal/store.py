@@ -17,6 +17,7 @@ from app.paypal.gateway import Offer, PayPalCapture
 @dataclass(frozen=True)
 class RevenueSummary:
     completed_orders: int
+    started_orders: int
     gross_revenue: Decimal
     currency: str
     latest_capture_id: str | None
@@ -241,13 +242,17 @@ class PostgresPaymentStore:
             result = await self._session.execute(
                 text(
                     """
-                    select count(*)::int as completed_orders,
-                           coalesce(sum(amount), 0) as gross_revenue,
-                           coalesce(max(currency), 'USD') as currency,
-                           (array_agg(paypal_capture_id order by captured_at desc))[1]
-                             as latest_capture_id
+                    select count(*) filter (where status = 'completed')::int
+                             as completed_orders,
+                           count(*)::int as started_orders,
+                           coalesce(sum(amount) filter (where status = 'completed'), 0)
+                             as gross_revenue,
+                           coalesce(max(currency) filter (where status = 'completed'), 'USD')
+                             as currency,
+                           (array_agg(paypal_capture_id order by captured_at desc)
+                             filter (where status = 'completed'))[1] as latest_capture_id
                     from growthreceipt.payment_orders
-                    where campaign_id = :campaign_id and status = 'completed'
+                    where campaign_id = :campaign_id
                     """
                 ),
                 {"campaign_id": campaign_id},
@@ -255,6 +260,7 @@ class PostgresPaymentStore:
             row = result.one()
         return RevenueSummary(
             completed_orders=row.completed_orders,
+            started_orders=row.started_orders,
             gross_revenue=Decimal(row.gross_revenue),
             currency=row.currency,
             latest_capture_id=row.latest_capture_id,
@@ -378,6 +384,7 @@ class FakePaymentStore:
         gross = sum((Decimal(capture.amount) for capture in captures), Decimal("0"))
         return RevenueSummary(
             completed_orders=len(captures),
+            started_orders=sum(1 for order in self.orders.values() if order[1] == campaign_id),
             gross_revenue=gross,
             currency=captures[-1].currency if captures else "USD",
             latest_capture_id=captures[-1].capture_id if captures else None,

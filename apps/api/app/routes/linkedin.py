@@ -21,7 +21,7 @@ SettingsStore = Annotated[WorkspaceSettingsStore, Depends(get_workspace_settings
 
 
 def personal_workspace(workspace: Workspace) -> UUID:
-    # The judge demo is one shared workspace, so it must never hold someone's LinkedIn.
+    # Judge demos are temporary guest workspaces, so they must never hold someone's LinkedIn.
     if workspace.mode == "judge":
         raise HTTPException(
             status_code=403, detail="Sign in with your own account to connect LinkedIn."
