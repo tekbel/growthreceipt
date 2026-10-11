@@ -947,3 +947,23 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .evidence-grid .evidence-pending { color: var(--warning); font-weight: 600; }
 .evidence-grid .evidence-muted { color: var(--muted); }
 .evidence-note { margin: 10px 0 0; color: var(--muted); font-size: var(--type-xs); }
+
+/* Agent runs. Input, evidence, output and control for every model call. */
+.agent-runs { margin-top: 44px; }
+.agent-runs > ol { margin: 0; padding: 0; list-style: none; }
+.agent-runs > ol > li { border-bottom: 1px solid var(--line); }
+.agent-runs summary { min-height: 60px; display: flex; align-items: center; gap: 12px; list-style: none; cursor: pointer; }
+.agent-runs summary::-webkit-details-marker { display: none; }
+.agent-runs summary > svg:first-child { width: 18px; height: 18px; flex: 0 0 auto; color: var(--accent-strong); }
+.agent-run-title { min-width: 0; display: grid; gap: 2px; }
+.agent-run-title strong { font-size: var(--type-sm); font-weight: 600; }
+.agent-run-title small { color: var(--muted); font-size: var(--type-xs); font-variant-numeric: tabular-nums; }
+.agent-run-chevron { width: 16px; height: 16px; margin-left: auto; flex: 0 0 auto; color: var(--muted); transition: transform var(--duration-base) var(--ease); }
+.agent-runs details[open] .agent-run-chevron { transform: rotate(180deg); }
+.agent-runs dl { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 10px 20px; margin: 0 0 20px 30px; }
+.agent-runs dl > div { display: contents; }
+.agent-runs dt { color: var(--muted); font-size: var(--type-xs); font-weight: 600; padding-top: 2px; }
+.agent-runs dd { margin: 0; color: var(--ink); font-size: var(--type-sm); line-height: 1.55; }
+.agent-runs dd ul { margin: 0; padding-left: 18px; }
+.agent-runs .agent-run-control { color: var(--success); font-weight: 600; }
+@media (max-width: 640px) { .agent-runs dl { grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 0; } .agent-runs dd { margin-bottom: 8px; } }

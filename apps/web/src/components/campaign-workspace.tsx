@@ -32,6 +32,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
+import { AgentRuns } from "@/components/agent-runs";
 import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
 import {
@@ -817,6 +818,7 @@ export function CampaignWorkspace({
             campaign={campaign}
             nextActions={evidenceNextActions()}
             openPost={openPost}
+            runsKey={`${recommendedAt}-${moveDecision?.decision}-${followUpId}`}
             revenue={revenue}
             revenueError={revenueError}
             receipts={receipts}
@@ -2643,6 +2645,7 @@ function ResultsPage({
   campaign,
   nextActions,
   openPost,
+  runsKey,
   revenue,
   revenueError,
   receipts,
@@ -2661,6 +2664,7 @@ function ResultsPage({
   move: ProvenMove | null;
   nextActions: Record<string, string>;
   openPost: (postId: string) => void;
+  runsKey: string;
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -2790,6 +2794,7 @@ function ResultsPage({
           onOpenPost={openPost}
         />
       </section>
+      <AgentRuns campaign={campaign} refreshKey={runsKey} />
       <section className="results-body">
         <div className="plain-panel">
           <div className="provider-heading">
