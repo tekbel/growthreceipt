@@ -1015,3 +1015,14 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-example p { margin: 0; color: var(--ink-soft); font-size: var(--type-xs); line-height: 1.55; }
 .auth-example strong { color: var(--ink); }
 .auth-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
+/* Keep the demo card in view near the top while the intro scrolls. */
+@media (min-width: 901px) {
+  .auth-card { align-self: start; position: sticky; top: clamp(32px, 12vh, 140px); margin-top: clamp(32px, 12vh, 140px); }
+}
+@media (min-width: 901px) and (max-height: 980px) {
+  .auth-promise { padding: 20px 0 18px; }
+  .auth-promise h1 { font-size: clamp(2.4rem, 1.5rem + 2.3vw, 3.3rem); }
+  .auth-promise p { margin-top: 12px; font-size: var(--type-md); }
+  .auth-example { margin-bottom: 14px; padding: 10px 12px; }
+  .flow-step { padding-bottom: 6px; }
+}
