@@ -1,174 +1,121 @@
-# LinkedIn integration plan
+# LinkedIn integration
 
 ## Status
 
-Deferred by product decision on October 9, 2026. GrowthReceipt will finish authentication, judge access, and the higher priority integration work before implementing LinkedIn.
+Shipped on October 11, 2026 in commit `62c11fe`. A founder connects their own LinkedIn profile under Integrations, and GrowthReceipt posts approved LinkedIn posts with their buy link, either on a confirmed **Post it** click or automatically on the scheduled day.
 
-This document is the resume point for the LinkedIn integration. Recheck LinkedIn's official documentation before implementation because permissions, API versions, review requirements, and rate limits can change.
+The feature stays inactive until the three `LINKEDIN_*` variables are set on the Railway api service. Without them the Integrations page keeps the share link behaviour.
 
-## Intended outcome
+Checked against the Microsoft Learn LinkedIn docs on October 11, 2026. Recheck them before changing scopes or endpoints, because LinkedIn changes products and versions often. The `microsoft-learn` MCP server is configured for this project and searches those docs.
 
-A signed in GrowthReceipt user can connect a LinkedIn account, approve a post, publish it through LinkedIn's official API, and see the verified publication result. GrowthReceipt must never publish without an explicit human approval.
+## Setup runbook
 
-The first release should support personal LinkedIn posts. Company Page publishing and analytics follow after the basic flow works.
+### 1. LinkedIn account and Page
 
-## Required LinkedIn setup
+Use your real LinkedIn account. LinkedIn's User Agreement allows one account per real person, and fake accounts get restricted, which would break the app before judging. Test posts go to your real profile, so delete them afterwards if needed.
 
-1. Create or choose a LinkedIn Page that represents the organization.
-2. Create a GrowthReceipt application in the [LinkedIn Developer Portal](https://www.linkedin.com/developers/apps).
-3. Have a Page administrator verify the application association.
-4. Add the GrowthReceipt privacy policy URL, application logo, website, and business details.
-5. Request the **Share on LinkedIn** product for the `w_member_social` permission.
-6. Add the production callback URL in the application's **Auth** tab.
-7. Copy the Client ID and Client Secret into the server environment.
+The developer app must be linked to a LinkedIn Company Page that you administer. A personal profile is not accepted.
 
-Use this production callback shape:
+The Addis Stack page is `https://www.linkedin.com/company/123143924/`. To get a page URL from the admin view, drop the `/admin/dashboard/` part from `https://www.linkedin.com/company/123143924/admin/dashboard/`.
 
-```text
-https://api.growthreceipt.com/v1/integrations/linkedin/callback
-```
+### 2. Create the app
 
-LinkedIn requires an absolute HTTPS callback URL. It cannot contain a URL fragment. The registered value and the value used during OAuth must match.
+Go to https://www.linkedin.com/developers/apps and choose **Create app**.
 
-For local development, use an HTTPS tunnel with a stable domain and register its exact callback URL in the Developer Portal.
-
-## Environment variables
-
-```env
-LINKEDIN_CLIENT_ID=
-LINKEDIN_CLIENT_SECRET=
-LINKEDIN_REDIRECT_URI=
-LINKEDIN_OAUTH_STATE_SECRET=
-SOCIAL_TOKEN_ENCRYPTION_KEY=
-```
-
-Keep every value on the API server. Never expose the Client Secret, state secret, token encryption key, or access token through a `NEXT_PUBLIC_` variable or browser response.
-
-## Product flow
-
-1. The user signs in to GrowthReceipt with a permanent account.
-2. The user opens **Integrations** and selects **Connect** beside LinkedIn.
-3. The API verifies that the user belongs to the active workspace.
-4. The API creates a short lived, single use OAuth state value tied to the user and workspace.
-5. GrowthReceipt redirects the browser to LinkedIn's authorization page.
-6. LinkedIn shows the permissions requested by GrowthReceipt.
-7. The user approves or denies access on LinkedIn.
-8. LinkedIn returns an authorization code and the original state value to the API callback.
-9. The API validates the state value before exchanging the authorization code for an access token.
-10. The API retrieves the permitted LinkedIn account identity.
-11. The API encrypts the access token before storing it.
-12. GrowthReceipt returns the user to **Integrations** and shows the connected account name.
-
-Anonymous judge accounts must not connect external social accounts. The judge demo should show the integration state without asking judges to authorize their personal LinkedIn accounts.
-
-## Publishing flow
-
-1. The campaign agent drafts content for LinkedIn.
-2. A human edits and approves the post.
-3. GrowthReceipt creates a scheduled publishing job only after approval.
-4. The worker loads and decrypts the workspace's LinkedIn token on the server.
-5. The worker uploads media first when the post contains media.
-6. The worker creates the LinkedIn post through the current Posts API.
-7. GrowthReceipt stores the LinkedIn post identifier, publication time, request version, and result.
-8. The UI shows **Published** only after LinkedIn confirms success.
-9. Retries use an idempotency record so a timeout cannot create duplicate posts.
-10. Later jobs retrieve the permitted delivery and engagement metrics.
-
-## API surface
-
-The expected GrowthReceipt routes are:
-
-```text
-GET    /v1/integrations
-POST   /v1/integrations/linkedin/authorize
-GET    /v1/integrations/linkedin/callback
-DELETE /v1/integrations/linkedin
-```
-
-The browser receives connection status, account display information, and an authorization URL. It never receives stored provider tokens.
-
-Publishing should run through an internal job interface rather than a public browser endpoint. The job must verify that the stored post is still approved immediately before publishing.
-
-## Data to store
-
-Create an `integration_connections` table with at least:
-
-| Field | Purpose |
+| Field | Value |
 |---|---|
-| `id` | Connection identifier |
-| `workspace_id` | Owning workspace |
-| `provider` | `linkedin` |
-| `provider_account_id` | LinkedIn member or organization identifier |
-| `provider_account_name` | Display name shown in Integrations |
-| `encrypted_access_token` | Server encrypted credential |
-| `granted_scopes` | Permissions the user approved |
-| `expires_at` | Token expiry when supplied |
-| `status` | Connected, expired, revoked, or error |
-| `metadata` | Minimal provider details needed by the connector |
-| `created_at` | Audit timestamp |
-| `updated_at` | Audit timestamp |
+| App name | `GrowthReceipt` |
+| LinkedIn Page | `https://www.linkedin.com/company/123143924/`. This cannot be changed after saving. |
+| Privacy policy URL | `https://growthreceipt.addisstack.com/privacy` |
+| App logo | `growthreceipt-logo-512.png`, the blue receipt mark rendered at 512 px from `apps/web/src/app/icon.svg` |
+| Legal agreement | Tick the box |
 
-Create a separate publication record for provider post identifiers, attempts, errors, and final status. Do not place provider tokens in campaign or publication records.
+To render the logo again, screenshot `icon.svg` at 512 by 512 with the corner radius set to 0. LinkedIn wants a square image of at least 100 px.
 
-## Security requirements
+If the **Settings** tab asks for verification, choose **Verify** and open the generated link as the Page admin.
 
-1. Require a valid GrowthReceipt session before starting OAuth.
-2. Use a random, short lived, single use state value to prevent login CSRF.
-3. Tie the state value to the current user and workspace.
-4. Exchange the authorization code only on the API server.
-5. Encrypt access and refresh tokens at rest.
-6. Request only the scopes required by implemented features.
-7. Redact tokens and authorization codes from logs and error reporting.
-8. Prevent anonymous judge users from connecting providers or publishing externally.
-9. Require explicit human approval before every first publication.
-10. Disconnect by revoking access where supported and deleting the stored credential.
+### 3. Products
 
-## Delivery phases
+On the **Products** tab, request access to exactly these two. Both are self serve and approve within a minute or two.
 
-### Phase 1: personal posting
+| Product | Why |
+|---|---|
+| **Share on LinkedIn** | Grants `w_member_social`, which lets GrowthReceipt post as the member |
+| **Sign In with LinkedIn using OpenID Connect** | Grants `openid profile`, which tells us who connected and which person URN to post as |
 
-1. Add the OAuth connection and callback flow.
-2. Request `w_member_social` through **Share on LinkedIn**.
-3. Publish approved text posts for the authenticated member.
-4. Store and display the verified LinkedIn post identifier.
-5. Support disconnect and expired token recovery.
+Do not request the others. Advertising, Lead Sync, Matched Audiences, Live Events, Events Management, Conversions, Ad Library and the Data Portability APIs are unused. **Community Management API** is the one for posting as a Company Page. It needs a business review and is a future phase, see below.
 
-### Phase 2: media and reliability
+### 4. Auth tab
 
-1. Add image and video upload flows.
-2. Add durable jobs, retries, idempotency, and failure recovery.
-3. Add publication status polling where required.
-4. Add rate limit handling and operational alerts.
+1. Under **Authorized redirect URLs**, add both:
+   `https://growthreceipt.addisstack.com/integrations/linkedin/callback`
+   `http://localhost:3001/integrations/linkedin/callback`
+2. Confirm the OAuth scopes list shows `openid`, `profile` and `w_member_social`.
+3. Copy the **Client ID** and the **Primary Client Secret**.
 
-### Phase 3: Company Pages
+The redirect URL is built from `WEB_ORIGIN` on the API, so it must match one of these exactly.
 
-1. Apply for the Community Management API Development Tier.
-2. Request the organization permissions required by the implemented use cases.
-3. List only Pages the authenticated member is allowed to manage.
-4. Let the user select a Page for the workspace.
-5. Publish approved Page posts and retrieve permitted results.
-6. Complete LinkedIn's Standard Tier review before offering unrestricted production access.
+### 5. Railway variables
 
-LinkedIn currently requires a registered legal organization, verified business email, organization website, privacy policy, verified LinkedIn Page, and app review for Community Management access.
+On the Railway **api** service, under Variables, set:
 
-## Acceptance criteria
+| Variable | Value |
+|---|---|
+| `LINKEDIN_CLIENT_ID` | Client ID from the Auth tab |
+| `LINKEDIN_CLIENT_SECRET` | Primary Client Secret |
+| `LINKEDIN_TOKEN_KEY` | A Fernet key, generated below |
 
-1. An authenticated permanent user can connect and disconnect LinkedIn.
-2. OAuth rejects missing, expired, reused, or mismatched state values.
-3. No provider secret or token reaches the browser, logs, repository, or error UI.
-4. The integration row shows the actual account and connection state.
-5. An unapproved post cannot enter the publishing queue.
-6. An approved post produces one LinkedIn post and stores its provider identifier.
-7. A retry cannot produce a duplicate LinkedIn post.
-8. Expired or revoked access produces a clear reconnection state.
-9. Anonymous judge users cannot authorize LinkedIn or publish externally.
-10. Automated tests cover authorization, callback validation, token storage, publishing success, provider errors, and disconnect.
+```bash
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+The key encrypts stored access tokens. Changing it makes every saved connection unreadable, so each workspace has to reconnect. Keep all three values out of chat, git and any `NEXT_PUBLIC_` variable. Railway redeploys on save.
+
+The database migration `supabase/migrations/20261011000100_linkedin_publishing.sql` was run on the hosted Supabase on October 11, 2026.
+
+### 6. Test
+
+1. Sign in to GrowthReceipt with a permanent account and open **Integrations**.
+2. Choose **Connect LinkedIn** and approve on LinkedIn. The row shows your name.
+3. Approve a LinkedIn post in **Content**, then choose **Post to LinkedIn now** and confirm with **Post it**.
+4. Open **View the post** and check that the text and buy link are right.
+5. Delete the test post on LinkedIn if you do not want to keep it.
+
+### 7. Token expiry
+
+Access tokens last 60 days and self serve apps get no refresh token. When Integrations says the connection expired, choose **Reconnect**. If your LinkedIn grant is still valid, LinkedIn skips the consent screen, so it is one click.
+
+Reconnect around November 25, 2026, before recording the demo video, so the token is valid through judging (December 1 to 15).
+
+## How it works
+
+1. **Connect.** The API signs a state value bound to the workspace (HMAC, 10 minute expiry) and returns the LinkedIn authorize URL. LinkedIn redirects to the web page `/integrations/linkedin/callback`, which hands the code to the signed in workspace. The workspace sends code and state to `POST /v1/integrations/linkedin/connect`, so a forged callback cannot attach a profile to another workspace.
+2. **Store.** The API exchanges the code, reads the member from `/v2/userinfo`, and stores the name, `urn:li:person:{sub}`, the expiry and the Fernet encrypted token in `growthreceipt.linkedin_connections`.
+3. **Post.** `POST https://api.linkedin.com/v2/ugcPosts` with `X-Restli-Protocol-Version: 2.0.0`, an `ARTICLE` share whose `originalUrl` is the post's buy link, visibility `PUBLIC`. The post ID comes from the `x-restli-id` header.
+4. **Claim.** An atomic update claims the post first, so two API replicas or a double click cannot post twice. A failed post is released and logged as `publish_failed`, and can be retried.
+5. **Lock.** A published post cannot be edited or sent back for changes.
+6. **Schedule.** With automatic publishing on, the API checks every five minutes and posts approved posts whose day has arrived, from 9:00 in the workspace time zone. It only covers posts dated on or after the day automatic publishing was turned on.
+7. **Disconnect.** `DELETE` revokes the token with LinkedIn (best effort) and deletes the row.
+
+Code: `apps/api/app/linkedin/` (client, crypto, store, publisher), `apps/api/app/routes/linkedin.py`, `apps/web/src/lib/linkedin.ts`, and the Integrations and Content pages in `campaign-workspace.tsx`. Tests: `apps/api/tests/test_linkedin.py`.
+
+## Limits worth knowing
+
+1. Posts are capped at 3000 characters. LinkedIn rejects longer ones and the UI shows a failed publish.
+2. Share on LinkedIn allows 150 requests per member per day.
+3. `ugcPosts` is still the documented endpoint for self serve personal posting. The newer `/rest/posts` API belongs to the Marketing platform and needs Community Management access.
+
+## Open gaps
+
+1. **Anonymous judge sessions can connect LinkedIn.** The routes do not check `is_anonymous`. The original plan required that judges see the integration state without authorizing personal accounts.
+2. **Company Page posting.** Needs the Community Management API Development Tier, organization scopes, a Page picker, and LinkedIn's Standard Tier review before unrestricted use. LinkedIn requires a registered legal organization, verified business email, website, privacy policy and a verified Page.
+3. **Images and video.** Posts are text plus a link card. Media needs the assets upload flow first.
 
 ## Official references
 
-1. [Getting access to LinkedIn APIs](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access)
-2. [LinkedIn authorization code flow](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow)
-3. [LinkedIn Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api)
-4. [Community Management overview](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview)
-5. [Community Management app review](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review)
-
+1. [Share on LinkedIn](https://learn.microsoft.com/linkedin/consumer/integrations/self-serve/share-on-linkedin)
+2. [Sign In with LinkedIn using OpenID Connect](https://learn.microsoft.com/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2)
+3. [Authorization code flow](https://learn.microsoft.com/linkedin/shared/authentication/authorization-code-flow)
+4. [UGC Post API](https://learn.microsoft.com/linkedin/compliance/integrations/shares/ugc-post-api)
+5. [Posts API](https://learn.microsoft.com/linkedin/marketing/community-management/shares/posts-api)
+6. [Community Management app review](https://learn.microsoft.com/linkedin/marketing/community-management-app-review)

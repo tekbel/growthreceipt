@@ -91,7 +91,7 @@ It uses LinkedIn's self serve products, Sign In with LinkedIn using OpenID Conne
 - `PATCH /v1/integrations/linkedin` turns automatic posting on or off. `DELETE /v1/integrations/linkedin` revokes the token and forgets it.
 - `POST /v1/integrations/linkedin/posts/{post_id}/publish` posts one approved, unpublished LinkedIn post. A published post can no longer be edited.
 
-Setup:
+Setup (full runbook with every form value in [docs/integrations/linkedin.md](./docs/integrations/linkedin.md)):
 
 1. Create an app at https://www.linkedin.com/developers/apps (it must be linked to a LinkedIn Page), then add the **Sign In with LinkedIn using OpenID Connect** and **Share on LinkedIn** products.
 2. Under Auth, add the redirect URLs `https://growthreceipt.addisstack.com/integrations/linkedin/callback` and `http://localhost:3001/integrations/linkedin/callback`.
@@ -108,7 +108,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
-- [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) records the deferred LinkedIn OAuth, publishing, security, and review plan.
+- [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
 
 ## Recommended build order
 
