@@ -30,12 +30,22 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { AgentRuns } from "@/components/agent-runs";
 import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
+import { PostRef } from "@/components/post-ref";
 import {
   ElapsedSeconds,
   type Receipt as PayPalReceipt,
@@ -862,6 +872,7 @@ export function CampaignWorkspace({
             stage={stage}
             needsReview={counts["Needs review"] + counts["Changes requested"]}
             navigate={navigate}
+            openPost={openPost}
           />
         );
       case "products":
@@ -951,6 +962,7 @@ export function CampaignWorkspace({
             drafting={drafting}
             draftFollowUp={draftFollowUp}
             openPost={openPost}
+            posts={campaign.posts}
             recommendation={recommendation}
             recommendationError={recommendationError}
             recommendationLoading={recommendationLoading}
@@ -965,6 +977,7 @@ export function CampaignWorkspace({
             posts={posts}
             revenue={revenue}
             openBuyPage={openBuyPage}
+            openPost={openPost}
             navigate={navigate}
             notify={notify}
           />
@@ -1507,18 +1520,23 @@ function PageHeader({
   eyebrow = "Workspace",
   title,
   description,
+  info,
   action,
 }: {
   eyebrow?: string;
   title: string;
   description: string;
+  info?: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
     <div className="page-header">
       <div>
         <span className="eyebrow">{eyebrow}</span>
-        <h1>{title}</h1>
+        <h1>
+          {title}
+          {info}
+        </h1>
         <p>{description}</p>
       </div>
       {action ? <div className="page-action">{action}</div> : null}
@@ -1579,6 +1597,7 @@ function TodayPage({
   stage,
   needsReview,
   navigate,
+  openPost,
 }: {
   campaign: Campaign;
   revenue: RevenueSummary | null;
@@ -1592,6 +1611,7 @@ function TodayPage({
   stage: Stage;
   needsReview: number;
   navigate: (view: View) => void;
+  openPost: (postId: string) => void;
 }) {
   const [clock, setClock] = useState<{ date: string; greeting: string } | null>(null);
 
@@ -1625,6 +1645,7 @@ function TodayPage({
           recommendation={recommendation}
           decisionPanel={decisionPanel}
           navigate={navigate}
+          openPost={openPost}
         />
       ) : null}
       <FocusCard
@@ -1766,6 +1787,7 @@ function TodayResultCard({
   recommendation,
   decisionPanel,
   navigate,
+  openPost,
 }: {
   campaign: Campaign;
   receipts: PayPalReceipt[];
@@ -1775,6 +1797,7 @@ function TodayResultCard({
   recommendation: Recommendation | null;
   decisionPanel: ReactNode;
   navigate: (view: View) => void;
+  openPost: (postId: string) => void;
 }) {
   const latest = receipts[0];
   const post = campaign.posts.find((item) => item.id === latest.content_id);
@@ -1802,7 +1825,7 @@ function TodayResultCard({
           <div>
             <dt>Attributed post</dt>
             <dd>
-              {post ? `Day ${post.day} on ${post.channel}` : "Campaign post"}
+              {post ? <PostRef post={post} onOpen={openPost} /> : "Campaign post"}
               {post ? <small>{post.theme}</small> : null}
             </dd>
           </div>
@@ -2983,6 +3006,7 @@ function ResultsPage({
             moveLoading={recommendationLoading}
             onFindNextMove={() => void findNextMove()}
             onReview={() => navigate("experiment")}
+            onOpenPost={openPost}
           />
           {receipts.length > 1 ? (
             <div className="earlier-receipts">
@@ -2993,7 +3017,9 @@ function ResultsPage({
                   return (
                     <li key={item.order_id}>
                       <time dateTime={item.captured_at}>{formatMoment(item.captured_at)}</time>
-                      <span>{post ? `Day ${post.day} · ${post.channel}` : "Campaign post"}</span>
+                      <span>
+                        {post ? <PostRef post={post} onOpen={openPost} /> : "Campaign post"}
+                      </span>
                       <code>{item.order_id}</code>
                       <strong>{formatMoney(item.amount, item.currency)}</strong>
                     </li>
@@ -3083,9 +3109,13 @@ function ResultsPage({
 function WhyThisMove({
   recommendation,
   context,
+  posts,
+  openPost,
 }: {
   recommendation: Recommendation;
   context: MoveContext | null;
+  posts: Post[];
+  openPost: (postId: string) => void;
 }) {
   const evidence = context?.evidence;
   return (
@@ -3110,7 +3140,7 @@ function WhyThisMove({
               <ul>
                 {evidence.paid_posts.map((post) => (
                   <li key={post.content_id}>
-                    Day {post.day} · {post.channel} · {post.theme}.{" "}
+                    <PostRef post={refFor(post, posts)} onOpen={openPost} /> · {post.theme}.{" "}
                     {formatMoney(post.revenue, evidence.currency)} from {post.completed_orders}{" "}
                     purchase{post.completed_orders === 1 ? "" : "s"}
                   </li>
@@ -3150,6 +3180,57 @@ function WhyThisMove({
         </div>
       </dl>
     </details>
+  );
+}
+
+type PaidPost = NonNullable<MoveEvidence["paid_posts"]>[number];
+
+/** The campaign post behind an evidence row, so a live link shows when the post was published. */
+function refFor(paid: PaidPost, posts: Post[]) {
+  return (
+    posts.find((post) => post.id === paid.content_id) ?? {
+      id: paid.content_id,
+      day: paid.day,
+      channel: paid.channel,
+    }
+  );
+}
+
+/** One line naming the post the agent built on, or the tied posts it compares. */
+function SignalBasis({
+  evidence,
+  posts,
+  openPost,
+}: {
+  evidence: MoveEvidence;
+  posts: Post[];
+  openPost: (postId: string) => void;
+}) {
+  const paid = evidence.paid_posts ?? [];
+  const lead = paid[0];
+  if (!lead || !evidence.signal || evidence.signal === "none") return null;
+  const money = (amount: string) => formatMoney(amount, evidence.currency);
+  if (evidence.signal === "tie") {
+    const tied = paid.filter((post) => Number(post.revenue) === Number(lead.revenue));
+    return (
+      <p className="move-basis">
+        Compares{" "}
+        {tied.map((post, index) => (
+          <Fragment key={post.content_id}>
+            {index ? (index === tied.length - 1 ? " and " : ", ") : null}
+            <PostRef post={refFor(post, posts)} onOpen={openPost} />
+          </Fragment>
+        ))}
+        , tied at {money(lead.revenue)} each.
+      </p>
+    );
+  }
+  return (
+    <p className="move-basis">
+      Built on <PostRef post={refFor(lead, posts)} onOpen={openPost} />, {lead.completed_orders}{" "}
+      purchase{lead.completed_orders === 1 ? "" : "s"} and {money(lead.revenue)}.{" "}
+      {evidence.signal === "early" ? "Early signal." : "Clear leader."}
+    </p>
   );
 }
 
@@ -3319,6 +3400,7 @@ function ExperimentPage({
   drafting,
   draftFollowUp,
   openPost,
+  posts,
   recommendation,
   recommendationError,
   recommendationLoading,
@@ -3334,6 +3416,7 @@ function ExperimentPage({
   drafting: boolean;
   draftFollowUp: () => Promise<void>;
   openPost: (postId: string) => void;
+  posts: Post[];
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -3346,12 +3429,22 @@ function ExperimentPage({
       <PageHeader
         title="Next experiment"
         description="One next experiment, chosen from verified purchase signals."
+        info={
+          <InfoTip label="What an experiment is" align="start">
+            An experiment is one change to how you market the offer, such as a new message,
+            audience, channel or image. The agent picks it from verified purchases, you approve it,
+            and the purchases that follow show whether it worked.
+          </InfoTip>
+        }
       />
       <section className="experiment-stage">
         {recommendation ? (
           <div>
             <ConfidenceTag confidence={recommendation.confidence} />
             <h2>{recommendation.headline}</h2>
+            {context?.evidence ? (
+              <SignalBasis evidence={context.evidence} posts={posts} openPost={openPost} />
+            ) : null}
             {context?.model && context.durationMs ? (
               <p className="move-run">
                 Written by the agent with <code>{context.model}</code> in{" "}
@@ -3412,7 +3505,12 @@ function ExperimentPage({
                 <dd>{recommendation.expected_signal}</dd>
               </div>
             </dl>
-            <WhyThisMove recommendation={recommendation} context={context} />
+            <WhyThisMove
+              recommendation={recommendation}
+              context={context}
+              posts={posts}
+              openPost={openPost}
+            />
             <MoveDecisionPanel
               recommendation={recommendation}
               decision={decision}
@@ -3687,6 +3785,7 @@ function CheckoutPage({
   posts,
   revenue,
   openBuyPage,
+  openPost,
   navigate,
   notify,
 }: {
@@ -3694,6 +3793,7 @@ function CheckoutPage({
   posts: Post[];
   revenue: RevenueSummary | null;
   openBuyPage: (contentId: string) => void;
+  openPost: (postId: string) => void;
   navigate: (view: View) => void;
   notify: (message: string) => void;
 }) {
@@ -3771,9 +3871,12 @@ function CheckoutPage({
               <li key={item.id}>
                 <div>
                   <strong>
-                    Day {item.day} · {item.channel}
+                    <PostRef post={item} onOpen={openPost} />
                   </strong>
                   <span>{item.theme}</span>
+                  <code className="buy-link-url">
+                    {buyLink(item.id).replace(/^https?:\/\//, "")}
+                  </code>
                 </div>
                 <div className="buy-link-actions">
                   <PublishButton className="button outline" post={item} notify={notify} />

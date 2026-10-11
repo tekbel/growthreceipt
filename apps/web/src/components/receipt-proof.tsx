@@ -6,6 +6,8 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Post } from "@/lib/campaign";
 import { formatMoment } from "@/lib/time";
 
+import { PostRef } from "./post-ref";
+
 export type WebhookProof = {
   event_id: string;
   event_type: string;
@@ -74,6 +76,7 @@ export function ReceiptChain({
   moveLoading,
   onFindNextMove,
   onReview,
+  onOpenPost,
   proof = true,
 }: {
   receipt: Receipt;
@@ -83,6 +86,7 @@ export function ReceiptChain({
   moveLoading: boolean;
   onFindNextMove: () => void;
   onReview: () => void;
+  onOpenPost?: (postId: string) => void;
   proof?: boolean;
 }) {
   const post = posts.find((item) => item.id === receipt.content_id);
@@ -101,7 +105,7 @@ export function ReceiptChain({
     >
       <ol className="receipt-chain">
         <ChainStep label="Post" done>
-          <strong>{post ? `Day ${post.day} · ${post.channel}` : "Campaign post"}</strong>
+          <strong>{post ? <PostRef post={post} onOpen={onOpenPost} /> : "Campaign post"}</strong>
           <span>{post?.theme ?? "This post is no longer in the campaign."}</span>
         </ChainStep>
         <ChainStep label="PayPal revenue" done>
@@ -238,10 +242,11 @@ function TechnicalProof({
         ) : null}
         <ProofStep title="Credited to the post" time={receipt.captured_at}>
           <ProofId label="Post">{receipt.content_id}</ProofId>
+          <ProofId label="Buy link">{`/buy/${receipt.content_id}`}</ProofId>
           <p>
             {post
-              ? `The buy link of the day ${post.day} ${post.channel} post opened this order.`
-              : "The buy link of this post opened the order."}
+              ? `Each post has its own buy link that carries its ID. This order was opened from the day ${post.day} ${post.channel} post's link, and the server stored that ID with the order.`
+              : "Each post has its own buy link that carries its ID. The server stored that ID with this order."}
           </p>
         </ProofStep>
         {move ? (
