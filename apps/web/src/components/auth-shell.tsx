@@ -232,12 +232,12 @@ export function AuthShell() {
               <img src="/products/launchcheck.svg" alt="" width={36} height={36} decoding="async" />
             </span>
             <p>
-              The demo markets <strong>LaunchCheck</strong>, an example SaaS product that scans a
-              launch page for speed, search and structure problems. Every campaign, post and
-              purchase you see is for it.{" "}
+              The demo markets{" "}
               <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
-                launchcheck.addisstack.com
+                LaunchCheck
               </a>
+              , an example SaaS product that scans a launch page for speed, search and structure
+              problems. Every campaign, post and purchase you see is for it.
             </p>
           </aside>
           <SampleFlow />
