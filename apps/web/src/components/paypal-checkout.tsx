@@ -303,9 +303,8 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                       <ArrowRight aria-hidden="true" />
                     </a>
                     <InfoTip label="About this button" align="start">
-                      Demo only. You see this because you opened your own buy link from the
-                      workspace. A real customer's journey ends at this thank you screen and never
-                      sees your workspace.
+                      Demo only. It appears because you opened your own buy link. A real customer's
+                      visit ends at this thank you screen.
                     </InfoTip>
                   </span>
                 </div>

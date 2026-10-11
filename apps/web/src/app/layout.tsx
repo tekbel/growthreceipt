@@ -4,8 +4,8 @@ import "@fontsource-variable/figtree";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GrowthReceipt | Marketing workspace",
-  description: "Plan, review, publish, and measure focused marketing campaigns.",
+  title: "GrowthReceipt | Know which post earned the money",
+  description: "Turn verified PayPal purchases into your next approved marketing experiment.",
 };
 
 // Runs before first paint so a saved or OS dark preference never flashes light.

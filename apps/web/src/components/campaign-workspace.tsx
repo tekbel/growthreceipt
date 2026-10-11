@@ -1060,10 +1060,7 @@ function Sidebar({
           <div className="environment-state">
             <span /> {environmentLabel}
           </div>
-          <button
-            type="button"
-            onClick={() => notify("Workspace settings are available from Settings.")}
-          >
+          <button type="button" onClick={() => notify("Change workspace preferences in Settings.")}>
             <span className="avatar">{initial}</span>
             <strong>{identity.displayName}</strong>
             <ChevronDown aria-hidden="true" />
@@ -1152,9 +1149,8 @@ function JudgeBar({
       <p>
         PayPal sandbox. No real money moves.
         <InfoTip label="About the judge demo" align="end">
-          This workspace is yours alone and is seeded with a campaign for LaunchCheck, an example
-          SaaS product at launchcheck.addisstack.com. Purchases use PayPal sandbox accounts, and
-          every agent run is a real model call.
+          Private demo workspace, prepared with a sample LaunchCheck campaign. Payments run in
+          PayPal's sandbox, and each recommendation is generated live.
         </InfoTip>
       </p>
       {confirming ? (
@@ -1299,21 +1295,21 @@ function HelpPanel({
     },
     {
       title: "Test the purchase",
-      copy: "Complete a PayPal Sandbox checkout. No real money moves.",
+      copy: "Buy from your own post in PayPal's sandbox. No real money moves.",
       action: "Open checkout",
       view: "checkout",
       complete: hasRevenue,
     },
     {
       title: "Read verified results",
-      copy: "See which campaign and post produced the captured order.",
+      copy: "Trace each purchase back to the post that earned it.",
       action: "View results",
       view: "results",
       complete: hasRevenue,
     },
     {
       title: "Choose the next test",
-      copy: "Turn verified revenue into one controlled recommendation.",
+      copy: "Let the agent turn verified revenue into one next experiment.",
       action: "Open experiment",
       view: "experiment",
       complete: Boolean(recommendation),
@@ -1328,7 +1324,7 @@ function HelpPanel({
           <div>
             <span className="eyebrow">Help</span>
             <h2 id="help-title">Learn the workflow</h2>
-            <p>Five steps from a product brief to a revenue backed next move.</p>
+            <p>Five steps from a product brief to a next move backed by real revenue.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close help">
             <X aria-hidden="true" />
@@ -1620,7 +1616,7 @@ function TodayPage({
             <QuietState
               icon={<FlaskConical aria-hidden="true" />}
               title="No recommendation yet"
-              copy="GrowthReceipt picks a test once it has verified results."
+              copy="The agent suggests a test once a purchase is verified."
               action="See what is needed"
               onAction={() => navigate("experiment")}
             />
@@ -1671,7 +1667,7 @@ function TodayResultCard({
         </span>
         <h2 id="result-card-title">
           <strong>{formatMoney(latest.amount, latest.currency)}</strong> captured through PayPal
-          Sandbox
+          sandbox
         </h2>
         <dl className="result-facts">
           <div>
@@ -1926,7 +1922,7 @@ function ProductsPage({
     <>
       <PageHeader
         title="Products"
-        description="The source material GrowthReceipt uses to understand what you sell."
+        description="What GrowthReceipt knows about what you sell."
         action={
           <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
             <Plus aria-hidden="true" /> Add product
@@ -2269,7 +2265,7 @@ function CampaignsPage({
     <>
       <PageHeader
         title="Campaigns"
-        description="Plan, review, publish, and measure one focused campaign at a time."
+        description="One campaign at a time, from brief to verified revenue."
         action={
           <button className="button dark" type="button" onClick={() => navigate("new-campaign")}>
             <Plus aria-hidden="true" /> New campaign
@@ -2423,10 +2419,7 @@ function ContentPage({
   const selectedStatus = statusFor(selected);
   return (
     <>
-      <PageHeader
-        title="Content"
-        description="A compact review queue for the work that is almost ready to publish."
-      />
+      <PageHeader title="Content" description="Review each post before it goes out." />
       <CampaignProgress status={stage} />
       <fieldset className="filter-row" aria-label="Filter content queue">
         {(["All", "Needs review", "Changes requested", "Approved"] as Filter[]).map((item) => (
@@ -2676,7 +2669,7 @@ function CalendarPage({ campaign }: { campaign: Campaign }) {
     <>
       <PageHeader
         title="Calendar"
-        description="A quiet view of what is planned, approved, and ready to publish."
+        description="What goes out when, and what still needs your approval."
         action={<span className="eyebrow">{scheduleRange(campaign)}</span>}
       />
       <section className="calendar-board">
@@ -2735,7 +2728,7 @@ function ResultsPage({
     <>
       <PageHeader
         title="Results"
-        description="Verified outcomes from connected providers, separated from estimates."
+        description="Revenue verified by PayPal and attributed to the post that earned it."
         action={
           <button
             className="button secondary"
@@ -2790,9 +2783,9 @@ function ResultsPage({
             <h2 id="receipts-title">
               From post to payment to next move
               <InfoTip label="How this is proven" align="start">
-                Each step comes from a recorded event. PayPal confirms the order and the capture,
-                PayPal webhooks are signature checked before they are stored, and the agent run is
-                logged with its ID. Nothing here is estimated.
+                Every step is a recorded event. PayPal confirms the order and the capture, each
+                webhook is signature checked before it is stored, and every agent run is logged with
+                its ID. Nothing here is estimated.
               </InfoTip>
             </h2>
             <span>Every step below is a recorded PayPal or GrowthReceipt event</span>
@@ -2886,10 +2879,7 @@ function ResultsPage({
           ) : (
             <>
               <h2>Choose the next test from real results.</h2>
-              <p>
-                GrowthReceipt needs at least one verified purchase before it recommends a message,
-                channel, or audience test.
-              </p>
+              <p>The agent needs one verified purchase before it recommends what to test next.</p>
               <button
                 className="button accent"
                 disabled={!hasRevenue || recommendationLoading}
@@ -2980,7 +2970,7 @@ function WhyThisMove({
 }
 
 const confidenceCopy: Record<Recommendation["confidence"], string> = {
-  low: "Low. Fewer than 10 purchases is too small a sample to trust fully.",
+  low: "Low. Fewer than 10 purchases is too small a sample to rely on.",
   medium: "Medium. Several purchases point the same way. Still worth testing.",
   high: "High. Many purchases point the same way.",
 };
@@ -3163,7 +3153,7 @@ function ExperimentPage({
     <>
       <PageHeader
         title="Next experiment"
-        description="One evidence based test, chosen after the current campaign has something real to teach us."
+        description="One next experiment, chosen from what customers actually paid for."
       />
       <section className="experiment-stage">
         {recommendation ? (
@@ -3181,8 +3171,8 @@ function ExperimentPage({
                   </>
                 ) : null}
                 <InfoTip label="About this agent run" align="start">
-                  The time is measured on the server around the model call. The run ID is the OpenAI
-                  turn ID, also saved in the campaign activity.
+                  The time is measured on the server around the model call. The run ID is OpenAI's
+                  turn ID, and it is also saved in the campaign activity.
                 </InfoTip>
               </p>
             ) : null}
@@ -3218,14 +3208,12 @@ function ExperimentPage({
               {ready ? "Ready" : "Waiting for evidence"}
             </span>
             <h2>
-              {ready
-                ? "A recommendation is ready to prepare."
-                : "Complete one verified purchase first."}
+              {ready ? "Ready for a recommendation." : "Complete one verified purchase first."}
             </h2>
             <p>
               {ready
-                ? "GrowthReceipt can now inspect the campaign result and propose one controlled next step."
-                : "This keeps the recommendation grounded in a real outcome instead of invented performance data."}
+                ? "There is a verified purchase to learn from. Ask the agent for one next experiment."
+                : "Recommendations begin with real purchases, not assumptions."}
             </p>
             <div className="form-actions">
               {!ready ? (
@@ -3267,7 +3255,7 @@ function IntegrationsPage({
       <PageHeader
         eyebrow="System"
         title="Integrations"
-        description="Connect the sources GrowthReceipt needs to publish work and verify what happened."
+        description="Connect where you publish and where you get paid."
       />
       <section className="integration-list">
         <Integration
@@ -3284,7 +3272,7 @@ function IntegrationsPage({
           icon={<SiPosthog aria-hidden="true" />}
           status="Not connected"
           action="Connect"
-          onAction={() => notify("PostHog connection is planned for the next integration slice.")}
+          onAction={() => notify("PostHog is planned next.")}
         />
         {channels.map((channel) => (
           <Integration
@@ -3342,7 +3330,7 @@ function SettingsPage({ notify }: { notify: (message: string) => void }) {
             <input type="checkbox" defaultChecked />
             <span>
               <strong>Keep verified and estimated results separate</strong>
-              <small>Unverified values will remain visibly labelled.</small>
+              <small>Anything unverified is always clearly labelled.</small>
             </span>
           </label>
         </fieldset>
@@ -3424,7 +3412,7 @@ function CheckoutPage({
             </>
           ) : (
             <>
-              <small>Approve a post first. Each approved post gets its own buy link.</small>
+              <small>Approve a post first. Every approved post gets its own buy link.</small>
               <button className="button dark" type="button" onClick={() => navigate("content")}>
                 Review posts
               </button>
