@@ -221,6 +221,10 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         <section className="buy-unavailable" role="alert">
           <h1>This offer is not available</h1>
           <p>The link may be out of date, or the post it came from is not approved yet.</p>
+          <a className="button secondary" href="/">
+            Go to GrowthReceipt
+            <ArrowRight aria-hidden="true" />
+          </a>
         </section>
       </main>
     );
