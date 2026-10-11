@@ -38,6 +38,7 @@ import {
   type ProvenMove,
   ReceiptChain,
 } from "@/components/receipt-proof";
+import { type SearchItem, WorkspaceSearch } from "@/components/workspace-search";
 import {
   apiFetch,
   type Campaign,
@@ -142,6 +143,17 @@ const systemNavigation = [
   ["settings", "Settings", SlidersHorizontal],
   ["checkout", "Customer checkout", CreditCard],
 ] as const;
+// Words people type when they look for a page, so "sales" finds Results.
+const viewKeywords: Partial<Record<View, string>> = {
+  today: "home dashboard overview",
+  content: "posts review approve drafts queue",
+  results: "revenue sales money paid orders paypal proof receipts",
+  experiment: "next move recommendation agent learn",
+  checkout: "buy link pay purchase customer",
+  calendar: "schedule publish dates",
+  "new-campaign": "create draft generate brief",
+};
+
 const viewLabels: Record<View, string> = {
   today: "Today",
   products: "Products",
@@ -490,6 +502,18 @@ export function CampaignWorkspace({
   }
 
   // After a page change, move focus to the new heading so screen readers announce it.
+  // Command K or Control K opens search from anywhere in the workspace.
+  useEffect(() => {
+    const open = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", open);
+    return () => window.removeEventListener("keydown", open);
+  }, []);
+
   const [focusRequest, setFocusRequest] = useState(0);
   useEffect(() => {
     if (focusRequest === 0 || loadState !== "ready") return;
@@ -498,6 +522,55 @@ export function CampaignWorkspace({
     heading.setAttribute("tabindex", "-1");
     heading.focus({ preventScroll: true });
   }, [focusRequest, loadState]);
+
+  function searchItems(): SearchItem[] {
+    const items: SearchItem[] = [
+      {
+        id: "action-purchase",
+        group: "Actions",
+        title: "Make a test purchase",
+        detail: "Open a buy link as your own customer",
+        keywords: "buy pay paypal checkout sandbox",
+        run: openCustomerView,
+      },
+      {
+        id: "action-next-move",
+        group: "Actions",
+        title: "Find next move",
+        detail: "Ask the agent what to try next",
+        keywords: "recommendation agent experiment",
+        run: () => navigate("experiment"),
+      },
+      ...views.map((page) => ({
+        id: `page-${page}`,
+        group: "Pages" as const,
+        title: viewLabels[page],
+        keywords: viewKeywords[page],
+        run: () => navigate(page),
+      })),
+    ];
+    for (const post of campaign?.posts ?? []) {
+      items.push({
+        id: `post-${post.id}`,
+        group: "Posts",
+        title: `Day ${post.day} · ${post.channel} · ${post.theme}`,
+        detail: excerpt(post.content),
+        keywords: `${post.content} ${post.call_to_action} ${reviewLabels[post.status]} day${post.day}`,
+        run: () => openPost(post.id),
+      });
+    }
+    for (const receipt of receipts ?? []) {
+      items.push({
+        id: `purchase-${receipt.order_id}`,
+        group: "Purchases",
+        title: `${formatMoney(receipt.amount, receipt.currency)} purchase`,
+        detail: `Order ${receipt.order_id}`,
+        keywords: `${receipt.capture_id} paypal order capture receipt`,
+        run: () => navigate("results"),
+      });
+    }
+    return items;
+  }
 
   function navigate(nextView: View) {
     if (nextView !== view) window.history.pushState(null, "", `#${nextView}`);
@@ -784,7 +857,10 @@ export function CampaignWorkspace({
           theme={theme}
           searchOpen={searchOpen}
           onMenu={() => setMobileNavigationOpen(true)}
-          onSearch={() => setSearchOpen((open) => !open)}
+          // Outside clicks close search, so the icon only opens it.
+          onSearch={() => setSearchOpen(true)}
+          onSearchClose={() => setSearchOpen(false)}
+          searchItems={searchItems()}
           onTheme={toggleTheme}
           onHelp={() => setHelpOpen(true)}
           notify={notify}
@@ -1046,6 +1122,8 @@ function Topbar({
   searchOpen,
   onMenu,
   onSearch,
+  onSearchClose,
+  searchItems,
   onTheme,
   onHelp,
   notify,
@@ -1057,6 +1135,8 @@ function Topbar({
   searchOpen: boolean;
   onMenu: () => void;
   onSearch: () => void;
+  onSearchClose: () => void;
+  searchItems: SearchItem[];
   onTheme: () => void;
   onHelp: () => void;
   notify: (message: string) => void;
@@ -1074,13 +1154,7 @@ function Topbar({
         <strong>{viewLabels[currentView]}</strong>
       </div>
       <div className="topbar-actions">
-        {searchOpen ? (
-          <input
-            className="topbar-search"
-            aria-label="Search workspace"
-            placeholder="Search workspace"
-          />
-        ) : null}
+        {searchOpen ? <WorkspaceSearch items={searchItems} onClose={onSearchClose} /> : null}
         <button
           type="button"
           onClick={onTheme}
@@ -1088,7 +1162,7 @@ function Topbar({
         >
           {theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
         </button>
-        <button type="button" onClick={onSearch} aria-label="Search">
+        <button type="button" onClick={onSearch} aria-label="Search" title="Search (⌘K)">
           <Search aria-hidden="true" />
         </button>
         <button type="button" onClick={onHelp} aria-label="Help">

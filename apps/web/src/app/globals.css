@@ -867,3 +867,17 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 /* A session check is usually instant, so the loading screen only fades in if it takes a moment. */
 .auth-loading { animation: auth-loading-in var(--duration-base) var(--ease) 300ms both; }
 @keyframes auth-loading-in { from { opacity: 0; } }
+
+/* Workspace search. Results drop under the field, grouped, with keyboard selection. */
+.search-box { position: relative; }
+.search-box .topbar-search { width: 300px; }
+.search-results { position: absolute; top: calc(100% + 6px); right: 0; z-index: 70; width: min(420px, calc(100vw - 32px)); max-height: min(440px, 70vh); overflow-y: auto; padding: 6px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface); box-shadow: var(--shadow); animation: rise var(--duration-fast) var(--ease) both; }
+.search-group { display: block; padding: 10px 10px 4px; color: var(--muted); font-size: var(--type-2xs); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.search-option { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: var(--corner-sm); cursor: pointer; }
+.search-option[aria-selected="true"] { background: var(--accent-soft); }
+.search-option > span { min-width: 0; display: grid; gap: 2px; }
+.search-option strong { overflow: hidden; color: var(--ink); font-size: var(--type-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.search-option small { overflow: hidden; color: var(--muted); font-size: var(--type-xs); text-overflow: ellipsis; white-space: nowrap; }
+.search-option svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--accent-strong); }
+.search-empty { margin: 0; padding: 14px 10px; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
+@media (max-width: 640px) { .search-box .topbar-search { width: min(200px, 50vw); } .search-results { position: fixed; top: 64px; left: 16px; right: 16px; width: auto; } }
