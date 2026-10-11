@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BadgeCheck, Check, Mail, ReceiptText } from "lucide-react";
+import { ArrowRight, BadgeCheck, Bot, Check, Mail, ReceiptText } from "lucide-react";
 import {
   type CSSProperties,
   type FormEvent,
@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+
+import { SiPaypal } from "react-icons/si";
 
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
@@ -205,30 +207,50 @@ export function AuthShell() {
             GrowthReceipt
           </div>
           <div className="auth-promise">
-            <span className="eyebrow">Marketing backed by payments</span>
-            <h1>Know what to do next.</h1>
-            <p>An AI marketing agent that learns from what people paid for, not what they liked.</p>
+            <span className="eyebrow">
+              For small software teams launching without a growth team
+            </span>
+            <h1>Know which post earned the money.</h1>
+            <p>
+              GrowthReceipt drafts your launch posts, links each one to PayPal, and turns every
+              verified purchase into the next experiment you approve.
+            </p>
+            <ul className="auth-proof" aria-label="Built with">
+              <li>
+                <SiPaypal aria-hidden="true" />
+                PayPal Orders, Web SDK v6 and verified webhooks
+              </li>
+              <li>
+                <Bot aria-hidden="true" />
+                OpenAI agents with human approval
+              </li>
+            </ul>
           </div>
           <SampleFlow />
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
-            <span className="eyebrow">Welcome</span>
-            <h2 id="sign-in-title">Open your workspace</h2>
+            <span className="eyebrow">PayPal AI Hackathon 2026</span>
+            <h2 id="sign-in-title">See the loop in 90 seconds</h2>
             <p>
-              A 90 second proof. Approve a post, buy it through PayPal sandbox, and watch the
-              payment change the next recommendation. No account needed.
+              Approve a post, buy it through PayPal sandbox, and watch the payment change the
+              agent's next recommendation.
             </p>
           </div>
           <button
-            className="button primary auth-demo-button"
+            className="button accent auth-demo-button"
             type="button"
             disabled={submitting || captchaPending}
             onClick={() => void enterJudgeDemo()}
           >
-            {submitting ? "Opening demo" : "Try the judge demo"}
+            {submitting ? "Opening your demo" : "Try the judge demo"}
             <ArrowRight aria-hidden="true" />
           </button>
+          <ul className="auth-demo-facts">
+            <li>No account</li>
+            <li>PayPal sandbox</li>
+            <li>No real money</li>
+          </ul>
           {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
           <div className="auth-divider">
             <span>or keep your workspace</span>
@@ -367,9 +389,42 @@ function SampleFlow() {
       <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
         <BadgeCheck aria-hidden="true" />
         <span>Attributed revenue</span>
-        <strong>9.00 USD</strong>
+        <strong>
+          <CountUp to={9} delayMs={(flowSteps.length + 1) * 160} /> USD
+        </strong>
       </div>
     </figure>
+  );
+}
+
+/** Counts the sample revenue up once the flow has played. Reduced motion shows the final value. */
+function CountUp({ to, delayMs }: { to: number; delayMs: number }) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setValue(to);
+      return;
+    }
+    let frame = 0;
+    const timer = window.setTimeout(() => {
+      const start = performance.now();
+      const tick = (now: number) => {
+        const progress = Math.min((now - start) / 700, 1);
+        setValue(to * (1 - (1 - progress) ** 3));
+        if (progress < 1) frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    }, delayMs);
+    return () => {
+      window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+    };
+  }, [to, delayMs]);
+  return (
+    <>
+      <span aria-hidden="true">{value.toFixed(2)}</span>
+      <span className="visually-hidden">{to.toFixed(2)}</span>
+    </>
   );
 }
 

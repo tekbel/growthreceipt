@@ -967,3 +967,17 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .agent-runs dd ul { margin: 0; padding-left: 18px; }
 .agent-runs .agent-run-control { color: var(--success); font-weight: 600; }
 @media (max-width: 640px) { .agent-runs dl { grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 0; } .agent-runs dd { margin-bottom: 8px; } }
+
+/* First impression. The demo is the one obvious action. */
+.auth-promise h1 { max-width: 640px; }
+.auth-proof { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 26px 0 0; padding: 0; list-style: none; }
+.auth-proof li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); }
+.auth-proof svg { width: 16px; height: 16px; color: var(--ink); }
+.auth-demo-button { min-height: 54px; font-size: var(--type-base); box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 8px 24px -12px var(--accent); transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease), box-shadow var(--duration-base) var(--ease); }
+.auth-demo-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 12px 28px -12px var(--accent); }
+.auth-demo-button:active:not(:disabled) { transform: translateY(0); }
+.auth-demo-button svg { transition: transform var(--duration-fast) var(--ease); }
+.auth-demo-button:hover:not(:disabled) svg { transform: translateX(3px); }
+.auth-demo-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 12px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--type-xs); }
+.auth-demo-facts li { display: inline-flex; align-items: center; gap: 6px; }
+.auth-demo-facts li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
