@@ -837,3 +837,5 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .receipt-chain .receipt-cta:hover:not(:disabled) svg { transform: translateX(2px); }
 .receipt-chain .receipt-cta:disabled { cursor: progress; opacity: .9; }
 .receipt-chain .receipt-cta .spinner { width: 13px; height: 13px; }
+
+.move-follow-up { display: grid; gap: 12px; justify-items: start; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.55; }

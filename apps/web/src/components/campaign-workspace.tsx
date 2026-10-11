@@ -168,6 +168,7 @@ const eventLabels: Record<string, string> = {
   next_action_recommended: "Next move recommended from PayPal revenue",
   next_action_approved: "Next move approved",
   next_action_rejected: "Next move rejected",
+  follow_up_drafted: "Post drafted from the approved next move",
 };
 
 const draftSteps: [DraftStage, string][] = [
@@ -220,6 +221,8 @@ export function CampaignWorkspace({
   const [moveContext, setMoveContext] = useState<MoveContext | null>(null);
   const [moveDecision, setMoveDecision] = useState<MoveDecision | null>(null);
   const [deciding, setDeciding] = useState(false);
+  const [followUpId, setFollowUpId] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -317,6 +320,7 @@ export function CampaignWorkspace({
     setRecommendedAt(null);
     setMoveContext(null);
     setMoveDecision(null);
+    setFollowUpId(null);
     void loadRevenue();
   }, [loadRevenue]);
 
@@ -345,6 +349,10 @@ export function CampaignWorkspace({
             },
         );
         if (decided) setMoveDecision((current) => current ?? (decided.detail as MoveDecision));
+        const drafted = events
+          .slice(0, index)
+          .find((event) => event.action === "follow_up_drafted" && event.post_id);
+        if (drafted?.post_id) setFollowUpId((current) => current ?? drafted.post_id);
       })
       .catch(() => {
         // Activity is optional here. The next move can still be requested.
@@ -380,6 +388,7 @@ export function CampaignWorkspace({
     setRecommendedAt(null);
     setMoveContext(null);
     setMoveDecision(null);
+    setFollowUpId(null);
     setToast({
       message: "New PayPal purchase verified and credited to this campaign.",
       action: { label: "Find next move", view: "experiment" },
@@ -403,16 +412,55 @@ export function CampaignWorkspace({
       });
       if (!response.ok) throw new Error("decision failed");
       setMoveDecision((await response.json()) as MoveDecision);
-      notify(
-        decision === "approved"
-          ? "Next move approved. It is recorded in the campaign activity."
-          : "Next move rejected. Ask for a different one when you are ready.",
-      );
     } catch {
       notify("Your decision could not be saved. Please try again.");
-    } finally {
       setDeciding(false);
+      return;
     }
+    setDeciding(false);
+    if (decision === "approved") await draftFollowUp();
+    else notify("Next move rejected. Ask for a different one when you are ready.");
+  }
+
+  // The agent writes the post the approved plan asks for. It waits in review like any other.
+  async function draftFollowUp() {
+    if (!campaign) return;
+    setDrafting(true);
+    try {
+      const response = await apiFetch("/v1/agents/follow-up-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaign.id }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        post_id?: string;
+        campaign?: Campaign;
+        detail?: unknown;
+      } | null;
+      if (!response.ok || !body?.post_id || !body.campaign) {
+        throw new Error(
+          typeof body?.detail === "string"
+            ? body.detail
+            : "The post could not be drafted right now.",
+        );
+      }
+      const day = body.campaign.posts.find((post) => post.id === body.post_id)?.day;
+      setCampaign(body.campaign);
+      setFollowUpId(body.post_id);
+      openPost(body.post_id);
+      notify(`Day ${day} post drafted from your approved plan. Review it before it goes out.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "The post could not be drafted right now.");
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  function openPost(postId: string) {
+    setSelectedId(postId);
+    setFilter("All");
+    setEditingBody(null);
+    navigate("content");
   }
 
   function openBuyPage(contentId: string) {
@@ -525,6 +573,7 @@ export function CampaignWorkspace({
       setRecommendation(result.next_action);
       setMoveContext({ evidence: result.evidence, model: result.model });
       setMoveDecision(null);
+      setFollowUpId(null);
       // Never earlier than the newest capture, so a small clock difference cannot hide it.
       const newest = Math.max(0, ...(receipts ?? []).map((item) => Date.parse(item.captured_at)));
       setRecommendedAt(new Date(Math.max(Date.now(), newest)).toISOString());
@@ -652,6 +701,10 @@ export function CampaignWorkspace({
             decision={moveDecision}
             deciding={deciding}
             decide={decideNextMove}
+            followUp={campaign.posts.find((post) => post.id === followUpId) ?? null}
+            drafting={drafting}
+            draftFollowUp={draftFollowUp}
+            openPost={openPost}
             recommendation={recommendation}
             recommendationError={recommendationError}
             recommendationLoading={recommendationLoading}
@@ -2582,6 +2635,10 @@ function MoveDecisionPanel({
   decision,
   deciding,
   decide,
+  followUp,
+  drafting,
+  draftFollowUp,
+  openPost,
   findNextMove,
   recommendationLoading,
 }: {
@@ -2589,6 +2646,10 @@ function MoveDecisionPanel({
   decision: MoveDecision | null;
   deciding: boolean;
   decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
+  followUp: Post | null;
+  drafting: boolean;
+  draftFollowUp: () => Promise<void>;
+  openPost: (postId: string) => void;
   findNextMove: () => Promise<void>;
   recommendationLoading: boolean;
 }) {
@@ -2605,6 +2666,31 @@ function MoveDecisionPanel({
             ? decision.recommendation
             : "This move will not run. The agent can propose a different one from the same evidence."}
         </p>
+        {approved ? (
+          followUp ? (
+            <div className="move-follow-up">
+              <span>
+                The agent drafted the day {followUp.day} {followUp.channel} post from this plan.
+                {followUp.status === "approved"
+                  ? " You approved it."
+                  : " It waits for your review."}
+              </span>
+              <button className="button dark" type="button" onClick={() => openPost(followUp.id)}>
+                Open the post
+              </button>
+            </div>
+          ) : (
+            <button
+              className="button accent"
+              type="button"
+              disabled={drafting}
+              aria-busy={drafting}
+              onClick={() => void draftFollowUp()}
+            >
+              {drafting ? <BusyLabel text="Drafting the post" /> : "Draft the post"}
+            </button>
+          )
+        ) : null}
         {!approved ? (
           <button
             className="button outline"
@@ -2641,7 +2727,7 @@ function MoveDecisionPanel({
             disabled={deciding || !draft.trim()}
             onClick={() => void decide("approved", draft.trim())}
           >
-            {deciding ? <BusyLabel text="Saving" /> : "Save and approve"}
+            {deciding ? <BusyLabel text="Saving" /> : "Save, approve and draft"}
           </button>
           <button className="button outline" type="button" onClick={() => setDraft(null)}>
             Cancel
@@ -2652,7 +2738,10 @@ function MoveDecisionPanel({
   }
   return (
     <div className="move-decision">
-      <p>Nothing changes until you decide.</p>
+      <p>
+        Approving asks the agent to draft the post this plan describes. It waits in review, so
+        nothing goes out until you approve it too.
+      </p>
       <div className="form-actions">
         <button
           className="button accent"
@@ -2660,7 +2749,7 @@ function MoveDecisionPanel({
           disabled={deciding}
           onClick={() => void decide("approved")}
         >
-          {deciding ? <BusyLabel text="Saving" /> : "Approve"}
+          {deciding ? <BusyLabel text="Saving" /> : "Approve and draft post"}
         </button>
         <button
           className="button secondary"
@@ -2689,6 +2778,10 @@ function ExperimentPage({
   decision,
   deciding,
   decide,
+  followUp,
+  drafting,
+  draftFollowUp,
+  openPost,
   recommendation,
   recommendationError,
   recommendationLoading,
@@ -2700,6 +2793,10 @@ function ExperimentPage({
   decision: MoveDecision | null;
   deciding: boolean;
   decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
+  followUp: Post | null;
+  drafting: boolean;
+  draftFollowUp: () => Promise<void>;
+  openPost: (postId: string) => void;
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -2736,6 +2833,10 @@ function ExperimentPage({
               decision={decision}
               deciding={deciding}
               decide={decide}
+              followUp={followUp}
+              drafting={drafting}
+              draftFollowUp={draftFollowUp}
+              openPost={openPost}
               findNextMove={findNextMove}
               recommendationLoading={recommendationLoading}
             />

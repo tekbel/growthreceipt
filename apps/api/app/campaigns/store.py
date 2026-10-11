@@ -14,6 +14,7 @@ from app.campaigns.models import (
     CampaignBrief,
     CampaignDraft,
     CampaignEvent,
+    CampaignPost,
     EventActor,
     Post,
     PostUpdate,
@@ -67,6 +68,15 @@ class CampaignStore(Protocol):
     async def approve(self, *, workspace_id: UUID, campaign_id: UUID) -> Campaign | None: ...
 
     async def events(self, *, workspace_id: UUID, campaign_id: UUID) -> list[CampaignEvent]: ...
+
+    async def add_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None: ...
 
     async def record_event(
         self,
@@ -204,9 +214,7 @@ class PostgresCampaignStore:
             ).one_or_none()
             if row is None:
                 return None
-            campaign = await self._load(
-                workspace_id=row.workspace_id, campaign_id=row.campaign_id
-            )
+            campaign = await self._load(workspace_id=row.workspace_id, campaign_id=row.campaign_id)
         return _locate(row.workspace_id, campaign, content_id)
 
     async def update_post(
@@ -332,6 +340,40 @@ class PostgresCampaignStore:
                 action=action,
                 detail=detail,
             )
+
+    async def add_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None:
+        async with self._session.begin():
+            post_id = await self._session.scalar(
+                text(
+                    """
+                    insert into growthreceipt.campaign_posts (
+                      campaign_id, day, channel, theme, content, call_to_action
+                    )
+                    select c.id, :day, :channel, :theme, :content, :call_to_action
+                    from growthreceipt.campaigns c
+                    where c.id = :campaign_id and c.workspace_id = :workspace_id
+                    returning id
+                    """
+                ),
+                {"campaign_id": campaign_id, "workspace_id": workspace_id, **post.model_dump()},
+            )
+            if post_id is None:
+                return None
+            await self._insert_event(
+                campaign_id=campaign_id,
+                post_id=post_id,
+                actor="agent",
+                action="follow_up_drafted",
+                detail=detail,
+            )
+            return await self._load(workspace_id=workspace_id, campaign_id=campaign_id)
 
     async def _insert_event(
         self,
@@ -503,6 +545,24 @@ class FakeCampaignStore:
         detail: dict[str, Any],
     ) -> None:
         self._log(campaign_id, None, actor, action, detail)
+
+    async def add_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None:
+        campaign = self.campaigns.get(campaign_id)
+        if campaign is None or self.workspaces.get(campaign_id) != workspace_id:
+            return None
+        added = Post(id=uuid4(), status="needs_review", review_note=None, **post.model_dump())
+        self.campaigns[campaign_id] = campaign.model_copy(
+            update={"posts": [*campaign.posts, added]}
+        )
+        self._log(campaign_id, added.id, "agent", "follow_up_drafted", detail)
+        return self.campaigns[campaign_id]
 
     def _log(
         self,

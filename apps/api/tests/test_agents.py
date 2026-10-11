@@ -40,7 +40,17 @@ def transport() -> ASGITransport:
         human_approval_required=True,
     )
     app.dependency_overrides[get_agent_gateway] = lambda: FakeAgentGateway(
-        {"campaign-draft": draft, "revenue-next-action": next_action}
+        {
+            "campaign-draft": draft,
+            "revenue-next-action": next_action,
+            "follow-up-post": CampaignPost(
+                day=99,
+                channel="LinkedIn",
+                theme="Catch it before launch",
+                content="Find what breaks a launch before your visitors do.",
+                call_to_action="Get the 10 scan pack.",
+            ),
+        }
     )
     app.dependency_overrides[get_payment_store] = lambda: FakePaymentStore()
     return ASGITransport(app=app)
@@ -186,3 +196,43 @@ async def test_decision_needs_a_recommendation(transport: ASGITransport) -> None
         )
 
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_approved_move_drafts_one_post_for_review(
+    transport: ASGITransport, campaign_store: FakeCampaignStore
+) -> None:
+    last_day = max(post.day for post in campaign_store.campaigns[UUID(CAMPAIGN)].posts)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await recommend(client)
+        await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "approved"},
+        )
+        response = await client.post("/v1/agents/follow-up-post", json={"campaign_id": CAMPAIGN})
+        repeated = await client.post("/v1/agents/follow-up-post", json={"campaign_id": CAMPAIGN})
+
+    assert response.status_code == 200
+    body = response.json()
+    [added] = [post for post in body["campaign"]["posts"] if post["id"] == body["post_id"]]
+    assert added["status"] == "needs_review"
+    assert added["day"] == last_day + 1
+    assert added["theme"] == "Catch it before launch"
+    assert repeated.status_code == 409
+    events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(CAMPAIGN))
+    assert events[0].action == "follow_up_drafted"
+    assert events[0].post_id == UUID(body["post_id"])
+
+
+@pytest.mark.asyncio
+async def test_follow_up_needs_an_approved_move(transport: ASGITransport) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await recommend(client)
+        await client.post(
+            "/v1/agents/next-action/decision",
+            json={"campaign_id": CAMPAIGN, "decision": "rejected"},
+        )
+        response = await client.post("/v1/agents/follow-up-post", json={"campaign_id": CAMPAIGN})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Approve a next move first"
