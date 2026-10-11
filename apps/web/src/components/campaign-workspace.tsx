@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowRight,
   BarChart3,
   Box,
   CalendarDays,
@@ -28,7 +29,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { InfoTip } from "@/components/info-tip";
@@ -723,6 +724,23 @@ export function CampaignWorkspace({
             move={provenMove}
             moveLoading={recommendationLoading}
             findNextMove={findNextMove}
+            recommendation={recommendation}
+            decisionPanel={
+              recommendation ? (
+                <MoveDecisionPanel
+                  recommendation={recommendation}
+                  decision={moveDecision}
+                  deciding={deciding}
+                  decide={decideNextMove}
+                  followUp={campaign.posts.find((post) => post.id === followUpId) ?? null}
+                  drafting={drafting}
+                  draftFollowUp={draftFollowUp}
+                  openPost={openPost}
+                  findNextMove={findNextMove}
+                  recommendationLoading={recommendationLoading}
+                />
+              ) : null
+            }
             stage={stage}
             needsReview={counts["Needs review"] + counts["Changes requested"]}
             navigate={navigate}
@@ -1365,6 +1383,8 @@ function TodayPage({
   move,
   moveLoading,
   findNextMove,
+  recommendation,
+  decisionPanel,
   stage,
   needsReview,
   navigate,
@@ -1376,6 +1396,8 @@ function TodayPage({
   move: ProvenMove | null;
   moveLoading: boolean;
   findNextMove: () => Promise<void>;
+  recommendation: Recommendation | null;
+  decisionPanel: ReactNode;
   stage: Stage;
   needsReview: number;
   navigate: (view: View) => void;
@@ -1406,6 +1428,18 @@ function TodayPage({
           {campaign.name} for {campaign.product_name} · {scheduleRange(campaign)}
         </p>
       </header>
+      {receipts?.length ? (
+        <TodayResultCard
+          campaign={campaign}
+          receipts={receipts}
+          move={move}
+          moveLoading={moveLoading}
+          findNextMove={findNextMove}
+          recommendation={recommendation}
+          decisionPanel={decisionPanel}
+          navigate={navigate}
+        />
+      ) : null}
       <FocusCard
         campaign={campaign}
         stage={stage}
@@ -1515,25 +1549,7 @@ function TodayPage({
           )}
         </article>
       </section>
-      {receipts?.length ? (
-        <section className="today-receipt" aria-label="Latest purchase">
-          <SectionTitle
-            title="Latest purchase"
-            action="See the PayPal proof"
-            onAction={() => navigate("results")}
-          />
-          <ReceiptChain
-            receipt={receipts[0]}
-            receipts={receipts}
-            posts={campaign.posts}
-            move={move}
-            moveLoading={moveLoading}
-            onFindNextMove={() => void findNextMove()}
-            onReview={() => navigate("experiment")}
-            proof={false}
-          />
-        </section>
-      ) : (
+      {receipts?.length ? null : (
         <section className="today-grid">
           <article>
             <SectionTitle title="Recent results" />
@@ -1558,6 +1574,115 @@ function TodayPage({
         </section>
       )}
     </>
+  );
+}
+
+function TodayResultCard({
+  campaign,
+  receipts,
+  move,
+  moveLoading,
+  findNextMove,
+  recommendation,
+  decisionPanel,
+  navigate,
+}: {
+  campaign: Campaign;
+  receipts: PayPalReceipt[];
+  move: ProvenMove | null;
+  moveLoading: boolean;
+  findNextMove: () => Promise<void>;
+  recommendation: Recommendation | null;
+  decisionPanel: ReactNode;
+  navigate: (view: View) => void;
+}) {
+  const latest = receipts[0];
+  const post = campaign.posts.find((item) => item.id === latest.content_id);
+  const verified = latest.webhooks.some(
+    (event) => event.event_type === "PAYMENT.CAPTURE.COMPLETED",
+  );
+  // A recommendation belongs to this purchase only if the agent made it after the money arrived.
+  const fresh = move && new Date(move.at) >= new Date(latest.captured_at) ? recommendation : null;
+  const captured = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(latest.captured_at));
+  return (
+    <section className="result-card" aria-labelledby="result-card-title">
+      <div className="result-card-payment">
+        <span className="status-tag success">
+          <Check aria-hidden="true" /> Payment verified
+        </span>
+        <h2 id="result-card-title">
+          <strong>{formatMoney(latest.amount, latest.currency)}</strong> captured through PayPal
+          Sandbox
+        </h2>
+        <dl className="result-facts">
+          <div>
+            <dt>Campaign</dt>
+            <dd>{campaign.name}</dd>
+          </div>
+          <div>
+            <dt>Attributed post</dt>
+            <dd>
+              {post ? `Day ${post.day} on ${post.channel}` : "Campaign post"}
+              {post ? <small>{post.theme}</small> : null}
+            </dd>
+          </div>
+          <div>
+            <dt>Attribution</dt>
+            <dd className={verified ? "verified" : "pending"}>
+              {verified ? "Verified by PayPal webhook" : "Captured. Webhook on its way"}
+            </dd>
+          </div>
+          <div>
+            <dt>Captured</dt>
+            <dd>
+              {captured}
+              {receipts.length > 1 ? <small>{receipts.length} purchases in total</small> : null}
+            </dd>
+          </div>
+        </dl>
+        <button className="text-button" type="button" onClick={() => navigate("results")}>
+          See the PayPal proof
+          <ArrowRight aria-hidden="true" />
+        </button>
+      </div>
+      <div className="result-card-move">
+        {fresh ? (
+          <>
+            <span className="eyebrow">New recommendation</span>
+            <h3>{fresh.headline}</h3>
+            <p>{fresh.recommendation}</p>
+            <p className="result-reason">
+              <strong>Reason.</strong> {fresh.rationale}
+            </p>
+            <span className="eyebrow">Your decision</span>
+            {decisionPanel}
+          </>
+        ) : (
+          <>
+            <span className="eyebrow">Next step</span>
+            <h3>Let the agent learn from this purchase</h3>
+            <p>
+              It reads which post earned the money and proposes one experiment. Nothing changes
+              until you approve it.
+            </p>
+            <button
+              className="button accent"
+              type="button"
+              disabled={moveLoading}
+              aria-busy={moveLoading}
+              onClick={() => void findNextMove()}
+            >
+              {moveLoading ? <BusyLabel text="Reviewing results" elapsed /> : "Find next move"}
+            </button>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
