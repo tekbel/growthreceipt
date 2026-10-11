@@ -32,6 +32,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
+import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
 import {
   ElapsedSeconds,
@@ -524,6 +525,19 @@ export function CampaignWorkspace({
     heading.focus({ preventScroll: true });
   }, [focusRequest, loadState]);
 
+  // What the evidence table shows as the next action for each post.
+  function evidenceNextActions(): Record<string, string> {
+    const actions: Record<string, string> = {};
+    const source = moveContext?.evidence?.paid_posts?.[0]?.content_id;
+    if (source && recommendation) {
+      actions[source] = moveDecision
+        ? `${recommendation.headline} (${moveDecision.decision})`
+        : `${recommendation.headline} (awaiting your decision)`;
+    }
+    if (followUpId) actions[followUpId] = "Experiment post from the approved next move";
+    return actions;
+  }
+
   function searchItems(): SearchItem[] {
     const items: SearchItem[] = [
       {
@@ -801,6 +815,8 @@ export function CampaignWorkspace({
         return (
           <ResultsPage
             campaign={campaign}
+            nextActions={evidenceNextActions()}
+            openPost={openPost}
             revenue={revenue}
             revenueError={revenueError}
             receipts={receipts}
@@ -2625,6 +2641,8 @@ function CalendarPage({ campaign }: { campaign: Campaign }) {
 
 function ResultsPage({
   campaign,
+  nextActions,
+  openPost,
   revenue,
   revenueError,
   receipts,
@@ -2641,6 +2659,8 @@ function ResultsPage({
   revenueError: boolean;
   receipts: PayPalReceipt[] | null;
   move: ProvenMove | null;
+  nextActions: Record<string, string>;
+  openPost: (postId: string) => void;
   recommendation: Recommendation | null;
   recommendationError: string | null;
   recommendationLoading: boolean;
@@ -2751,6 +2771,25 @@ function ResultsPage({
           ) : null}
         </section>
       ) : null}
+      <section className="results-evidence" aria-labelledby="evidence-title">
+        <div className="column-heading">
+          <h2 id="evidence-title">
+            Which post earned real revenue
+            <InfoTip label="About this table" align="start">
+              One row per post. Payment and attribution come from PayPal captures and signature
+              checked webhooks. Built with AG Grid.
+            </InfoTip>
+          </h2>
+          <span>Sorted by revenue. Filter by payment, approval or channel.</span>
+        </div>
+        <EvidenceGrid
+          campaign={campaign}
+          receipts={receipts ?? []}
+          nextActions={nextActions}
+          currency={revenue?.currency ?? "USD"}
+          onOpenPost={openPost}
+        />
+      </section>
       <section className="results-body">
         <div className="plain-panel">
           <div className="provider-heading">

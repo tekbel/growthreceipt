@@ -935,3 +935,16 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .result-card-move { border-top: 1px solid var(--line); border-left: 0; }
   .result-card-payment, .result-card-move { padding: 20px; }
 }
+
+/* Evidence table on Results, built with AG Grid. */
+.results-evidence { margin-top: 44px; }
+.evidence-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.evidence-toolbar .filter-row { padding: 18px 0 14px; }
+.evidence-channel select { min-height: 36px; padding: 0 30px 0 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--type-sm); }
+.evidence-grid-frame { min-width: 0; overflow-x: auto; }
+.evidence-grid-frame .ag-root-wrapper { min-width: 760px; }
+.evidence-grid .ag-row { cursor: pointer; }
+.evidence-grid .evidence-verified { color: var(--success); font-weight: 600; }
+.evidence-grid .evidence-pending { color: var(--warning); font-weight: 600; }
+.evidence-grid .evidence-muted { color: var(--muted); }
+.evidence-note { margin: 10px 0 0; color: var(--muted); font-size: var(--type-xs); }
