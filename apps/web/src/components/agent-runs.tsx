@@ -87,6 +87,19 @@ function toRuns(campaign: Campaign, events: CampaignEvent[]): Run[] {
           ? `You ${decided.action === "next_action_approved" ? "approved" : "rejected"} it.`
           : "Waiting for your decision. The agent cannot act on its own.",
       });
+    } else if (event.action === "post_revised") {
+      const post = campaign.posts.find((item) => item.id === event.post_id);
+      runs.push({
+        id: event.id,
+        title: "Post revision",
+        at: event.created_at,
+        meta: runMeta(detail),
+        input: `Your note: "${text(detail.review_note) ?? "requested changes"}"`,
+        evidence: post ? [`The day ${post.day} ${post.channel} post as it was`] : undefined,
+        output: "A revised version of the same post, same channel and offer.",
+        control:
+          post?.status === "approved" ? "You approved it." : "It waits in Content for your review.",
+      });
     } else if (event.action === "follow_up_drafted") {
       const post = campaign.posts.find((item) => item.id === event.post_id);
       runs.push({

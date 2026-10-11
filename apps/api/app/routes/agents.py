@@ -389,3 +389,83 @@ async def draft_follow_up_post(
         source_post_id=source.id if source else None,
         campaign=updated,
     )
+
+
+REVISION_INSTRUCTIONS = """You are GrowthReceipt's campaign writer.
+Revise exactly one post so it does what the founder's review note asks.
+Change only what the note asks for and keep everything else that works.
+Keep the channel, the product, the offer and the price. Never invent metrics, customers or quotes.
+Preserve the brand voice. Include one clear call to action.
+Never use semicolons or dashes.
+"""
+
+
+class RevisionRequest(BaseModel):
+    campaign_id: UUID
+    post_id: UUID
+
+
+class RevisionResponse(BaseModel):
+    post_id: UUID
+    campaign: Campaign
+
+
+@router.post("/revise-post", response_model=RevisionResponse)
+async def revise_post(
+    request: RevisionRequest,
+    gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
+    _run: CampaignDraftRun,
+) -> RevisionResponse:
+    """Applies the founder's change request to one post. The result goes back to review."""
+    campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    post = next((item for item in campaign.posts if item.id == request.post_id), None)
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    note = (post.review_note or "").strip()
+    if post.status != "changes_requested" or not note:
+        raise HTTPException(status_code=409, detail="Request changes with a note first")
+    prompt = json.dumps(
+        {
+            "product_name": campaign.product_name,
+            "audience": campaign.audience,
+            "brand_voice": campaign.brand_voice,
+            "review_note": note,
+            "post": post.model_dump(
+                mode="json", include={"day", "channel", "theme", "content", "call_to_action"}
+            ),
+        },
+        indent=2,
+    )
+    try:
+        run = await gateway.run_structured(
+            workflow="revise-post",
+            instructions=REVISION_INSTRUCTIONS,
+            input_text=prompt,
+            output_type=CampaignPost,
+        )
+    except (APIError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=502, detail="The post could not be revised right now"
+        ) from error
+    revised = run.output.model_copy(update={"day": post.day, "channel": post.channel})
+    updated = await campaigns.revise_post(
+        workspace_id=workspace_id,
+        campaign_id=campaign.id,
+        post_id=post.id,
+        revised=revised,
+        detail={
+            "session_id": run.session_id,
+            "turn_id": run.turn_id,
+            "model": get_settings().openai_model,
+            "review_note": note,
+            "before": post.content,
+            "after": revised.content,
+        },
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return RevisionResponse(post_id=post.id, campaign=updated)

@@ -43,6 +43,13 @@ def transport() -> ASGITransport:
         {
             "campaign-draft": draft,
             "revenue-next-action": next_action,
+            "revise-post": CampaignPost(
+                day=99,
+                channel="X",
+                theme="Revised theme",
+                content="Revised text. #IndieHackers #Launch #SaaS",
+                call_to_action="Scan your page.",
+            ),
             "follow-up-post": CampaignPost(
                 day=99,
                 channel="LinkedIn",
@@ -236,3 +243,37 @@ async def test_follow_up_needs_an_approved_move(transport: ASGITransport) -> Non
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Approve a next move first"
+
+
+@pytest.mark.asyncio
+async def test_agent_revises_a_post_from_the_review_note(
+    transport: ASGITransport, campaign_store: FakeCampaignStore
+) -> None:
+    post = campaign_store.campaigns[UUID(CAMPAIGN)].posts[0]
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        early = await client.post(
+            "/v1/agents/revise-post", json={"campaign_id": CAMPAIGN, "post_id": str(post.id)}
+        )
+        await client.patch(
+            f"/v1/campaigns/{CAMPAIGN}/posts/{post.id}",
+            json={"status": "changes_requested", "review_note": "Add one more hashtag."},
+        )
+        response = await client.post(
+            "/v1/agents/revise-post", json={"campaign_id": CAMPAIGN, "post_id": str(post.id)}
+        )
+
+    assert early.status_code == 409
+    assert response.status_code == 200
+    [revised] = [
+        item for item in response.json()["campaign"]["posts"] if item["id"] == str(post.id)
+    ]
+    assert revised["status"] == "needs_review"
+    assert revised["review_note"] is None
+    assert revised["content"].endswith("#SaaS")
+    assert revised["day"] == post.day
+    assert revised["channel"] == post.channel
+    events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(CAMPAIGN))
+    assert events[0].action == "post_revised"
+    assert events[0].actor == "agent"
+    assert events[0].detail["review_note"] == "Add one more hashtag."
+    assert events[0].detail["before"] == post.content

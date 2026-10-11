@@ -78,6 +78,16 @@ class CampaignStore(Protocol):
         detail: dict[str, Any],
     ) -> Campaign | None: ...
 
+    async def revise_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post_id: UUID,
+        revised: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None: ...
+
     async def record_event(
         self,
         *,
@@ -375,6 +385,50 @@ class PostgresCampaignStore:
             )
             return await self._load(workspace_id=workspace_id, campaign_id=campaign_id)
 
+    async def revise_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post_id: UUID,
+        revised: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None:
+        # The agent's revision goes back to review. The founder's note is cleared once used.
+        async with self._session.begin():
+            updated = await self._session.scalar(
+                text(
+                    """
+                    update growthreceipt.campaign_posts post
+                    set theme = :theme, content = :content, call_to_action = :call_to_action,
+                        status = 'needs_review', review_note = null, updated_at = now()
+                    from growthreceipt.campaigns campaign
+                    where post.id = :post_id and post.campaign_id = :campaign_id
+                      and campaign.id = post.campaign_id
+                      and campaign.workspace_id = :workspace_id
+                    returning post.id
+                    """
+                ),
+                {
+                    "post_id": post_id,
+                    "campaign_id": campaign_id,
+                    "workspace_id": workspace_id,
+                    "theme": revised.theme,
+                    "content": revised.content,
+                    "call_to_action": revised.call_to_action,
+                },
+            )
+            if updated is None:
+                return None
+            await self._insert_event(
+                campaign_id=campaign_id,
+                post_id=post_id,
+                actor="agent",
+                action="post_revised",
+                detail=detail,
+            )
+            return await self._load(workspace_id=workspace_id, campaign_id=campaign_id)
+
     async def _insert_event(
         self,
         *,
@@ -562,6 +616,38 @@ class FakeCampaignStore:
             update={"posts": [*campaign.posts, added]}
         )
         self._log(campaign_id, added.id, "agent", "follow_up_drafted", detail)
+        return self.campaigns[campaign_id]
+
+    async def revise_post(
+        self,
+        *,
+        workspace_id: UUID,
+        campaign_id: UUID,
+        post_id: UUID,
+        revised: CampaignPost,
+        detail: dict[str, Any],
+    ) -> Campaign | None:
+        campaign = self.campaigns.get(campaign_id)
+        if campaign is None or self.workspaces.get(campaign_id) != workspace_id:
+            return None
+        if not any(post.id == post_id for post in campaign.posts):
+            return None
+        posts = [
+            post.model_copy(
+                update={
+                    "theme": revised.theme,
+                    "content": revised.content,
+                    "call_to_action": revised.call_to_action,
+                    "status": "needs_review",
+                    "review_note": None,
+                }
+            )
+            if post.id == post_id
+            else post
+            for post in campaign.posts
+        ]
+        self.campaigns[campaign_id] = campaign.model_copy(update={"posts": posts})
+        self._log(campaign_id, post_id, "agent", "post_revised", detail)
         return self.campaigns[campaign_id]
 
     def _log(

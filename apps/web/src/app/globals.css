@@ -1026,3 +1026,5 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .auth-example { margin-bottom: 14px; padding: 10px 12px; }
   .flow-step { padding-bottom: 6px; }
 }
+.revise-action { display: grid; gap: 8px; justify-items: start; margin: 4px 0 16px; }
+.revise-action > span { color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }

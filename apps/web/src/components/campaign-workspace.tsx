@@ -191,6 +191,7 @@ const eventLabels: Record<string, string> = {
   next_action_approved: "Next move approved",
   next_action_rejected: "Next move rejected",
   follow_up_drafted: "Post drafted from the approved next move",
+  post_revised: "Post revised by the agent from your note",
 };
 
 const draftSteps: [DraftStage, string][] = [
@@ -245,6 +246,7 @@ export function CampaignWorkspace({
   const [deciding, setDeciding] = useState(false);
   const [followUpId, setFollowUpId] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [revising, setRevising] = useState(false);
   const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -478,6 +480,37 @@ export function CampaignWorkspace({
       notify(error instanceof Error ? error.message : "The post could not be drafted right now.");
     } finally {
       setDrafting(false);
+    }
+  }
+
+  // The agent applies the founder's change request. The new version goes back to review.
+  async function revisePost(postId: string) {
+    if (!campaign) return;
+    setRevising(true);
+    try {
+      const response = await apiFetch("/v1/agents/revise-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaign.id, post_id: postId }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        campaign?: Campaign;
+        detail?: unknown;
+      } | null;
+      if (!response.ok || !body?.campaign) {
+        throw new Error(
+          typeof body?.detail === "string"
+            ? body.detail
+            : "The post could not be revised right now.",
+        );
+      }
+      setCampaign(body.campaign);
+      setEditingBody(null);
+      notify("The agent revised the post from your note. Review the new version.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "The post could not be revised right now.");
+    } finally {
+      setRevising(false);
     }
   }
 
@@ -795,6 +828,8 @@ export function CampaignWorkspace({
                 { label: "Open checkout", view: "checkout" },
               )
             }
+            revisePost={revisePost}
+            revising={revising}
             requestChanges={(note) =>
               updateSelected(
                 { status: "changes_requested", review_note: note },
@@ -2358,6 +2393,8 @@ function ContentPage({
   approveCampaign,
   approvePost,
   requestChanges,
+  revisePost,
+  revising,
   saveEdits,
   selectFilter,
   selectPost,
@@ -2376,6 +2413,8 @@ function ContentPage({
   approveCampaign: () => void;
   approvePost: () => void;
   requestChanges: (note: string) => Promise<boolean>;
+  revisePost: (postId: string) => Promise<void>;
+  revising: boolean;
   saveEdits: () => Promise<void>;
   selectFilter: (filter: Filter) => void;
   selectPost: (id: string) => void;
@@ -2493,6 +2532,8 @@ function ContentPage({
           approveCampaign={approveCampaign}
           approvePost={approvePost}
           requestChanges={requestChanges}
+          revisePost={revisePost}
+          revising={revising}
           startEditing={() => setEditingBody(selected.content)}
           saveEdits={saveEdits}
           openCheckout={openCheckout}
@@ -2510,6 +2551,8 @@ function ReviewActions({
   approveCampaign,
   approvePost,
   requestChanges,
+  revisePost,
+  revising,
   startEditing,
   saveEdits,
   openCheckout,
@@ -2522,6 +2565,8 @@ function ReviewActions({
   approveCampaign: () => void;
   approvePost: () => void;
   requestChanges: (note: string) => Promise<boolean>;
+  revisePost: (postId: string) => Promise<void>;
+  revising: boolean;
   startEditing: () => void;
   saveEdits: () => Promise<void>;
 }) {
@@ -2541,6 +2586,18 @@ function ReviewActions({
         <>
           <span className="eyebrow">Requested change</span>
           <p>{post.review_note ?? "Revise the draft before it is scheduled."}</p>
+          <div className="revise-action">
+            <button
+              className="button accent"
+              type="button"
+              disabled={revising || !post.review_note}
+              aria-busy={revising}
+              onClick={() => void revisePost(post.id)}
+            >
+              {revising ? <BusyLabel text="Revising" elapsed /> : "Revise with agent"}
+            </button>
+            <span>Or edit the post yourself. Either way it comes back for your approval.</span>
+          </div>
         </>
       ) : (
         <>
