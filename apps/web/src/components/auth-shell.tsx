@@ -90,6 +90,7 @@ export function AuthShell() {
       else {
         loadedUser.current = null;
         setApiAccessToken(null);
+        if (window.location.hash) window.history.replaceState(null, "", "/");
         // A finished sign in leaves the buttons busy, so clear that on sign out.
         setSubmitting(false);
         setEmailSent(false);
@@ -163,6 +164,8 @@ export function AuthShell() {
     const supabase = getSupabase();
     if (!supabase) return;
     await supabase.auth.signOut();
+    // Signed out visitors start at the clean home address, not the page they left.
+    window.history.replaceState(null, "", "/");
   }
 
   async function resetJudgeDemo() {

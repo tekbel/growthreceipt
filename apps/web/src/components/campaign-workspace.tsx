@@ -886,7 +886,7 @@ export function CampaignWorkspace({
           />
         );
       case "integrations":
-        return <IntegrationsPage navigate={navigate} notify={notify} />;
+        return <IntegrationsPage navigate={navigate} />;
       case "settings":
         return <SettingsPage notify={notify} />;
       case "checkout":
@@ -934,8 +934,10 @@ export function CampaignWorkspace({
           searchItems={searchItems()}
           onTheme={toggleTheme}
           onHelp={() => setHelpOpen(true)}
-          notify={notify}
           identity={identity}
+          onSettings={() => navigate("settings")}
+          onResetDemo={identity.mode === "judge" ? onResetDemo : undefined}
+          onSignOut={onSignOut}
         />
         {identity.mode === "judge" && onResetDemo ? (
           <JudgeBar onReset={onResetDemo} notify={notify} />
@@ -1031,18 +1033,13 @@ function Sidebar({
             <X aria-hidden="true" />
           </button>
         </div>
-        <button
-          className="product-picker"
-          type="button"
-          onClick={() => notify("Product switching is coming next.")}
-        >
+        <button className="product-picker" type="button" onClick={() => navigate("products")}>
           {productIcon ? (
             <ProductMark className="picker-mark" name={productName} iconUrl={productIcon} />
           ) : (
             <span className="product-dot" />
           )}
           <strong>{productName}</strong>
-          <ChevronDown aria-hidden="true" />
         </button>
         <NavigationGroup
           label="Workspace"
@@ -1060,10 +1057,9 @@ function Sidebar({
           <div className="environment-state">
             <span /> {environmentLabel}
           </div>
-          <button type="button" onClick={() => notify("Change workspace preferences in Settings.")}>
+          <button type="button" onClick={() => navigate("settings")}>
             <span className="avatar">{initial}</span>
             <strong>{identity.displayName}</strong>
-            <ChevronDown aria-hidden="true" />
           </button>
           {onResetDemo || onSignOut ? (
             <div className="sidebar-session-actions">
@@ -1183,6 +1179,79 @@ function JudgeBar({
   );
 }
 
+function AccountMenu({
+  initial,
+  identity,
+  onSettings,
+  onResetDemo,
+  onSignOut,
+}: {
+  initial: string;
+  identity: WorkspaceIdentity;
+  onSettings: () => void;
+  onResetDemo?: () => Promise<void>;
+  onSignOut?: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+  const choose = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+  return (
+    <div className="account-menu" ref={root}>
+      <button
+        className="topbar-avatar"
+        type="button"
+        aria-label={`Account, ${identity.displayName}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {initial}
+      </button>
+      {open ? (
+        <div className="account-menu-list" id={menuId} role="menu">
+          <p>
+            <strong>{identity.displayName}</strong>
+            <small>{identity.mode === "judge" ? "Judge demo" : "Signed in"}</small>
+          </p>
+          <button type="button" role="menuitem" onClick={() => choose(onSettings)}>
+            Settings
+          </button>
+          {onResetDemo ? (
+            <button type="button" role="menuitem" onClick={() => choose(() => void onResetDemo())}>
+              Reset demo
+            </button>
+          ) : null}
+          {onSignOut ? (
+            <button type="button" role="menuitem" onClick={() => choose(() => void onSignOut())}>
+              Sign out
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Topbar({
   currentView,
   productName,
@@ -1192,9 +1261,11 @@ function Topbar({
   onSearch,
   onSearchClose,
   searchItems,
+  onSettings,
+  onResetDemo,
+  onSignOut,
   onTheme,
   onHelp,
-  notify,
   identity,
 }: {
   currentView: View;
@@ -1205,9 +1276,11 @@ function Topbar({
   onSearch: () => void;
   onSearchClose: () => void;
   searchItems: SearchItem[];
+  onSettings: () => void;
+  onResetDemo?: () => Promise<void>;
+  onSignOut?: () => Promise<void>;
   onTheme: () => void;
   onHelp: () => void;
-  notify: (message: string) => void;
   identity: WorkspaceIdentity;
 }) {
   const initial = identity.displayName.trim().charAt(0).toUpperCase() || "G";
@@ -1236,14 +1309,13 @@ function Topbar({
         <button type="button" onClick={onHelp} aria-label="Help">
           <CircleHelp aria-hidden="true" />
         </button>
-        <button
-          className="topbar-avatar"
-          type="button"
-          onClick={() => notify(`Signed in to ${identity.displayName}.`)}
-          aria-label={identity.displayName}
-        >
-          {initial}
-        </button>
+        <AccountMenu
+          initial={initial}
+          identity={identity}
+          onSettings={onSettings}
+          onResetDemo={onResetDemo}
+          onSignOut={onSignOut}
+        />
       </div>
     </header>
   );
@@ -3243,13 +3315,7 @@ function ExperimentPage({
   );
 }
 
-function IntegrationsPage({
-  navigate,
-  notify,
-}: {
-  navigate: (view: View) => void;
-  notify: (message: string) => void;
-}) {
+function IntegrationsPage({ navigate }: { navigate: (view: View) => void }) {
   return (
     <>
       <PageHeader
@@ -3270,9 +3336,7 @@ function IntegrationsPage({
           provider="PostHog"
           description="Product activation, trials, and conversion events."
           icon={<SiPosthog aria-hidden="true" />}
-          status="Not connected"
-          action="Connect"
-          onAction={() => notify("PostHog is planned next.")}
+          status="Planned"
         />
         {channels.map((channel) => (
           <Integration
@@ -3280,9 +3344,7 @@ function IntegrationsPage({
             provider={channel}
             description={channelIntegration[channel]}
             icon={<ChannelIcon channel={channel} />}
-            status="Not connected"
-            action="Connect"
-            onAction={() => notify(`${channel} publishing is not connected yet.`)}
+            status="Planned"
           />
         ))}
       </section>
@@ -3633,9 +3695,9 @@ function Integration({
   provider: string;
   description: string;
   icon: React.ReactNode;
-  status: "Connected" | "Not connected";
-  action: string;
-  onAction: () => void;
+  status: "Connected" | "Planned";
+  action?: string;
+  onAction?: () => void;
 }) {
   return (
     <article className="integration-row">
@@ -3647,9 +3709,11 @@ function Integration({
       <span className={`status-tag ${status === "Connected" ? "success" : "neutral"}`}>
         {status}
       </span>
-      <button className="button secondary" type="button" onClick={onAction}>
-        {action}
-      </button>
+      {action && onAction ? (
+        <button className="button secondary" type="button" onClick={onAction}>
+          {action}
+        </button>
+      ) : null}
     </article>
   );
 }
