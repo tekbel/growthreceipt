@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, LockKeyhole } from "lucide-react";
+import { ArrowRight, Check, Copy, LockKeyhole } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
@@ -66,6 +66,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
   const buttonContainer = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<PublicOffer | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [founderPreview, setFounderPreview] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState("Preparing secure checkout…");
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +75,11 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
     amount: string;
     currency: string;
   } | null>(null);
+
+  // Set by the workspace when the founder opens their own buy link. Customer links lack it.
+  useEffect(() => {
+    setFounderPreview(new URLSearchParams(window.location.search).get("preview") === "founder");
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -269,10 +275,15 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                   <dd>{receipt.captureId}</dd>
                 </div>
               </dl>
-              <p className="buy-founder-note">
-                Testing as the founder? Go back to your GrowthReceipt tab. This purchase is already
-                credited to the post that brought it.
-              </p>
+              {founderPreview ? (
+                <div className="buy-founder-note">
+                  <p>This purchase is already credited to the post that brought it.</p>
+                  <a className="button dark" href="/#today">
+                    See it on Today
+                    <ArrowRight aria-hidden="true" />
+                  </a>
+                </div>
+              ) : null}
             </div>
           ) : (
             <>

@@ -416,7 +416,8 @@ export function CampaignWorkspace({
   }
 
   function openBuyPage(contentId: string) {
-    window.open(buyLink(contentId), "_blank", "noopener");
+    // The marker only adds a way back to the workspace on the thank you screen.
+    window.open(`${buyLink(contentId)}?preview=founder`, "_blank", "noopener");
   }
 
   function openCustomerView() {
