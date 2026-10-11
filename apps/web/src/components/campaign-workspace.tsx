@@ -4047,9 +4047,11 @@ function LinkedInIntegration({
         <p>
           {live
             ? `Posting as ${status.member_name || "your profile"}. Access lasts until ${formatMoment(status.expires_at ?? "", { day: "numeric", month: "long", year: "numeric" })}, then reconnect.`
-            : status.expired
-              ? "The LinkedIn connection expired. Reconnect to keep posting."
-              : "Connect your profile to post approved posts directly or on their scheduled day. Until then, Publish opens the LinkedIn composer."}
+            : !status.can_connect
+              ? "The judge demo is shared, so it cannot hold a LinkedIn profile. Sign in with your own account to connect yours. Publish still opens the LinkedIn composer."
+              : status.expired
+                ? "The LinkedIn connection expired. Reconnect to keep posting."
+                : "Connect your profile to post approved posts directly or on their scheduled day. Until then, Publish opens the LinkedIn composer."}
         </p>
       </div>
       <span className={`status-tag ${live ? "success" : "neutral"}`}>
@@ -4070,7 +4072,7 @@ function LinkedInIntegration({
           Disconnect
         </button>
       ) : null}
-      {!live ? (
+      {!live && status.can_connect ? (
         <button
           className="button dark"
           type="button"

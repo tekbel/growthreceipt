@@ -16,6 +16,7 @@ from app.linkedin.publisher import get_linkedin_client, get_token_cipher, publis
 from app.linkedin.store import FakeLinkedInStore, get_linkedin_store
 from app.main import app
 from app.workspace_settings import FakeWorkspaceSettingsStore, get_workspace_settings_store
+from app.workspaces import WorkspaceContext, get_workspace_context
 
 CAMPAIGN_ID = UUID("11111111-1111-4111-8111-111111111111")
 LINKEDIN_POST = UUID("22222222-2222-4222-8222-222222222222")
@@ -228,3 +229,22 @@ async def test_auto_publish_sends_only_due_posts_from_its_start_day(
     _, event = campaign_store.event_log[-1]
     assert (event.actor, event.detail["trigger"]) == ("system", "scheduled")
     assert await publish_due_posts(store, linkedin, cipher, after_nine) == 0
+
+
+async def test_the_shared_judge_demo_cannot_connect_or_post(
+    client: AsyncClient, campaign_store: FakeCampaignStore, linkedin: FakeLinkedInClient
+) -> None:
+    approve(campaign_store)
+    judge = WorkspaceContext(id=WORKSPACE, mode="judge")
+    app.dependency_overrides[get_workspace_context] = lambda: judge
+    try:
+        status = await client.get("/v1/integrations/linkedin")
+        authorize = await client.post("/v1/integrations/linkedin/authorize")
+        publish = await client.post(f"/v1/integrations/linkedin/posts/{LINKEDIN_POST}/publish")
+    finally:
+        app.dependency_overrides.pop(get_workspace_context)
+
+    assert status.json()["can_connect"] is False
+    assert authorize.status_code == 403
+    assert publish.status_code == 403
+    assert linkedin.published == []

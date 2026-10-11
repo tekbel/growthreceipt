@@ -12,12 +12,24 @@ from app.linkedin.client import LinkedInError
 from app.linkedin.publisher import Cipher, Client, NotPublishable, publish_post
 from app.linkedin.store import LinkedInConnection, LinkedInStore, get_linkedin_store
 from app.workspace_settings import WorkspaceSettingsStore, get_workspace_settings_store
-from app.workspaces import WorkspaceId
+from app.workspaces import Workspace, WorkspaceId
 
 router = APIRouter(prefix="/v1/integrations/linkedin", tags=["linkedin"])
 
 Store = Annotated[LinkedInStore, Depends(get_linkedin_store)]
 SettingsStore = Annotated[WorkspaceSettingsStore, Depends(get_workspace_settings_store)]
+
+
+def personal_workspace(workspace: Workspace) -> UUID:
+    # The judge demo is one shared workspace, so it must never hold someone's LinkedIn.
+    if workspace.mode == "judge":
+        raise HTTPException(
+            status_code=403, detail="Sign in with your own account to connect LinkedIn."
+        )
+    return workspace.id
+
+
+PersonalWorkspaceId = Annotated[UUID, Depends(personal_workspace)]
 
 
 class LinkedInStatus(BaseModel):
@@ -27,6 +39,7 @@ class LinkedInStatus(BaseModel):
     expires_at: datetime | None = None
     expired: bool = False
     auto_publish: bool = False
+    can_connect: bool = True
 
 
 class AuthorizeResponse(BaseModel):
@@ -46,12 +59,13 @@ class PublishResponse(BaseModel):
     url: str
 
 
-def _status(connection: LinkedInConnection | None) -> LinkedInStatus:
+def _status(connection: LinkedInConnection | None, *, can_connect: bool = True) -> LinkedInStatus:
     configured = get_settings().linkedin_configured
     if connection is None:
-        return LinkedInStatus(configured=configured, connected=False)
+        return LinkedInStatus(configured=configured, connected=False, can_connect=can_connect)
     return LinkedInStatus(
         configured=configured,
+        can_connect=can_connect,
         connected=True,
         member_name=connection.member_name,
         expires_at=connection.expires_at,
@@ -61,12 +75,14 @@ def _status(connection: LinkedInConnection | None) -> LinkedInStatus:
 
 
 @router.get("", response_model=LinkedInStatus)
-async def linkedin_status(workspace_id: WorkspaceId, store: Store) -> LinkedInStatus:
-    return _status(await store.get(workspace_id))
+async def linkedin_status(workspace: Workspace, store: Store) -> LinkedInStatus:
+    return _status(await store.get(workspace.id), can_connect=workspace.mode != "judge")
 
 
 @router.post("/authorize", response_model=AuthorizeResponse)
-async def authorize(workspace_id: WorkspaceId, client: Client, cipher: Cipher) -> AuthorizeResponse:
+async def authorize(
+    workspace_id: PersonalWorkspaceId, client: Client, cipher: Cipher
+) -> AuthorizeResponse:
     state = cipher.sign_state(workspace_id)
     url = client.authorize_url(state=state, redirect_uri=get_settings().linkedin_redirect_uri)
     return AuthorizeResponse(url=url)
@@ -75,7 +91,7 @@ async def authorize(workspace_id: WorkspaceId, client: Client, cipher: Cipher) -
 @router.post("/connect", response_model=LinkedInStatus)
 async def connect(
     request: ConnectRequest,
-    workspace_id: WorkspaceId,
+    workspace_id: PersonalWorkspaceId,
     store: Store,
     client: Client,
     cipher: Cipher,
@@ -106,7 +122,7 @@ async def connect(
 @router.patch("", response_model=LinkedInStatus)
 async def set_auto_publish(
     request: AutoPublishRequest,
-    workspace_id: WorkspaceId,
+    workspace_id: PersonalWorkspaceId,
     store: Store,
     settings_store: SettingsStore,
 ) -> LinkedInStatus:
@@ -138,7 +154,7 @@ async def disconnect(
 
 @router.post("/posts/{post_id}/publish", response_model=PublishResponse)
 async def publish_now(
-    post_id: UUID, workspace_id: WorkspaceId, store: Store, client: Client, cipher: Cipher
+    post_id: UUID, workspace_id: PersonalWorkspaceId, store: Store, client: Client, cipher: Cipher
 ) -> PublishResponse:
     try:
         url = await publish_post(

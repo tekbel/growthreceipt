@@ -9,6 +9,7 @@ export type LinkedInStatus = {
   expires_at: string | null;
   expired: boolean;
   auto_publish: boolean;
+  can_connect: boolean;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
