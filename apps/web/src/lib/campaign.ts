@@ -80,9 +80,9 @@ export const exampleBrief: CampaignBrief = {
   product_name: "LaunchCheck",
   product_icon_url: "/products/launchcheck.svg",
   product_description:
-    "Checks a public page and finds launch problems in speed, SEO and page structure, with clear fixes for indie builders.",
-  audience: "Indie builders and small teams about to launch a product page.",
-  objective: "Sell the 10 scan pack to builders preparing a launch",
+    "Scans a launch page for speed, SEO and structure issues, then explains practical fixes in plain English.",
+  audience: "Indie builders and small teams getting ready to launch.",
+  objective: "Encourage builders to purchase the 10 scan pack before launch.",
   channels: ["LinkedIn", "X", "Instagram"],
   days: 7,
   brand_voice: "Direct, practical, encouraging",
