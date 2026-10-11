@@ -14,6 +14,7 @@ import {
   FileText,
   FlaskConical,
   LayoutDashboard,
+  Lock,
   Menu,
   Moon,
   Network,
@@ -59,6 +60,13 @@ import {
   postDate,
   scheduleRange,
 } from "@/lib/campaign";
+import {
+  allTimeZones,
+  browserTimeZone,
+  formatMoment,
+  timeZoneLabel,
+  workspaceHour,
+} from "@/lib/time";
 
 const views = [
   "today",
@@ -210,6 +218,8 @@ export type WorkspaceIdentity = {
   mode: "local" | "judge" | "user";
   displayName: string;
   isAnonymous: boolean;
+  /** Null follows the viewer's browser time zone. */
+  timezone: string | null;
 };
 
 function statusFor(post: Post): ReviewStatus {
@@ -218,10 +228,12 @@ function statusFor(post: Post): ReviewStatus {
 
 export function CampaignWorkspace({
   identity,
+  onIdentityChange,
   onSignOut,
   onResetDemo,
 }: {
   identity: WorkspaceIdentity;
+  onIdentityChange?: (update: Pick<WorkspaceIdentity, "displayName" | "timezone">) => void;
   onSignOut?: () => Promise<void>;
   onResetDemo?: () => Promise<void>;
 }) {
@@ -888,7 +900,7 @@ export function CampaignWorkspace({
       case "integrations":
         return <IntegrationsPage navigate={navigate} />;
       case "settings":
-        return <SettingsPage notify={notify} />;
+        return <SettingsPage notify={notify} onSaved={onIdentityChange} />;
       case "checkout":
         return (
           <CheckoutPage
@@ -1530,12 +1542,8 @@ function TodayPage({
   useEffect(() => {
     const now = new Date();
     setClock({
-      date: new Intl.DateTimeFormat("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      }).format(now),
-      greeting: greetingFor(now.getHours()),
+      date: formatMoment(now, { weekday: "long", day: "numeric", month: "long" }),
+      greeting: greetingFor(workspaceHour(now)),
     });
   }, []);
   const attention = campaign.posts.filter((post) => post.status !== "approved").slice(0, 3);
@@ -1725,12 +1733,7 @@ function TodayResultCard({
   );
   // A recommendation belongs to this purchase only if the agent made it after the money arrived.
   const fresh = move && new Date(move.at) >= new Date(latest.captured_at) ? recommendation : null;
-  const captured = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(latest.captured_at));
+  const captured = formatMoment(latest.captured_at);
   return (
     <section className="result-card" aria-labelledby="result-card-title">
       <div className="result-card-payment">
@@ -2420,12 +2423,6 @@ function ActivityPanel({ campaign }: { campaign: Campaign }) {
   }, [campaign]);
 
   const days = new Map(campaign.posts.map((post) => [post.id, post.day]));
-  const time = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
   return (
     <section className="activity-panel" aria-label="Campaign activity">
       <div className="column-heading">
@@ -2441,7 +2438,7 @@ function ActivityPanel({ campaign }: { campaign: Campaign }) {
               {eventLabels[event.action] ?? event.action}
               {event.post_id && days.has(event.post_id) ? ` · day ${days.get(event.post_id)}` : ""}
             </strong>
-            <time dateTime={event.created_at}>{time.format(new Date(event.created_at))}</time>
+            <time dateTime={event.created_at}>{formatMoment(event.created_at)}</time>
           </li>
         ))}
       </ol>
@@ -2879,14 +2876,7 @@ function ResultsPage({
                   const post = campaign.posts.find((entry) => entry.id === item.content_id);
                   return (
                     <li key={item.order_id}>
-                      <time dateTime={item.captured_at}>
-                        {new Intl.DateTimeFormat("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }).format(new Date(item.captured_at))}
-                      </time>
+                      <time dateTime={item.captured_at}>{formatMoment(item.captured_at)}</time>
                       <span>{post ? `Day ${post.day} · ${post.channel}` : "Campaign post"}</span>
                       <code>{item.order_id}</code>
                       <strong>{formatMoney(item.amount, item.currency)}</strong>
@@ -3352,56 +3342,159 @@ function IntegrationsPage({ navigate }: { navigate: (view: View) => void }) {
   );
 }
 
-function SettingsPage({ notify }: { notify: (message: string) => void }) {
+type WorkspaceSettings = { name: string; timezone: string | null };
+
+/** Zones grouped by region, so the long list reads like a directory. */
+function timeZoneGroups(): [string, string[]][] {
+  const groups = new Map<string, string[]>();
+  for (const zone of allTimeZones()) {
+    const region = zone.includes("/") ? zone.split("/")[0] : "Other";
+    groups.set(region, [...(groups.get(region) ?? []), zone]);
+  }
+  return [...groups];
+}
+
+function SettingsPage({
+  notify,
+  onSaved,
+}: {
+  notify: (message: string) => void;
+  onSaved?: (update: Pick<WorkspaceIdentity, "displayName" | "timezone">) => void;
+}) {
+  const [settings, setSettings] = useState<WorkspaceSettings | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const zones = useMemo(timeZoneGroups, []);
+  const browserZone = useMemo(browserTimeZone, []);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/v1/workspace/settings")
+      .then((response) => {
+        if (!response.ok) throw new Error();
+        return response.json() as Promise<WorkspaceSettings>;
+      })
+      .then((loaded) => active && setSettings(loaded))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const response = await apiFetch("/v1/workspace/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      });
+      if (!response.ok) throw new Error();
+      const saved = (await response.json()) as WorkspaceSettings;
+      setSettings(saved);
+      onSaved?.({ displayName: saved.name, timezone: saved.timezone });
+      notify("Workspace settings saved.");
+    } catch {
+      notify("Settings could not be saved. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const previewZone = settings?.timezone ?? browserZone;
   return (
     <>
       <PageHeader
         eyebrow="System"
         title="Settings"
-        description="Workspace defaults for review, publishing, and measurement."
+        description="Your workspace name, the time zone for every date and time, and the rules that keep you in control."
       />
-      <form
-        className="settings-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          notify("Workspace settings saved.");
-        }}
-      >
-        <fieldset>
+      {failed ? (
+        <p className="inline-error" role="alert">
+          Settings could not be loaded. Refresh the page to try again.
+        </p>
+      ) : null}
+      <form className="settings-form" onSubmit={save} aria-busy={!settings && !failed}>
+        <fieldset disabled={!settings || saving}>
           <legend>Workspace</legend>
           <label htmlFor="workspace-name">Workspace name</label>
-          <input id="workspace-name" defaultValue="GrowthReceipt demo" />
-          <label htmlFor="timezone">Timezone</label>
-          <select id="timezone" defaultValue="Europe/Stockholm">
-            <option value="Europe/Stockholm">Europe / Stockholm</option>
-            <option value="UTC">UTC</option>
+          <input
+            id="workspace-name"
+            maxLength={60}
+            required
+            value={settings?.name ?? ""}
+            onChange={(event) =>
+              setSettings((current) => current && { ...current, name: event.target.value })
+            }
+          />
+          <label htmlFor="timezone">Time zone</label>
+          <select
+            id="timezone"
+            value={settings?.timezone ?? ""}
+            onChange={(event) =>
+              setSettings(
+                (current) => current && { ...current, timezone: event.target.value || null },
+              )
+            }
+          >
+            <option value="">Use my browser time zone ({timeZoneLabel(browserZone)})</option>
+            {zones.map(([region, list]) => (
+              <optgroup key={region} label={region}>
+                {list.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {timeZoneLabel(zone)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
+          <small className="settings-hint">
+            Times read like this: {formatPreview(previewZone)}. Payments, agent runs and activity
+            all follow this zone.
+          </small>
         </fieldset>
         <fieldset>
           <legend>Approval</legend>
-          <label className="check-row">
-            <input type="checkbox" defaultChecked />
+          <div className="policy-row">
+            <Lock aria-hidden="true" />
             <span>
-              <strong>Require approval before publishing</strong>
+              <strong>Nothing goes out without your approval</strong>
               <small>
-                GrowthReceipt will never publish campaign content without a human decision.
+                The agent drafts, revises and recommends. It cannot publish. A post gets a working
+                buy link only after you approve it.
               </small>
             </span>
-          </label>
-          <label className="check-row">
-            <input type="checkbox" defaultChecked />
+            <em>Always on</em>
+          </div>
+          <div className="policy-row">
+            <Lock aria-hidden="true" />
             <span>
-              <strong>Keep verified and estimated results separate</strong>
-              <small>Anything unverified is always clearly labelled.</small>
+              <strong>Revenue counts only payments PayPal captured</strong>
+              <small>
+                Each purchase is marked verified once the PayPal webhook confirms the capture.
+                Nothing is estimated.
+              </small>
             </span>
-          </label>
+            <em>Always on</em>
+          </div>
         </fieldset>
-        <button className="button dark" type="submit">
-          Save settings
+        <button className="button dark" type="submit" disabled={!settings || saving}>
+          {saving ? "Saving" : "Save settings"}
         </button>
       </form>
     </>
   );
+}
+
+function formatPreview(zone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: zone,
+  }).format(new Date());
 }
 
 function buyLink(contentId: string) {

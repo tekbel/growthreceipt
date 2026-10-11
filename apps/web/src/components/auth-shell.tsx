@@ -15,6 +15,7 @@ import { SiPaypal } from "react-icons/si";
 import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
+import { setWorkspaceTimeZone } from "@/lib/time";
 
 type AuthState = "loading" | "signed-out" | "bootstrapping" | "ready" | "error";
 
@@ -24,6 +25,7 @@ export function AuthShell() {
     mode: "local",
     displayName: "Workspace owner",
     isAnonymous: true,
+    timezone: null,
   });
   const [email, setEmail] = useState("");
   const [emailSent, setEmailSent] = useState(false);
@@ -57,11 +59,14 @@ export function AuthShell() {
         mode: WorkspaceIdentity["mode"];
         display_name: string;
         is_anonymous: boolean;
+        timezone: string | null;
       };
+      setWorkspaceTimeZone(workspace.timezone);
       setIdentity({
         mode: workspace.mode,
         displayName: workspace.display_name,
         isAnonymous: workspace.is_anonymous,
+        timezone: workspace.timezone,
       });
       setError(null);
       setState("ready");
@@ -175,8 +180,14 @@ export function AuthShell() {
     window.location.reload();
   }
 
+  // Settings saves update the name and time zone everywhere without a reload.
+  function updateIdentity(update: Pick<WorkspaceIdentity, "displayName" | "timezone">) {
+    setWorkspaceTimeZone(update.timezone);
+    setIdentity((current) => ({ ...current, ...update }));
+  }
+
   if (!supabaseConfigured) {
-    return <CampaignWorkspace identity={identity} />;
+    return <CampaignWorkspace identity={identity} onIdentityChange={updateIdentity} />;
   }
   if (state === "loading" || state === "bootstrapping") {
     return (
@@ -366,6 +377,7 @@ export function AuthShell() {
   return (
     <CampaignWorkspace
       identity={identity}
+      onIdentityChange={updateIdentity}
       onSignOut={signOut}
       onResetDemo={identity.mode === "judge" ? resetJudgeDemo : undefined}
     />

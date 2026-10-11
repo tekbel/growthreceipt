@@ -69,6 +69,7 @@ The tunnel always uses `https://justify-usual-twirl.ngrok-free.dev/v1/paypal/web
 - `POST /v1/agents/next-action/decision` records the founder approving, editing or rejecting the latest next move. Nothing runs without it.
 - `GET /v1/paypal/receipts/{campaign_id}` returns each completed purchase with its post, order and capture IDs, and the signature verified PayPal webhooks that match it.
 - `POST /v1/agents/next-action` loads the stored campaign, turns normalized PayPal revenue into one approval-gated experiment, and records it in the campaign history.
+- `GET /v1/workspace/settings` and `PATCH /v1/workspace/settings` read and save the workspace name and time zone. The time zone must be a known IANA zone, and null follows each viewer's browser.
 
 Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tests use an explicit fake adapter. The application never treats placeholder credentials or fake responses as payments.
 

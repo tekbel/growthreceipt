@@ -4,6 +4,7 @@ import { Bot, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { type Campaign, type CampaignEvent, campaignApi } from "@/lib/campaign";
+import { formatMoment } from "@/lib/time";
 
 type Run = {
   id: number;
@@ -17,13 +18,6 @@ type Run = {
 };
 
 type PaidPost = { day: number; channel: string; theme: string; revenue: string };
-
-const stamp = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
@@ -171,7 +165,7 @@ export function AgentRuns({ campaign, refreshKey }: { campaign: Campaign; refres
                 <span className="agent-run-title">
                   <strong>{run.title}</strong>
                   <small>
-                    <time dateTime={run.at}>{stamp.format(new Date(run.at))}</time>
+                    <time dateTime={run.at}>{formatMoment(run.at)}</time>
                     {run.meta.map((item) => (
                       <span key={item}> · {item}</span>
                     ))}

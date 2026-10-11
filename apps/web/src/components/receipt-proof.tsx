@@ -4,6 +4,7 @@ import { ArrowRight, Check, ChevronDown, Clock, ShieldCheck } from "lucide-react
 import { type ReactNode, useEffect, useState } from "react";
 
 import type { Post } from "@/lib/campaign";
+import { formatMoment } from "@/lib/time";
 
 export type WebhookProof = {
   event_id: string;
@@ -30,20 +31,20 @@ const webhookLabels: Record<string, string> = {
   "PAYMENT.CAPTURE.COMPLETED": "PayPal confirmed the payment",
 };
 
-const stamp = new Intl.DateTimeFormat("en-GB", {
+const stampOptions: Intl.DateTimeFormatOptions = {
   day: "numeric",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
-});
+};
 
 function money(amount: number | string, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount));
 }
 
 function at(value: string): string {
-  return stamp.format(new Date(value));
+  return formatMoment(value, stampOptions);
 }
 
 /** A recommendation counts for a purchase only when the agent made it after the money arrived. */

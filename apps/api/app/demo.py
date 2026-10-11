@@ -103,6 +103,15 @@ async def seed_judge_workspace(
             text("delete from growthreceipt.campaigns where workspace_id = :workspace_id"),
             {"workspace_id": workspace_id},
         )
+        # A reset demo starts with its original name and the viewer's own time zone.
+        await session.execute(
+            text(
+                "update growthreceipt.workspaces "
+                "set name = 'Judge demo', settings = settings - 'timezone' "
+                "where id = :workspace_id"
+            ),
+            {"workspace_id": workspace_id},
+        )
     existing = await session.scalar(
         text(
             """

@@ -24,6 +24,7 @@ class WorkspaceSession(BaseModel):
     mode: WorkspaceMode
     display_name: str
     is_anonymous: bool
+    timezone: str | None = None
 
 
 @router.post("/bootstrap", response_model=WorkspaceSession)
@@ -43,7 +44,8 @@ async def bootstrap_workspace(
             await session.execute(
                 text(
                     """
-                    select id, name, coalesce(settings->>'kind', 'user') as mode
+                    select id, name, coalesce(settings->>'kind', 'user') as mode,
+                           settings->>'timezone' as timezone
                     from growthreceipt.workspaces
                     where created_by_user_id = :user_id
                     """
@@ -53,6 +55,7 @@ async def bootstrap_workspace(
         ).one_or_none()
         if row is None:
             mode: WorkspaceMode = "judge" if actor.is_anonymous else "user"
+            timezone = None
             name = "Judge demo" if actor.is_anonymous else "My workspace"
             workspace_id = await session.scalar(
                 text(
@@ -84,11 +87,13 @@ async def bootstrap_workspace(
             workspace_id = row.id
             name = row.name
             mode = cast(WorkspaceMode, row.mode)
+            timezone = row.timezone
     return WorkspaceSession(
         workspace_id=workspace_id,
         mode=mode,
         display_name=name,
         is_anonymous=actor.is_anonymous,
+        timezone=timezone,
     )
 
 
