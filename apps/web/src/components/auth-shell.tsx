@@ -272,6 +272,10 @@ export function AuthShell() {
                 <strong>Teams and agencies.</strong> Many products in one workspace, compared by the
                 revenue each post earned.
               </li>
+              <li>
+                <strong>Pay when it pays.</strong> Free to start, with a 3% fee on verified revenue
+                collected through PayPal. Plans from $19 a month remove the fee.
+              </li>
             </ul>
           </section>
         </section>
