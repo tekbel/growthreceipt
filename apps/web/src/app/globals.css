@@ -431,6 +431,20 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .toast button:hover { background: color-mix(in srgb, var(--canvas) 12%, transparent); }
 
 .buy-page { min-height: 100dvh; display: grid; place-items: center; padding: 32px 24px; background: var(--canvas); }
+.auth-legal { display: inline-block; margin-top: 20px; color: var(--muted); font-size: var(--type-xs); text-decoration: underline; text-underline-offset: 3px; }
+.auth-legal:hover { color: var(--ink); }
+.legal-page { min-height: 100dvh; padding: 56px 24px 80px; background: var(--canvas); }
+.legal-article { max-width: 42rem; margin: 0 auto; color: var(--ink-soft); font-size: var(--type-md); line-height: 1.65; }
+.legal-home { display: inline-block; margin-bottom: 40px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.legal-home:hover { color: var(--accent-strong); }
+.legal-article h1 { margin: 0; color: var(--ink); font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; }
+.legal-updated { margin: 8px 0 32px; color: var(--muted); font-size: var(--type-sm); }
+.legal-article h2 { margin: 40px 0 8px; color: var(--ink); font-size: var(--type-lg); font-weight: 600; letter-spacing: -.01em; }
+.legal-article h3 { margin: 20px 0 4px; color: var(--ink); font-size: var(--type-md); font-weight: 600; }
+.legal-article p { margin: 0 0 12px; }
+.legal-article ul { margin: 0 0 12px; padding-left: 20px; }
+.legal-article li { margin-bottom: 6px; }
+.legal-article p a { color: var(--accent); }
 .buy-unavailable { max-width: 28rem; padding: 32px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); }
 .buy-unavailable h1 { margin: 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; }
 .buy-unavailable p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
@@ -598,6 +612,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .checkout-preview-card > div { padding: 30px 24px; }
   .checkout-preview-card ul { margin-top: 36px; }
   .buy-page { padding: 0; }
+  .legal-page { padding: 32px 16px 56px; }
   .buy-unavailable { margin-inline: 16px; padding: 24px; }
   .checkout-dialog { width: 100%; min-height: 100dvh; grid-template-columns: 1fr; border: 0; border-radius: 0; box-shadow: none; }
   .checkout-product { min-height: 360px; padding: 35px 25px; }

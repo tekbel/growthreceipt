@@ -265,8 +265,8 @@ export function AuthShell() {
                 same verified webhooks, so the agent learns what keeps customers.
               </li>
               <li>
-                <strong>Real publishing.</strong> Approved posts go out to LinkedIn and X, each with
-                its own buy link.
+                <strong>More publishing.</strong> Approved posts go out to X and Facebook the way
+                they already do on LinkedIn, each with its own buy link.
               </li>
               <li>
                 <strong>Teams and agencies.</strong> Many products in one workspace, compared by the
@@ -370,6 +370,9 @@ export function AuthShell() {
               {error}
             </p>
           ) : null}
+          <a className="auth-legal" href="/privacy">
+            Privacy policy
+          </a>
         </section>
       </main>
     );
