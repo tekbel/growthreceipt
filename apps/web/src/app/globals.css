@@ -892,7 +892,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .judge-bar .info-tip { margin-left: 2px; }
 @media (max-width: 900px) {
   html, body { overflow-x: clip; }
-  .mobile-close { width: 44px; height: 44px; }
+  .mobile-close { width: 44px; height: 44px; flex: 0 0 44px; }
   .mobile-menu { width: 44px; height: 44px; }
   .topbar-actions .topbar-avatar { width: 36px; height: 36px; }
   .post-preview-region { scroll-margin-top: 72px; }
