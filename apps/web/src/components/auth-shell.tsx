@@ -206,7 +206,8 @@ export function AuthShell() {
             <span className="eyebrow">Welcome</span>
             <h2 id="sign-in-title">Open your workspace</h2>
             <p>
-              Explore the complete demo without creating an account, or sign in to keep your work.
+              A 90 second proof. Approve a post, buy it through PayPal sandbox, and watch the
+              payment change the next recommendation. No account needed.
             </p>
           </div>
           <button

@@ -708,6 +708,9 @@ export function CampaignWorkspace({
           notify={notify}
           identity={identity}
         />
+        {identity.mode === "judge" && onResetDemo ? (
+          <JudgeBar onReset={onResetDemo} notify={notify} />
+        ) : null}
         <main className="page-shell" key={loadState === "ready" ? view : loadState}>
           {renderPage()}
         </main>
@@ -890,6 +893,61 @@ function NavigationGroup({
         ))}
       </nav>
     </div>
+  );
+}
+
+function JudgeBar({
+  onReset,
+  notify,
+}: {
+  onReset: () => Promise<void>;
+  notify: (message: string) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  async function reset() {
+    setResetting(true);
+    try {
+      await onReset();
+    } catch {
+      notify("The judge demo could not be reset.");
+      setResetting(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <section className="judge-bar" aria-label="Judge demo">
+      <span className="status-tag review">Judge demo</span>
+      <p>PayPal sandbox. No real money moves.</p>
+      {confirming ? (
+        <div className="judge-bar-actions">
+          <span>Start over with the seeded campaign and no purchases?</span>
+          <button
+            className="text-button"
+            type="button"
+            disabled={resetting}
+            aria-busy={resetting}
+            onClick={() => void reset()}
+          >
+            {resetting ? "Resetting" : "Reset"}
+          </button>
+          <button
+            className="text-button muted"
+            type="button"
+            disabled={resetting}
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button className="text-button" type="button" onClick={() => setConfirming(true)}>
+          Reset demo
+        </button>
+      )}
+    </section>
   );
 }
 

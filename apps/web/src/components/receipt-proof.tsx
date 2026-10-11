@@ -96,20 +96,32 @@ export function ReceiptChain({
         <ChainStep label="Signal" done>
           <span>{signal}</span>
         </ChainStep>
-        <ChainStep label="Next move" done={Boolean(fresh)}>
+        <ChainStep label="Next move" done={Boolean(fresh)} active={!fresh}>
           {fresh ? (
             <strong>{fresh.headline}</strong>
           ) : (
-            <button
-              className="text-button"
-              type="button"
-              disabled={moveLoading}
-              aria-busy={moveLoading}
-              onClick={onFindNextMove}
-            >
-              {moveLoading ? "Reviewing results" : "Find next move"}
-              <ArrowRight aria-hidden="true" />
-            </button>
+            <>
+              <span>This purchase is ready for the agent to learn from.</span>
+              <button
+                className="button accent small receipt-cta"
+                type="button"
+                disabled={moveLoading}
+                aria-busy={moveLoading}
+                onClick={onFindNextMove}
+              >
+                {moveLoading ? (
+                  <>
+                    <span className="spinner" aria-hidden="true" />
+                    Reviewing results
+                  </>
+                ) : (
+                  <>
+                    Find next move
+                    <ArrowRight aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </>
           )}
         </ChainStep>
         <ChainStep label="Your decision" done={Boolean(fresh?.decision)}>
@@ -139,14 +151,16 @@ export function ReceiptChain({
 function ChainStep({
   label,
   done,
+  active = false,
   children,
 }: {
   label: string;
   done: boolean;
+  active?: boolean;
   children: ReactNode;
 }) {
   return (
-    <li className={done ? "done" : undefined}>
+    <li className={done ? "done" : active ? "active" : undefined}>
       <span className="receipt-marker" aria-hidden="true">
         {done ? <Check /> : null}
       </span>
