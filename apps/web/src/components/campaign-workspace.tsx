@@ -1080,7 +1080,7 @@ function JudgeBar({
       <span className="status-tag review">Judge demo</span>
       <p>
         PayPal sandbox. No real money moves.
-        <InfoTip label="About the judge demo">
+        <InfoTip label="About the judge demo" align="end">
           This workspace is yours alone and is seeded with a sample campaign. Purchases use PayPal
           sandbox accounts, and every agent run is a real model call.
         </InfoTip>
@@ -2273,7 +2273,15 @@ function ContentPage({
                   className={`queue-item reveal ${post.id === selected.id ? "selected" : ""}`}
                   style={{ "--i": index } as React.CSSProperties}
                   aria-pressed={post.id === selected.id}
-                  onClick={() => selectPost(post.id)}
+                  onClick={() => {
+                    selectPost(post.id);
+                    // On narrow screens the preview sits below the list, so bring it into view.
+                    if (window.matchMedia("(max-width: 900px)").matches) {
+                      document
+                        .querySelector(".post-preview-region")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
                   key={post.id}
                 >
                   <span className={`status-tag ${statusClass(status)}`}>{status}</span>

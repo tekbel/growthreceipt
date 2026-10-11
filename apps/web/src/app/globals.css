@@ -881,3 +881,27 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .search-option svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--accent-strong); }
 .search-empty { margin: 0; padding: 14px 10px; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
 @media (max-width: 640px) { .search-box .topbar-search { width: min(200px, 50vw); } .search-results { position: fixed; top: 64px; left: 16px; right: 16px; width: auto; } }
+
+/* Phone and tablet fixes from the responsive audit. */
+.post-row-body strong { display: block; }
+.post-row-body strong svg { display: inline-block; margin-right: 7px; vertical-align: -2px; }
+.section-title button { min-height: 44px; }
+.info-tip-button { position: relative; }
+.info-tip-button::before { content: ""; position: absolute; inset: -8px; }
+.tip { max-width: min(280px, calc(100vw - 32px)); }
+.judge-bar .info-tip { margin-left: 2px; }
+@media (max-width: 900px) {
+  html, body { overflow-x: clip; }
+  .mobile-close { width: 44px; height: 44px; }
+  .mobile-menu { width: 44px; height: 44px; }
+  .topbar-actions .topbar-avatar { width: 36px; height: 36px; }
+  .post-preview-region { scroll-margin-top: 72px; }
+  /* Progress fits the screen. Every step keeps its mark, only the current one keeps its label. */
+  .campaign-ribbon, .focus-card .campaign-ribbon { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; overflow: visible; scroll-snap-type: none; }
+  .campaign-ribbon::after { display: none; }
+  .campaign-ribbon > div { min-width: 0; min-height: 52px; flex: 0 0 auto; }
+  .campaign-ribbon > div.current { flex: 1 1 auto; }
+  .campaign-ribbon > div:not(:last-child)::after { display: none; }
+  .campaign-ribbon > div:not(.current) .step-copy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .filter-row { flex-wrap: wrap; margin-right: 0; overflow: visible; padding-right: 0; }
+}
