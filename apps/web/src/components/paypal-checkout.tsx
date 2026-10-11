@@ -68,6 +68,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
   const [offer, setOffer] = useState<PublicOffer | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [founderPreview, setFounderPreview] = useState(false);
+  const [iconFailed, setIconFailed] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState("Preparing secure checkout…");
   const [error, setError] = useState<string | null>(null);
@@ -229,7 +230,13 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
       <section className="checkout-dialog" aria-labelledby="checkout-title">
         <div className="checkout-product">
           <div className="checkout-product-mark" aria-hidden="true">
-            {productName[0]?.toUpperCase()}
+            {/* The founder's uploaded icon when there is one, otherwise the first letter. */}
+            {offer?.product_icon_url && !iconFailed ? (
+              // biome-ignore lint/performance/noImgElement: icons can be any uploaded URL, so next/image is not used.
+              <img src={offer.product_icon_url} alt="" onError={() => setIconFailed(true)} />
+            ) : (
+              productName[0]?.toUpperCase()
+            )}
           </div>
           <div>
             <span className="checkout-label">{productName}</span>

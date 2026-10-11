@@ -905,3 +905,5 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .campaign-ribbon > div:not(.current) .step-copy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .filter-row { flex-wrap: wrap; margin-right: 0; overflow: visible; padding-right: 0; }
 }
+.checkout-product-mark { overflow: hidden; }
+.checkout-product-mark img { width: 100%; height: 100%; object-fit: cover; }
