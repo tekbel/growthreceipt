@@ -29,6 +29,8 @@ export type Post = {
   call_to_action: string;
   status: PostStatus;
   review_note: string | null;
+  published_at?: string | null;
+  published_url?: string | null;
 };
 
 export type Campaign = {
@@ -157,6 +159,7 @@ export const campaignApi = {
       throw error;
     }
   },
+  get: (campaignId: string) => request<Campaign>(`/v1/campaigns/${campaignId}`),
   create: (brief: CampaignBrief) =>
     request<Campaign>("/v1/campaigns", { method: "POST", body: JSON.stringify(brief) }),
   streamCreate,

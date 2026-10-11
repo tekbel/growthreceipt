@@ -242,7 +242,7 @@ class PostgresCampaignStore:
                         """
                         select post.id, post.day, post.channel, post.theme, post.content,
                                post.call_to_action, post.status::text as status,
-                               post.review_note
+                               post.review_note, post.published_at, post.published_url
                         from growthreceipt.campaign_posts post
                         join growthreceipt.campaigns campaign on campaign.id = post.campaign_id
                         where post.id = :post_id
@@ -474,7 +474,7 @@ class PostgresCampaignStore:
             text(
                 """
                 select id, day, channel, theme, content, call_to_action,
-                       status::text as status, review_note
+                       status::text as status, review_note, published_at, published_url
                 from growthreceipt.campaign_posts
                 where campaign_id = :campaign_id
                 order by day, created_at

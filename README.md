@@ -79,6 +79,27 @@ Approved posts also get **Publish on LinkedIn** or **Publish on X**. It opens th
 
 Approve a post, then select **Make a test purchase** or open **Customer checkout**. Each approved post has a public buy page at `/buy/{post id}` that needs no sign in. It loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the public API (`/v1/public/...`), captures it after approval, and shows the receipt. The server resolves the campaign from the post and refuses posts that are not approved. Use a Personal account from PayPal's Sandbox Accounts page. Set `PAYPAL_SANDBOX_BUYER_EMAIL` and `PAYPAL_SANDBOX_BUYER_PASSWORD` to show that login on the buy page, which is how judges pay on the hosted demo. The API only shares them in sandbox mode. No real money moves in sandbox mode.
 
+### LinkedIn publishing
+
+Founders can connect their own LinkedIn profile under Integrations. GrowthReceipt then posts approved LinkedIn posts, with their attributed buy link, either on a confirmed **Post to LinkedIn now** click or automatically on the post's scheduled day from 9:00 in the workspace time zone. Automatic posting only covers approved posts dated on or after the day it was turned on. Nothing in review is ever posted.
+
+It uses LinkedIn's self serve products, Sign In with LinkedIn using OpenID Connect and Share on LinkedIn (`openid profile w_member_social`), and posts through `POST https://api.linkedin.com/v2/ugcPosts`.
+
+- `GET /v1/integrations/linkedin` returns whether LinkedIn is configured and connected, the member name, token expiry and the auto publish choice.
+- `POST /v1/integrations/linkedin/authorize` returns the LinkedIn sign in URL with a signed state for this workspace.
+- `POST /v1/integrations/linkedin/connect` finishes the sign in. LinkedIn redirects to the web app at `/integrations/linkedin/callback`, and the signed in web app sends the code here, so a forged callback cannot attach a LinkedIn profile to another workspace.
+- `PATCH /v1/integrations/linkedin` turns automatic posting on or off. `DELETE /v1/integrations/linkedin` revokes the token and forgets it.
+- `POST /v1/integrations/linkedin/posts/{post_id}/publish` posts one approved, unpublished LinkedIn post. A published post can no longer be edited.
+
+Setup:
+
+1. Create an app at https://www.linkedin.com/developers/apps (it must be linked to a LinkedIn Page), then add the **Sign In with LinkedIn using OpenID Connect** and **Share on LinkedIn** products.
+2. Under Auth, add the redirect URLs `https://growthreceipt.addisstack.com/integrations/linkedin/callback` and `http://localhost:3001/integrations/linkedin/callback`.
+3. Run `supabase/migrations/20261011000100_linkedin_publishing.sql`.
+4. Set `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` and `LINKEDIN_TOKEN_KEY` on the API. Generate the key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. It encrypts stored tokens, so changing it means every workspace reconnects. `WEB_ORIGIN` must be the web app's address, because the redirect URL is built from it.
+
+Without these variables the Integrations page keeps the share link behaviour. LinkedIn access tokens last 60 days and self serve apps get no refresh token, so the founder reconnects when the Integrations page says the connection expired. The API checks for due posts every five minutes, and a claim column stops two replicas from posting the same item.
+
 ## Documents
 
 - [SPEC.md](./SPEC.md) defines the product, V1 scope, user stories, data model, API surface, agent contracts, security, analytics, and acceptance criteria.

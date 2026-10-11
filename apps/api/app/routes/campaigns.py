@@ -131,6 +131,11 @@ async def update_post(
     store: Store,
     workspace_id: WorkspaceId,
 ) -> Campaign:
+    campaign = _found(await store.get(workspace_id=workspace_id, campaign_id=campaign_id))
+    post = next((item for item in campaign.posts if item.id == post_id), None)
+    if post is not None and post.published_at is not None:
+        # The live post would no longer match the record of what went out.
+        raise HTTPException(status_code=409, detail="This post is already published on LinkedIn")
     return _found(
         await store.update_post(
             workspace_id=workspace_id,

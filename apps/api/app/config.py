@@ -34,6 +34,21 @@ class Settings(BaseSettings):
     agent_runs_per_workspace_day: int = 20
     agent_runs_per_day: int = 300
     demo_workspace_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    linkedin_client_id: str | None = None
+    linkedin_client_secret: SecretStr | None = None
+    # A Fernet key. It encrypts stored LinkedIn tokens and signs the OAuth state.
+    linkedin_token_key: SecretStr | None = None
+    linkedin_publish_interval_seconds: int = 300
+
+    @property
+    def linkedin_configured(self) -> bool:
+        return bool(
+            self.linkedin_client_id and self.linkedin_client_secret and self.linkedin_token_key
+        )
+
+    @property
+    def linkedin_redirect_uri(self) -> str:
+        return f"{str(self.web_origin).rstrip('/')}/integrations/linkedin/callback"
 
 
 @lru_cache

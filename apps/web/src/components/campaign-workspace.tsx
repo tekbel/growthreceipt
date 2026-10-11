@@ -60,6 +60,7 @@ import {
   postDate,
   scheduleRange,
 } from "@/lib/campaign";
+import { type LinkedInStatus, linkedinApi, takeLinkedInCallback } from "@/lib/linkedin";
 import { shareTarget, shareText, xLength } from "@/lib/share";
 import {
   allTimeZones,
@@ -201,6 +202,8 @@ const eventLabels: Record<string, string> = {
   next_action_rejected: "Next move rejected",
   follow_up_drafted: "Post drafted from the approved next move",
   post_revised: "Post revised by the agent from your note",
+  post_published: "Published on LinkedIn",
+  publish_failed: "LinkedIn publishing failed",
 };
 
 const draftSteps: [DraftStage, string][] = [
@@ -309,6 +312,36 @@ export function CampaignWorkspace({
   useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
+
+  const [linkedin, setLinkedin] = useState<LinkedInStatus | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per workspace load.
+  useEffect(() => {
+    let active = true;
+    const callback = takeLinkedInCallback();
+    // Finish a sign in that LinkedIn just sent back, otherwise load the current status.
+    const load =
+      callback?.code && callback.state
+        ? linkedinApi.connect(callback.code, callback.state).then((status) => {
+            notify(`LinkedIn connected as ${status.member_name || "your profile"}.`);
+            return status;
+          })
+        : linkedinApi.status();
+    if (callback?.error) notify(`LinkedIn was not connected. ${callback.error}`);
+    load
+      .catch((reason: unknown) => {
+        if (callback?.code) notify(reason instanceof Error ? reason.message : "LinkedIn failed.");
+        return linkedinApi.status();
+      })
+      .then((status) => active && setLinkedin(status))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const refreshCampaign = useCallback(async () => {
+    if (campaign) setCampaign(await campaignApi.get(campaign.id));
+  }, [campaign]);
 
   useEffect(() => {
     const syncView = () => setView(viewFromHash() ?? "today");
@@ -827,6 +860,8 @@ export function CampaignWorkspace({
             campaign={campaign}
             openCheckout={() => (selected ? openBuyPage(selected.id) : navigate("checkout"))}
             notify={notify}
+            linkedin={linkedin}
+            onPublished={refreshCampaign}
             counts={counts}
             posts={filteredPosts}
             filter={filter}
@@ -900,7 +935,14 @@ export function CampaignWorkspace({
           />
         );
       case "integrations":
-        return <IntegrationsPage navigate={navigate} />;
+        return (
+          <IntegrationsPage
+            navigate={navigate}
+            linkedin={linkedin}
+            setLinkedin={setLinkedin}
+            notify={notify}
+          />
+        );
       case "settings":
         return <SettingsPage notify={notify} onSaved={onIdentityChange} />;
       case "checkout":
@@ -2468,10 +2510,14 @@ function ContentPage({
   setEditingBody,
   openCheckout,
   notify,
+  linkedin,
+  onPublished,
 }: {
   campaign: Campaign;
   openCheckout: () => void;
   notify: (message: string) => void;
+  linkedin: LinkedInStatus | null;
+  onPublished: () => Promise<void>;
   counts: Record<Filter, number>;
   posts: Post[];
   filter: Filter;
@@ -2604,6 +2650,8 @@ function ContentPage({
           saveEdits={saveEdits}
           openCheckout={openCheckout}
           notify={notify}
+          linkedin={linkedin}
+          onPublished={onPublished}
         />
       </section>
     </>
@@ -2624,6 +2672,8 @@ function ReviewActions({
   saveEdits,
   openCheckout,
   notify,
+  linkedin,
+  onPublished,
 }: {
   campaign: Campaign;
   post: Post;
@@ -2631,6 +2681,8 @@ function ReviewActions({
   saving: boolean;
   openCheckout: () => void;
   notify: (message: string) => void;
+  linkedin: LinkedInStatus | null;
+  onPublished: () => Promise<void>;
   approveCampaign: () => void;
   approvePost: () => void;
   requestChanges: (note: string) => Promise<boolean>;
@@ -2696,11 +2748,23 @@ function ReviewActions({
           </div>
         </form>
       ) : null}
+      {post.published_url ? (
+        <p className="published-note">
+          <Check aria-hidden="true" />
+          <span>
+            Published on LinkedIn
+            {post.published_at ? ` ${formatMoment(post.published_at)}` : ""}.{" "}
+            <a href={post.published_url} target="_blank" rel="noopener noreferrer">
+              View the post
+            </a>
+          </span>
+        </p>
+      ) : null}
       <div className="action-stack">
         <button
           className="button secondary"
           type="button"
-          disabled={saving}
+          disabled={saving || Boolean(post.published_url)}
           onClick={() => (editing ? void saveEdits() : startEditing())}
         >
           <PencilLine aria-hidden="true" /> {editing ? "Save edits" : "Edit post"}
@@ -2708,14 +2772,25 @@ function ReviewActions({
         <button
           className="button secondary"
           type="button"
-          disabled={saving || note !== null}
+          disabled={saving || note !== null || Boolean(post.published_url)}
           onClick={() => setNote("")}
         >
           <FileText aria-hidden="true" /> Request changes
         </button>
         {post.status === "approved" ? (
           <>
-            <PublishButton className="button secondary" post={post} notify={notify} />
+            {post.channel === "LinkedIn" && linkedin?.connected && !linkedin.expired ? (
+              post.published_url ? null : (
+                <LinkedInPostButton
+                  post={post}
+                  memberName={linkedin.member_name}
+                  notify={notify}
+                  onPublished={onPublished}
+                />
+              )
+            ) : (
+              <PublishButton className="button secondary" post={post} notify={notify} />
+            )}
             <TestPurchaseButton className="button accent" onClick={openCheckout} />
           </>
         ) : (
@@ -3315,7 +3390,17 @@ function ExperimentPage({
   );
 }
 
-function IntegrationsPage({ navigate }: { navigate: (view: View) => void }) {
+function IntegrationsPage({
+  navigate,
+  linkedin,
+  setLinkedin,
+  notify,
+}: {
+  navigate: (view: View) => void;
+  linkedin: LinkedInStatus | null;
+  setLinkedin: (status: LinkedInStatus) => void;
+  notify: (message: string) => void;
+}) {
   return (
     <>
       <PageHeader
@@ -3338,15 +3423,24 @@ function IntegrationsPage({ navigate }: { navigate: (view: View) => void }) {
           icon={<SiPosthog aria-hidden="true" />}
           status="Planned"
         />
-        {channels.map((channel) => (
-          <Integration
-            key={channel}
-            provider={channel}
-            description={channelIntegration[channel]}
-            icon={<ChannelIcon channel={channel} />}
-            status={channel === "Instagram" ? "Planned" : "Share link"}
-          />
-        ))}
+        {channels.map((channel) =>
+          channel === "LinkedIn" && linkedin?.configured ? (
+            <LinkedInIntegration
+              key={channel}
+              status={linkedin}
+              setStatus={setLinkedin}
+              notify={notify}
+            />
+          ) : (
+            <Integration
+              key={channel}
+              provider={channel}
+              description={channelIntegration[channel]}
+              icon={<ChannelIcon channel={channel} />}
+              status={channel === "Instagram" ? "Planned" : "Share link"}
+            />
+          ),
+        )}
       </section>
     </>
   );
@@ -3649,6 +3743,70 @@ function BusyLabel({ text, elapsed = false }: { text: string; elapsed?: boolean 
   );
 }
 
+/** Posts through the connected LinkedIn account after an explicit confirmation. */
+function LinkedInPostButton({
+  post,
+  memberName,
+  notify,
+  onPublished,
+}: {
+  post: Post;
+  memberName: string | null;
+  notify: (message: string) => void;
+  onPublished: () => Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [posting, setPosting] = useState(false);
+
+  async function publish() {
+    setPosting(true);
+    try {
+      await linkedinApi.publish(post.id);
+      await onPublished();
+      notify("Published on LinkedIn with its buy link.");
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : "LinkedIn could not be reached.");
+    } finally {
+      setPosting(false);
+      setConfirming(false);
+    }
+  }
+
+  if (!confirming)
+    return (
+      <button className="button secondary" type="button" onClick={() => setConfirming(true)}>
+        <FaLinkedinIn aria-hidden="true" /> Post to LinkedIn now
+      </button>
+    );
+  return (
+    <fieldset className="confirm-publish">
+      <legend className="visually-hidden">Confirm LinkedIn post</legend>
+      <p>
+        Post this publicly on LinkedIn as {memberName || "your profile"}, with its buy link? It
+        cannot be edited here afterwards.
+      </p>
+      <div>
+        <button
+          className="button dark"
+          type="button"
+          disabled={posting}
+          onClick={() => void publish()}
+        >
+          {posting ? "Posting" : "Post it"}
+        </button>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={posting}
+          onClick={() => setConfirming(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </fieldset>
+  );
+}
+
 /** Opens the channel's own composer with the post and its buy link. The founder presses Post. */
 function PublishButton({
   className,
@@ -3844,6 +4002,110 @@ function AgentSteps({
         {progress ? draftSteps[current]?.[1] : "Sending brief"}
       </p>
     </section>
+  );
+}
+
+function LinkedInIntegration({
+  status,
+  setStatus,
+  notify,
+}: {
+  status: LinkedInStatus;
+  setStatus: (status: LinkedInStatus) => void;
+  notify: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const live = status.connected && !status.expired;
+
+  async function run(action: () => Promise<LinkedInStatus | undefined>, done?: string) {
+    setBusy(true);
+    try {
+      const next = await action();
+      if (next) setStatus(next);
+      if (done) notify(done);
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : "LinkedIn could not be reached.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const connect = () =>
+    run(async () => {
+      const { url } = await linkedinApi.authorize();
+      window.location.assign(url);
+      return undefined;
+    });
+
+  return (
+    <article className="integration-row linkedin-row">
+      <span className="integration-icon">
+        <FaLinkedinIn aria-hidden="true" />
+      </span>
+      <div>
+        <h2>LinkedIn</h2>
+        <p>
+          {live
+            ? `Posting as ${status.member_name || "your profile"}. Access lasts until ${formatMoment(status.expires_at ?? "", { day: "numeric", month: "long", year: "numeric" })}, then reconnect.`
+            : status.expired
+              ? "The LinkedIn connection expired. Reconnect to keep posting."
+              : "Connect your profile to post approved posts directly or on their scheduled day. Until then, Publish opens the LinkedIn composer."}
+        </p>
+      </div>
+      <span className={`status-tag ${live ? "success" : "neutral"}`}>
+        {live ? "Connected" : status.expired ? "Expired" : "Not connected"}
+      </span>
+      {live ? (
+        <button
+          className="button secondary"
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              () => linkedinApi.disconnect(),
+              "LinkedIn disconnected. The access was revoked.",
+            )
+          }
+        >
+          Disconnect
+        </button>
+      ) : null}
+      {!live ? (
+        <button
+          className="button dark"
+          type="button"
+          disabled={busy}
+          onClick={() => void connect()}
+        >
+          {status.expired ? "Reconnect" : "Connect LinkedIn"}
+        </button>
+      ) : null}
+      {live ? (
+        <label className="check-row linkedin-auto">
+          <input
+            type="checkbox"
+            checked={status.auto_publish}
+            disabled={busy}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              void run(
+                () => linkedinApi.setAutoPublish(enabled),
+                enabled
+                  ? "Approved LinkedIn posts will go out on their scheduled day."
+                  : "Automatic posting is off.",
+              );
+            }}
+          />
+          <span>
+            <strong>Post approved LinkedIn posts on their scheduled day</strong>
+            <small>
+              Each one goes out from 9:00 in your workspace time zone, with its buy link. Only posts
+              you approved, and only from today forward. Anything still in review waits.
+            </small>
+          </span>
+        </label>
+      ) : null}
+    </article>
   );
 }
 

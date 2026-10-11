@@ -67,6 +67,8 @@ class Post(CampaignPost):
     id: UUID
     status: PostStatus
     review_note: str | None
+    published_at: datetime | None = None
+    published_url: str | None = None
 
 
 class Campaign(BaseModel):

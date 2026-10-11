@@ -1047,3 +1047,13 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .account-menu-list p small { color: var(--muted); font-size: var(--type-xs); }
 .account-menu-list button { min-height: 40px; padding: 0 10px; border: 0; border-radius: var(--corner-sm); background: transparent; color: var(--ink); font-size: var(--type-sm); text-align: left; }
 .account-menu-list button:hover, .account-menu-list button:focus-visible { background: var(--surface-hover); }
+
+/* LinkedIn publishing */
+.linkedin-row { padding-bottom: 14px; }
+.linkedin-auto { grid-column: 2 / -1; max-width: none; padding: 0; }
+.published-note { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border-radius: var(--corner-sm); background: var(--success-soft); color: var(--ink); font-size: var(--type-sm); line-height: 1.5; }
+.published-note svg { flex: none; width: 16px; height: 16px; margin-top: 3px; color: var(--success); }
+.published-note a { color: var(--accent); font-weight: 600; }
+.confirm-publish { margin: 0; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-sm); background: var(--surface); }
+.confirm-publish p { margin: 0; font-size: var(--type-sm); line-height: 1.5; }
+.confirm-publish div { display: flex; gap: 8px; }
