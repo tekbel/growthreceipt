@@ -23,7 +23,7 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 
 The PayPal payment is a buyer paying the founder for the founder's product. It is not a fee for using GrowthReceipt.
 
-In the demo, the founder sells LaunchCheck (launchcheck.addisstack.com), a scanner that finds launch issues on a public page. The offer is a one time pack of 10 scans for 9 USD. A buyer who arrives from a campaign post pays 9 USD, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and the demo shows the same pack sold through PayPal.
+In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offer is a one time pack of 10 scans for 9 USD. A buyer who arrives from a campaign post buys the pack for 9 USD, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and in the demo customers buy the same pack through PayPal.
 
 Hosted demo limits:
 

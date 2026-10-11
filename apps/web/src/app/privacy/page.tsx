@@ -6,7 +6,8 @@ export const metadata: Metadata = {
 };
 
 const UPDATED = "11 October 2026";
-const CONTACT = "support@addisstack.com";
+const SUPPORT = "support@mail.addisstack.com";
+const MAKER = "tekbelbzu@gmail.com";
 
 export default function PrivacyPage() {
   return (
@@ -19,9 +20,11 @@ export default function PrivacyPage() {
         <p className="legal-updated">Last updated {UPDATED}</p>
 
         <p>
-          GrowthReceipt is made by Addis Stack. It drafts marketing posts for your offer, waits for
-          your approval, and links each PayPal purchase to the post that brought the customer. This
-          page explains what it stores and how to remove it.
+          GrowthReceipt is built by Teklie Belay, an independent developer who runs{" "}
+          <a href="https://addisstack.com">Addis Stack</a> and{" "}
+          <a href="https://launchcheck.addisstack.com">LaunchCheck</a>. It drafts marketing posts
+          for your offer, waits for your approval, and links each PayPal purchase to the post that
+          brought the customer. This page explains what it stores and how to remove it.
         </p>
 
         <h2>What we store</h2>
@@ -81,7 +84,8 @@ export default function PrivacyPage() {
 
         <h2>Contact</h2>
         <p>
-          Questions or requests go to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+          Questions or requests go to <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a>. You can also
+          reach Teklie Belay directly at <a href={`mailto:${MAKER}`}>{MAKER}</a>.
         </p>
       </article>
     </main>
