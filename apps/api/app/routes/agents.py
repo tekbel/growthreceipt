@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -66,6 +67,7 @@ class NextActionResponse(BaseModel):
     session_id: str
     turn_id: str
     model: str
+    duration_ms: int
     evidence: RevenueEvidence
     next_action: NextAction
 
@@ -180,6 +182,7 @@ async def create_next_action(
         },
         indent=2,
     )
+    started = time.perf_counter()
     try:
         run = await gateway.run_structured(
             workflow="revenue-next-action",
@@ -193,6 +196,7 @@ async def create_next_action(
             detail="Revenue learning agent is temporarily unavailable",
         ) from error
 
+    duration_ms = round((time.perf_counter() - started) * 1000)
     if run.session_id is None or run.turn_id is None:
         raise HTTPException(
             status_code=502,
@@ -211,6 +215,7 @@ async def create_next_action(
             "session_id": run.session_id,
             "turn_id": run.turn_id,
             "model": get_settings().openai_model,
+            "duration_ms": duration_ms,
             "evidence": evidence.model_dump(mode="json"),
             "next_action": run.output.model_dump(),
         },
@@ -219,6 +224,7 @@ async def create_next_action(
         session_id=run.session_id,
         turn_id=run.turn_id,
         model=get_settings().openai_model,
+        duration_ms=duration_ms,
         evidence=evidence,
         next_action=run.output,
     )

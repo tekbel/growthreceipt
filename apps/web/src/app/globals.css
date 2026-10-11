@@ -839,3 +839,13 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .receipt-chain .receipt-cta .spinner { width: 13px; height: 13px; }
 
 .move-follow-up { display: grid; gap: 12px; justify-items: start; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.55; }
+
+/* Busy buttons show real elapsed time and a soft sweep, so waiting reads as working. */
+.elapsed { margin-left: 4px; font-variant-numeric: tabular-nums; opacity: .75; font-weight: 500; }
+.button[aria-busy="true"] { position: relative; overflow: hidden; }
+.button[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / .22) 50%, transparent 80%); transform: translateX(-100%); animation: busy-sweep 1.6s var(--ease) infinite; pointer-events: none; }
+@keyframes busy-sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .button[aria-busy="true"]::after { display: none; } }
+.move-run { margin: 10px 0 0; color: var(--muted); font-size: var(--type-xs); }
+.experiment-stage p.move-run { font-size: var(--type-xs); }
+.move-run code { padding: 1px 6px; border-radius: var(--corner-sm); background: var(--surface-subtle); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--type-xs); }

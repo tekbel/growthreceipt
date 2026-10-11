@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Check, ChevronDown, Clock, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import type { Post } from "@/lib/campaign";
 
@@ -49,6 +49,20 @@ function at(value: string): string {
 /** A recommendation counts for a purchase only when the agent made it after the money arrived. */
 export function moveFor(receipt: Receipt, move: ProvenMove | null): ProvenMove | null {
   return move && new Date(move.at) >= new Date(receipt.captured_at) ? move : null;
+}
+
+/** Real time since the work started, so a judge sees the agent is busy. Never a fake percentage. */
+export function ElapsedSeconds() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+  return <span className="elapsed">{seconds} s</span>;
 }
 
 export function ReceiptChain({
@@ -113,6 +127,7 @@ export function ReceiptChain({
                   <>
                     <span className="spinner" aria-hidden="true" />
                     Reviewing results
+                    <ElapsedSeconds />
                   </>
                 ) : (
                   <>

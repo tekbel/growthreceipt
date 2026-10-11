@@ -32,6 +32,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import {
+  ElapsedSeconds,
   type Receipt as PayPalReceipt,
   type ProvenMove,
   ReceiptChain,
@@ -100,7 +101,12 @@ type MoveEvidence = {
   }[];
 };
 
-type MoveContext = { evidence: MoveEvidence | null; model: string | null };
+type MoveContext = {
+  evidence: MoveEvidence | null;
+  model: string | null;
+  turnId?: string | null;
+  durationMs?: number | null;
+};
 
 type MoveDecision = {
   decision: "approved" | "rejected";
@@ -346,6 +352,9 @@ export function CampaignWorkspace({
             current ?? {
               evidence: (latest.detail.evidence as MoveEvidence | undefined) ?? null,
               model: typeof latest.detail.model === "string" ? latest.detail.model : null,
+              turnId: typeof latest.detail.turn_id === "string" ? latest.detail.turn_id : null,
+              durationMs:
+                typeof latest.detail.duration_ms === "number" ? latest.detail.duration_ms : null,
             },
         );
         if (decided) setMoveDecision((current) => current ?? (decided.detail as MoveDecision));
@@ -569,9 +578,16 @@ export function CampaignWorkspace({
         next_action: Recommendation;
         evidence: MoveEvidence;
         model: string;
+        turn_id: string;
+        duration_ms: number;
       };
       setRecommendation(result.next_action);
-      setMoveContext({ evidence: result.evidence, model: result.model });
+      setMoveContext({
+        evidence: result.evidence,
+        model: result.model,
+        turnId: result.turn_id,
+        durationMs: result.duration_ms,
+      });
       setMoveDecision(null);
       setFollowUpId(null);
       // Never earlier than the newest capture, so a small clock difference cannot hide it.
@@ -2546,7 +2562,11 @@ function ResultsPage({
                 type="button"
                 onClick={() => void findNextMove()}
               >
-                {recommendationLoading ? <BusyLabel text="Reviewing results" /> : "Find next move"}
+                {recommendationLoading ? (
+                  <BusyLabel text="Reviewing results" elapsed />
+                ) : (
+                  "Find next move"
+                )}
               </button>
             </>
           )}
@@ -2687,7 +2707,7 @@ function MoveDecisionPanel({
               aria-busy={drafting}
               onClick={() => void draftFollowUp()}
             >
-              {drafting ? <BusyLabel text="Drafting the post" /> : "Draft the post"}
+              {drafting ? <BusyLabel text="Drafting the post" elapsed /> : "Draft the post"}
             </button>
           )
         ) : null}
@@ -2700,7 +2720,7 @@ function MoveDecisionPanel({
             onClick={() => void findNextMove()}
           >
             {recommendationLoading ? (
-              <BusyLabel text="Reviewing results" />
+              <BusyLabel text="Reviewing results" elapsed />
             ) : (
               "Ask for a different move"
             )}
@@ -2815,6 +2835,18 @@ function ExperimentPage({
           <div>
             <ConfidenceTag confidence={recommendation.confidence} />
             <h2>{recommendation.headline}</h2>
+            {context?.model && context.durationMs ? (
+              <p className="move-run">
+                Written by the agent with <code>{context.model}</code> in{" "}
+                {(context.durationMs / 1000).toFixed(1)} s
+                {context.turnId ? (
+                  <>
+                    {" "}
+                    · run <code title={context.turnId}>{context.turnId.slice(-8)}</code>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
             <p className="experiment-plan">{recommendation.recommendation}</p>
             <p>{recommendation.rationale}</p>
             <dl>
@@ -2870,7 +2902,7 @@ function ExperimentPage({
                 onClick={() => void findNextMove()}
               >
                 {recommendationLoading ? (
-                  <BusyLabel text="Reviewing results" />
+                  <BusyLabel text="Reviewing results" elapsed />
                 ) : (
                   "Prepare next experiment"
                 )}
@@ -3112,11 +3144,11 @@ function ConfidenceTag({ confidence }: { confidence: Recommendation["confidence"
   );
 }
 
-function BusyLabel({ text }: { text: string }) {
+function BusyLabel({ text, elapsed = false }: { text: string; elapsed?: boolean }) {
   return (
     <span className="busy-label">
       <span className="spinner" aria-hidden="true" />
-      {text}…
+      {text}…{elapsed ? <ElapsedSeconds /> : null}
     </span>
   );
 }
