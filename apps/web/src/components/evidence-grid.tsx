@@ -3,8 +3,11 @@
 import {
   AllCommunityModule,
   type ColDef,
+  type GetRowIdParams,
   type IRowNode,
   ModuleRegistry,
+  type RowClickedEvent,
+  type RowSelectionOptions,
   themeQuartz,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
@@ -33,6 +36,15 @@ const theme = themeQuartz.withParams({
   wrapperBorderRadius: 10,
   spacing: 7,
 });
+
+// Static grid options live outside the component, so React never recreates them.
+const defaultColDef: ColDef = { sortable: true, resizable: true, suppressMovable: true };
+const rowSelection: RowSelectionOptions = {
+  mode: "singleRow",
+  checkboxes: false,
+  enableClickSelection: true,
+};
+const getRowId = (params: GetRowIdParams<EvidenceRow>) => params.data.id;
 
 type Payment = "Verified revenue" | "Captured" | "Awaiting payment" | "Not live";
 
@@ -191,6 +203,17 @@ export function EvidenceGrid({
   );
 
   // The grid caches filter results, so tell it when the chips or the channel change.
+  const filterPresent = useCallback(
+    () => view !== "All posts" || channel !== "All channels",
+    [view, channel],
+  );
+  const openRow = useCallback(
+    (event: RowClickedEvent<EvidenceRow>) => {
+      if (event.data) onOpenPost(event.data.id);
+    },
+    [onOpenPost],
+  );
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: rerun when the filter function changes.
   useEffect(() => {
     grid.current?.api?.onFilterChanged();
@@ -237,15 +260,15 @@ export function EvidenceGrid({
           theme={theme}
           rowData={rows}
           columnDefs={columns}
-          getRowId={(params) => params.data.id}
+          getRowId={getRowId}
+          // A campaign has at most 14 posts, so the grid sizes to its rows instead of
+          // virtualizing. Switch to a fixed height if this ever lists many campaigns.
           domLayout="autoHeight"
-          isExternalFilterPresent={() => view !== "All posts" || channel !== "All channels"}
+          isExternalFilterPresent={filterPresent}
           doesExternalFilterPass={passes}
-          defaultColDef={{ sortable: true, resizable: true, suppressMovable: true }}
-          rowSelection={{ mode: "singleRow", checkboxes: false, enableClickSelection: true }}
-          onRowClicked={(event) => {
-            if (event.data) onOpenPost(event.data.id);
-          }}
+          defaultColDef={defaultColDef}
+          rowSelection={rowSelection}
+          onRowClicked={openRow}
           overlayNoRowsTemplate="<span>No posts match this filter.</span>"
           tooltipShowDelay={300}
         />
