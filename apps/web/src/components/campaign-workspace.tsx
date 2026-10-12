@@ -3254,8 +3254,8 @@ function ResultsPage({
               <p>
                 The agent compares verified purchase signals across posts and recommends one focused
                 next experiment. When several posts bring purchases, the agent ranks them by
-                verified revenue, then by order count. Fewer than 3 purchases is an early signal,
-                and equal revenue is a tie that needs a controlled test.
+                verified revenue. The number of purchases sets how much to trust the lead. Fewer
+                than 3 is an early signal, and equal revenue is a tie that needs a controlled test.
               </p>
               <button
                 className="button accent"
