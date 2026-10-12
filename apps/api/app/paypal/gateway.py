@@ -210,9 +210,11 @@ class HttpPayPalGateway:
 
 
 class FakePayPalGateway:
-    def __init__(self, *, webhook_valid: bool = True) -> None:
+    def __init__(self, *, webhook_valid: bool = True, capture_status: str = "COMPLETED") -> None:
         self.webhook_valid = webhook_valid
+        self.capture_status = capture_status
         self.created_orders: list[tuple[Offer, str, str]] = []
+        self.capture_request_ids: list[str] = []
 
     async def create_order(
         self,
@@ -225,11 +227,11 @@ class FakePayPalGateway:
         return PayPalOrder(id="TEST-ORDER-001", status="CREATED")
 
     async def capture_order(self, *, order_id: str, request_id: str) -> PayPalCapture:
-        del request_id
+        self.capture_request_ids.append(request_id)
         return PayPalCapture(
             order_id=order_id,
             capture_id="TEST-CAPTURE-001",
-            status="COMPLETED",
+            status=self.capture_status,
             amount="9.00",
             currency="USD",
         )

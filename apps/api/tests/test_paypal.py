@@ -377,3 +377,58 @@ async def test_receipts_hide_unknown_campaigns(client: AsyncClient) -> None:
     response = await client.get("/v1/paypal/receipts/99999999-9999-4999-8999-999999999999")
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_capture_that_is_not_completed_is_not_revenue() -> None:
+    store = FakePaymentStore()
+    gateway = FakePayPalGateway(capture_status="PENDING")
+    app.dependency_overrides[get_paypal_gateway] = lambda: gateway
+    app.dependency_overrides[get_payment_store] = lambda: store
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+        capture = await client.post(f"/v1/public/orders/{order.json()['order_id']}/capture")
+
+    assert capture.status_code == 409
+    assert store.captures == {}
+
+
+@pytest.mark.asyncio
+async def test_a_repeated_capture_reuses_the_paypal_request_id() -> None:
+    gateway = FakePayPalGateway()
+    store = FakePaymentStore()
+    app.dependency_overrides[get_paypal_gateway] = lambda: gateway
+    app.dependency_overrides[get_payment_store] = lambda: store
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+        order_id = order.json()["order_id"]
+        await client.post(f"/v1/public/orders/{order_id}/capture")
+        await client.post(f"/v1/public/orders/{order_id}/capture")
+
+    assert gateway.capture_request_ids == [f"capture-{order_id}"] * 2
+
+
+@pytest.mark.asyncio
+async def test_public_order_refuses_an_offer_the_founder_switched(client: AsyncClient) -> None:
+    stale = await client.post(
+        "/v1/public/orders",
+        json={"content_id": CONTENT_ID, "offer_id": "launchcheck-scan-pack-30"},
+    )
+    current = await client.post(
+        "/v1/public/orders",
+        json={"content_id": CONTENT_ID, "offer_id": "launchcheck-scan-pack"},
+    )
+
+    assert stale.status_code == 409
+    assert current.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_webhook_with_a_body_that_is_not_json_is_refused(client: AsyncClient) -> None:
+    response = await client.post(
+        "/v1/paypal/webhooks",
+        content=b"not json",
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 400

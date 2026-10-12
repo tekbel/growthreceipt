@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
@@ -249,9 +249,13 @@ async def settle_order(
     *, gateway: PayPalGateway, store: PaymentStore, order_id: str
 ) -> CaptureResponse:
     try:
-        capture = await gateway.capture_order(order_id=order_id, request_id=str(uuid4()))
+        # One request id per order, so a repeated capture gets PayPal's first answer back.
+        capture = await gateway.capture_order(order_id=order_id, request_id=f"capture-{order_id}")
     except PayPalAPIError as error:
         raise HTTPException(status_code=502, detail="PayPal could not capture the order") from error
+    # Only a completed capture is verified revenue. PENDING or DECLINED is not money yet.
+    if capture.status != "COMPLETED":
+        raise HTTPException(status_code=409, detail="PayPal has not completed this payment yet")
     try:
         await store.record_capture(capture)
     except LookupError as error:
@@ -271,7 +275,12 @@ async def receive_webhook(
     gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
 ) -> WebhookResponse:
-    event: dict[str, Any] = await request.json()
+    try:
+        event = await request.json()
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Invalid PayPal webhook body") from error
+    if not isinstance(event, dict):
+        raise HTTPException(status_code=400, detail="Invalid PayPal webhook body")
     try:
         valid = await gateway.verify_webhook(headers=request.headers, event=event)
     except PayPalAPIError as error:

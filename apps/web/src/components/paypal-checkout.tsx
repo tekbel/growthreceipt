@@ -126,10 +126,13 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
       setStatus("Creating your order…");
       const response = await publicFetch("/v1/public/orders", {
         method: "POST",
-        body: JSON.stringify({ content_id: contentId }),
+        body: JSON.stringify({ content_id: contentId, offer_id: checkoutOffer.offer_id }),
       });
       if (response.status === 429) {
         throw new Error("Too many checkout attempts. Please try again later.");
+      }
+      if (response.status === 409) {
+        throw new Error("This offer changed. Reload the page to see the new price.");
       }
       if (!response.ok) throw new Error("PayPal could not create the order.");
       const order = (await response.json()) as { order_id: string };
@@ -143,6 +146,12 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
       const response = await publicFetch(`/v1/public/orders/${orderId}/capture`, {
         method: "POST",
       });
+      if (response.status === 409) {
+        const message = "PayPal has not completed this payment yet, so no receipt was issued.";
+        setError(message);
+        setStatus("Checkout needs attention.");
+        throw new Error(message);
+      }
       if (!response.ok) throw new Error("The approved order could not be captured.");
       const capture = (await response.json()) as {
         capture_id: string;

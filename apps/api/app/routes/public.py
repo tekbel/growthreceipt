@@ -43,6 +43,8 @@ class PublicOfferResponse(BaseModel):
 
 class PublicOrderRequest(BaseModel):
     content_id: UUID
+    # The offer the buy page showed. Refused if the founder switched it since.
+    offer_id: str | None = None
 
 
 order_rate_limit = RateLimit(
@@ -99,6 +101,8 @@ async def create_order(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
 ) -> OrderResponse:
     location = await approved_post(request.content_id, campaigns)
+    if request.offer_id is not None and request.offer_id != location.campaign.offer_id:
+        raise HTTPException(status_code=409, detail="This offer changed. Review the new price.")
     return await open_order(
         gateway=gateway,
         store=store,
