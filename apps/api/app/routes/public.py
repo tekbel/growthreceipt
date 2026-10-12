@@ -18,11 +18,10 @@ from app.paypal.gateway import PayPalGateway
 from app.paypal.store import PaymentStore
 from app.paypal.store_dependencies import get_payment_store
 from app.rate_limit import RateLimit
-from app.routes.paypal import OFFERS, CaptureResponse, OrderResponse, open_order, settle_order
+from app.routes.paypal import CaptureResponse, OrderResponse, open_order, settle_order
 
 router = APIRouter(prefix="/v1/public", tags=["public"])
 
-OFFER = OFFERS["launchcheck-scan-pack"]
 ORDERS_PER_HOUR = 20
 
 
@@ -30,8 +29,10 @@ class PublicOfferResponse(BaseModel):
     content_id: UUID
     product_name: str
     product_icon_url: str | None
+    offer_id: str
     offer_name: str
     offer_description: str
+    credits: int
     amount: str
     currency: str
     client_id: str
@@ -64,6 +65,7 @@ async def get_offer(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
 ) -> PublicOfferResponse:
     location = await approved_post(content_id, campaigns)
+    offer = location.campaign.offer
     settings = get_settings()
     if settings.paypal_client_id is None:
         raise HTTPException(status_code=503, detail="PayPal is not configured")
@@ -72,10 +74,12 @@ async def get_offer(
         content_id=content_id,
         product_name=location.campaign.product_name,
         product_icon_url=location.campaign.product_icon_url,
-        offer_name=OFFER.name,
-        offer_description=OFFER.description,
-        amount=str(OFFER.amount),
-        currency=OFFER.currency,
+        offer_id=offer.id,
+        offer_name=offer.name,
+        offer_description=offer.description,
+        credits=offer.credits,
+        amount=str(offer.amount),
+        currency=offer.currency,
         client_id=settings.paypal_client_id.get_secret_value(),
         environment=settings.paypal_environment,
         sandbox_buyer_email=settings.paypal_sandbox_buyer_email if sandbox else None,
@@ -99,7 +103,7 @@ async def create_order(
         gateway=gateway,
         store=store,
         workspace_id=location.workspace_id,
-        offer=OFFER,
+        offer=location.campaign.offer,
         campaign_id=location.campaign.id,
         content_id=request.content_id,
     )

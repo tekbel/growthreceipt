@@ -5,7 +5,7 @@ import { BuyCheckout } from "@/components/paypal-checkout";
 
 export const metadata: Metadata = {
   title: "LaunchCheck scan pack | Checkout",
-  description: "Buy the LaunchCheck 10 scan pack with PayPal.",
+  description: "Buy a LaunchCheck scan pack with PayPal.",
   robots: { index: false },
 };
 

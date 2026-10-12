@@ -125,6 +125,15 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                     }
                 ],
                 "signal": "early",
+                "current_offer_id": "launchcheck-scan-pack",
+                "by_offer": [
+                    {
+                        "offer_id": "launchcheck-scan-pack",
+                        "name": "LaunchCheck 10 scan pack",
+                        "completed_orders": 1,
+                        "revenue": "9.00",
+                    }
+                ],
             }
             assert result["next_action"]["human_approval_required"] is True
 

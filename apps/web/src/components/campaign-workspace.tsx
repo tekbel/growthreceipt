@@ -64,6 +64,7 @@ import {
   type DraftProgress,
   type DraftStage,
   exampleBrief,
+  type Offer,
   type Post,
   type PostStatus,
   type PostUpdate,
@@ -145,7 +146,10 @@ type MoveDecision = {
   recommendation: string;
   edited: boolean;
   decided_at: string;
+  offer_change?: OfferChange | null;
 };
+
+type OfferChange = { offer_id: string; reason: string };
 
 type Recommendation = {
   headline: string;
@@ -156,6 +160,8 @@ type Recommendation = {
   confidence: "low" | "medium" | "high";
   needs_more_data: boolean;
   human_approval_required: boolean;
+  // Checked on the server. Only a catalog offer other than the current one.
+  offer_change?: OfferChange | null;
 };
 
 const workspaceNavigation = [
@@ -280,6 +286,7 @@ export function CampaignWorkspace({
   const [drafting, setDrafting] = useState(false);
   const [revising, setRevising] = useState(false);
   const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
@@ -328,6 +335,13 @@ export function CampaignWorkspace({
   useEffect(() => {
     void loadCampaign();
   }, [loadCampaign]);
+
+  useEffect(() => {
+    campaignApi
+      .offers()
+      .then(setOffers)
+      .catch(() => setOffers([]));
+  }, []);
 
   const [linkedin, setLinkedin] = useState<LinkedInStatus | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per workspace load.
@@ -490,17 +504,29 @@ export function CampaignWorkspace({
       ? { headline: recommendation.headline, at: recommendedAt, decision: moveDecision?.decision }
       : null;
 
-  async function decideNextMove(decision: MoveDecision["decision"], edited?: string) {
+  async function decideNextMove(
+    decision: MoveDecision["decision"],
+    edited?: string,
+    applyOfferChange = true,
+  ) {
     if (!campaign) return;
     setDeciding(true);
     try {
       const response = await apiFetch("/v1/agents/next-action/decision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign_id: campaign.id, decision, recommendation: edited }),
+        body: JSON.stringify({
+          campaign_id: campaign.id,
+          decision,
+          recommendation: edited,
+          apply_offer_change: applyOfferChange,
+        }),
       });
       if (!response.ok) throw new Error("decision failed");
-      setMoveDecision((await response.json()) as MoveDecision);
+      const decided = (await response.json()) as MoveDecision;
+      setMoveDecision(decided);
+      // The buy links now sell another pack, so reload what the campaign sells.
+      if (decided.offer_change) setCampaign(await campaignApi.get(campaign.id));
     } catch {
       notify("Your decision could not be saved. Please try again.");
       setDeciding(false);
@@ -860,6 +886,8 @@ export function CampaignWorkspace({
                   decision={moveDecision}
                   deciding={deciding}
                   decide={decideNextMove}
+                  offers={offers}
+                  currentOffer={campaign.offer}
                   followUp={campaign.posts.find((post) => post.id === followUpId) ?? null}
                   drafting={drafting}
                   draftFollowUp={draftFollowUp}
@@ -941,6 +969,7 @@ export function CampaignWorkspace({
             revenue={revenue}
             revenueError={revenueError}
             receipts={receipts}
+            offers={offers}
             move={provenMove}
             recommendation={recommendation}
             recommendationError={recommendationError}
@@ -958,6 +987,8 @@ export function CampaignWorkspace({
             decision={moveDecision}
             deciding={deciding}
             decide={decideNextMove}
+            offers={offers}
+            currentOffer={campaign.offer}
             followUp={campaign.posts.find((post) => post.id === followUpId) ?? null}
             drafting={drafting}
             draftFollowUp={draftFollowUp}
@@ -973,6 +1004,7 @@ export function CampaignWorkspace({
       case "checkout":
         return (
           <CheckoutPage
+            offer={campaign.offer}
             post={checkoutPost}
             posts={posts}
             revenue={revenue}
@@ -1920,7 +1952,7 @@ function FocusCard({
           ? {
               label: "Next up",
               title: "Your campaign is approved. Now be your own customer",
-              note: `You are the founder of ${campaign.product_name}. Picture a customer who saw one of your posts and bought the 10 scan pack for 9 USD. Make that purchase yourself with a PayPal sandbox account. The 9 USD is credited to this campaign as revenue, and the agent learns from it to plan posts around what people paid for, not what they liked.`,
+              note: `You are the founder of ${campaign.product_name}. Picture a customer who saw one of your posts and bought the ${campaign.offer.credits} scan pack for ${formatMoney(campaign.offer.amount, campaign.offer.currency)}. Make that purchase yourself with a PayPal sandbox account. The payment is credited to this campaign as revenue, and the agent learns from it to plan posts around what people paid for, not what they liked.`,
               action: "Open checkout",
               view: "checkout" as View,
             }
@@ -2983,6 +3015,47 @@ function CalendarPage({ campaign }: { campaign: Campaign }) {
   );
 }
 
+// Purchases and revenue for each pack customers bought, most revenue first.
+function OfferSplit({
+  receipts,
+  offers,
+  current,
+}: {
+  receipts: PayPalReceipt[];
+  offers: Offer[];
+  current: Offer;
+}) {
+  const totals = new Map<string, { orders: number; cents: number; currency: string }>();
+  for (const receipt of receipts) {
+    const total = totals.get(receipt.offer_id) ?? {
+      orders: 0,
+      cents: 0,
+      currency: receipt.currency,
+    };
+    total.orders += 1;
+    total.cents += Math.round(Number(receipt.amount) * 100);
+    totals.set(receipt.offer_id, total);
+  }
+  const rows = [...totals.entries()].sort((a, b) => b[1].cents - a[1].cents);
+  return (
+    <div className="earlier-receipts offer-split">
+      <h3>Revenue by offer</h3>
+      <ul>
+        {rows.map(([offerId, total]) => (
+          <li key={offerId}>
+            <span>{offers.find((offer) => offer.id === offerId)?.name ?? offerId}</span>
+            <span>
+              {total.orders} purchase{total.orders === 1 ? "" : "s"}
+            </span>
+            <span>{offerId === current.id ? "On sale now" : ""}</span>
+            <strong>{formatMoney((total.cents / 100).toFixed(2), total.currency)}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ResultsPage({
   campaign,
   nextActions,
@@ -2991,6 +3064,7 @@ function ResultsPage({
   revenue,
   revenueError,
   receipts,
+  offers,
   move,
   recommendation,
   recommendationError,
@@ -3003,6 +3077,7 @@ function ResultsPage({
   revenue: RevenueSummary | null;
   revenueError: boolean;
   receipts: PayPalReceipt[] | null;
+  offers: Offer[];
   move: ProvenMove | null;
   nextActions: Record<string, string>;
   openPost: (postId: string) => void;
@@ -3097,6 +3172,7 @@ function ResultsPage({
               </ul>
             </div>
           ) : null}
+          <OfferSplit receipts={receipts} offers={offers} current={campaign.offer} />
         </section>
       ) : null}
       <section className="results-evidence" aria-labelledby="evidence-title">
@@ -3317,11 +3393,23 @@ const confidenceCopy: Record<Recommendation["confidence"], string> = {
   high: "High. Many purchases point the same way.",
 };
 
+type Decide = (
+  decision: MoveDecision["decision"],
+  edited?: string,
+  applyOfferChange?: boolean,
+) => Promise<void>;
+
+function offerLabel(offer: Offer): string {
+  return `${offer.name} (${formatMoney(offer.amount, offer.currency)})`;
+}
+
 function MoveDecisionPanel({
   recommendation,
   decision,
   deciding,
   decide,
+  offers,
+  currentOffer,
   followUp,
   drafting,
   draftFollowUp,
@@ -3332,7 +3420,9 @@ function MoveDecisionPanel({
   recommendation: Recommendation;
   decision: MoveDecision | null;
   deciding: boolean;
-  decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
+  decide: Decide;
+  offers: Offer[];
+  currentOffer: Offer;
   followUp: Post | null;
   drafting: boolean;
   draftFollowUp: () => Promise<void>;
@@ -3341,6 +3431,28 @@ function MoveDecisionPanel({
   recommendationLoading: boolean;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const [switchOffer, setSwitchOffer] = useState(true);
+  const proposed = recommendation.offer_change
+    ? offers.find((offer) => offer.id === recommendation.offer_change?.offer_id)
+    : undefined;
+  const switchPanel =
+    proposed && proposed.id !== currentOffer.id ? (
+      <div className="offer-switch">
+        <p>
+          <strong>Switch the buy link offer</strong> from {offerLabel(currentOffer)} to{" "}
+          {offerLabel(proposed)}.
+        </p>
+        <p>{recommendation.offer_change?.reason}</p>
+        <label>
+          <input
+            type="checkbox"
+            checked={switchOffer}
+            onChange={(event) => setSwitchOffer(event.target.checked)}
+          />
+          Switch the offer when I approve
+        </label>
+      </div>
+    ) : null;
   if (decision) {
     const approved = decision.decision === "approved";
     return (
@@ -3353,6 +3465,9 @@ function MoveDecisionPanel({
             ? decision.recommendation
             : "This move will not run. The agent can propose a different one from the same evidence."}
         </p>
+        {approved && decision.offer_change ? (
+          <p>Every buy link now sells the {offerLabel(currentOffer)}.</p>
+        ) : null}
         {approved ? (
           followUp ? (
             <div className="move-follow-up">
@@ -3407,12 +3522,13 @@ function MoveDecisionPanel({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
         />
+        {switchPanel}
         <div className="form-actions">
           <button
             className="button accent"
             type="button"
             disabled={deciding || !draft.trim()}
-            onClick={() => void decide("approved", draft.trim())}
+            onClick={() => void decide("approved", draft.trim(), switchOffer)}
           >
             {deciding ? <BusyLabel text="Saving" /> : "Save, approve and draft"}
           </button>
@@ -3429,12 +3545,13 @@ function MoveDecisionPanel({
         Approving asks the agent to draft the post this plan describes. It waits in review, so
         nothing goes out until you approve it too.
       </p>
+      {switchPanel}
       <div className="form-actions">
         <button
           className="button accent"
           type="button"
           disabled={deciding}
-          onClick={() => void decide("approved")}
+          onClick={() => void decide("approved", undefined, switchOffer)}
         >
           {deciding ? <BusyLabel text="Saving" /> : "Approve and draft post"}
         </button>
@@ -3465,6 +3582,8 @@ function ExperimentPage({
   decision,
   deciding,
   decide,
+  offers,
+  currentOffer,
   followUp,
   drafting,
   draftFollowUp,
@@ -3480,7 +3599,9 @@ function ExperimentPage({
   context: MoveContext | null;
   decision: MoveDecision | null;
   deciding: boolean;
-  decide: (decision: MoveDecision["decision"], edited?: string) => Promise<void>;
+  decide: Decide;
+  offers: Offer[];
+  currentOffer: Offer;
   followUp: Post | null;
   drafting: boolean;
   draftFollowUp: () => Promise<void>;
@@ -3585,6 +3706,8 @@ function ExperimentPage({
               decision={decision}
               deciding={deciding}
               decide={decide}
+              offers={offers}
+              currentOffer={currentOffer}
               followUp={followUp}
               drafting={drafting}
               draftFollowUp={draftFollowUp}
@@ -3850,6 +3973,7 @@ function buyLink(contentId: string) {
 }
 
 function CheckoutPage({
+  offer,
   post,
   posts,
   revenue,
@@ -3858,6 +3982,7 @@ function CheckoutPage({
   navigate,
   notify,
 }: {
+  offer: Offer;
   post: Post | null;
   posts: Post[];
   revenue: RevenueSummary | null;
@@ -3886,12 +4011,12 @@ function CheckoutPage({
       />
       <section className="checkout-preview-card">
         <div>
-          <span className="eyebrow">LaunchCheck scan pack</span>
+          <span className="eyebrow">{offer.name}</span>
           <h2>Find what breaks a launch before your visitors do.</h2>
-          <p>10 extra page scans, paid once. Use them across your launch week.</p>
+          <p>{offer.description}. Use them across your launch week.</p>
           <ul>
             <li>
-              <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
+              <Check aria-hidden="true" /> {offer.credits} scans for speed, SEO and page structure
             </li>
             <li>
               <Check aria-hidden="true" /> A clear fix for every issue found
@@ -3904,7 +4029,7 @@ function CheckoutPage({
         <div className="checkout-offer">
           <SiPaypal aria-hidden="true" />
           <span>PayPal sandbox</span>
-          <strong>{formatMoney("9.00", "USD")}</strong>
+          <strong>{formatMoney(offer.amount, offer.currency)}</strong>
           <p>Sandbox only. No real money moves.</p>
           {post ? (
             <>

@@ -16,6 +16,7 @@ class Offer:
     description: str
     amount: Decimal
     currency: str
+    credits: int = 0
 
 
 @dataclass(frozen=True)

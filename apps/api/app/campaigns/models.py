@@ -7,6 +7,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
+from app.offers import DEFAULT_OFFER_ID, offer_for
+from app.paypal.gateway import Offer
+
 Channel = Literal["LinkedIn", "Facebook", "X", "Instagram"]
 PostStatus = Literal["needs_review", "changes_requested", "approved"]
 CampaignStatus = Literal["in_review", "changes_requested", "approved"]
@@ -85,6 +88,14 @@ class Campaign(BaseModel):
     starts_on: date
     created_at: datetime
     posts: list[Post]
+    # The latest approved offer_changed event decides it.
+    offer_id: str = DEFAULT_OFFER_ID
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def offer(self) -> Offer:
+        """What every buy link of this campaign sells right now."""
+        return offer_for(self.offer_id)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

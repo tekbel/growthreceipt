@@ -14,8 +14,10 @@ type PublicOffer = {
   content_id: string;
   product_name: string;
   product_icon_url: string | null;
+  offer_id: string;
   offer_name: string;
   offer_description: string;
+  credits: number;
   amount: string;
   currency: string;
   client_id: string;
@@ -259,12 +261,14 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
             <p>Find what breaks a launch before your visitors do.</p>
           </div>
           <div className="checkout-price">
-            <strong>${offer?.amount ?? "9.00"}</strong>
+            {/* The campaign decides the pack, so no price shows until the server says it. */}
+            <strong>{offer ? `$${offer.amount}` : "\u00a0"}</strong>
             <span>{offer?.currency ?? "USD"} · one payment</span>
           </div>
           <ul className="checkout-benefits">
             <li>
-              <Check aria-hidden="true" /> 10 scans for speed, SEO and page structure
+              <Check aria-hidden="true" /> {offer ? `${offer.credits} scans` : "Page scans"} for
+              speed, SEO and page structure
             </li>
             <li>
               <Check aria-hidden="true" /> A clear fix for every issue found

@@ -18,6 +18,7 @@ export type Receipt = {
   order_id: string;
   capture_id: string;
   content_id: string;
+  offer_id: string;
   amount: string;
   currency: string;
   ordered_at: string;

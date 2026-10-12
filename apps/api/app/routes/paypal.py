@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -9,6 +8,7 @@ from pydantic import BaseModel
 from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
+from app.offers import OFFERS
 from app.paypal.dependencies import get_paypal_gateway
 from app.paypal.gateway import Offer, PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore, Receipt
@@ -17,19 +17,10 @@ from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/paypal", tags=["paypal"])
 
-OFFERS = {
-    "launchcheck-scan-pack": Offer(
-        id="launchcheck-scan-pack",
-        name="LaunchCheck scan pack",
-        description="10 extra page scans, paid once",
-        amount=Decimal("9.00"),
-        currency="USD",
-    )
-}
-
 
 class CreateOrderRequest(BaseModel):
-    offer_id: str
+    # The campaign decides the offer. A stale id from an old page is refused.
+    offer_id: str | None = None
     campaign_id: UUID
     content_id: UUID
 
@@ -80,6 +71,7 @@ class ReceiptResponse(BaseModel):
     order_id: str
     capture_id: str
     content_id: UUID
+    offer_id: str
     amount: str
     currency: str
     ordered_at: datetime
@@ -92,6 +84,7 @@ class ReceiptResponse(BaseModel):
             order_id=receipt.paypal_order_id,
             capture_id=receipt.paypal_capture_id,
             content_id=receipt.content_id,
+            offer_id=receipt.offer_id,
             amount=f"{receipt.amount:.2f}",
             currency=receipt.currency,
             ordered_at=receipt.ordered_at,
@@ -105,6 +98,15 @@ class ReceiptResponse(BaseModel):
                 for proof in receipt.webhooks
             ],
         )
+
+
+class OfferResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    amount: str
+    currency: str
+    credits: int
 
 
 class ReceiptsResponse(BaseModel):
@@ -127,6 +129,22 @@ async def get_paypal_config(_workspace_id: WorkspaceId) -> PayPalConfigResponse:
     )
 
 
+@router.get("/offers", response_model=list[OfferResponse])
+async def list_offers(_workspace_id: WorkspaceId) -> list[OfferResponse]:
+    """The catalog a campaign can sell. The agent can only suggest offers from it."""
+    return [
+        OfferResponse(
+            id=offer.id,
+            name=offer.name,
+            description=offer.description,
+            amount=f"{offer.amount:.2f}",
+            currency=offer.currency,
+            credits=offer.credits,
+        )
+        for offer in OFFERS.values()
+    ]
+
+
 @router.post("/orders", response_model=OrderResponse)
 async def create_order(
     request: CreateOrderRequest,
@@ -135,20 +153,21 @@ async def create_order(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
 ) -> OrderResponse:
-    offer = OFFERS.get(request.offer_id)
-    if offer is None:
+    if request.offer_id is not None and request.offer_id not in OFFERS:
         raise HTTPException(status_code=404, detail="Offer not found")
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     posts = campaign.posts if campaign else []
     post = next((post for post in posts if post.id == request.content_id), None)
     # Customers only ever arrive from approved posts, so only those can take a payment.
-    if post is None or post.status != "approved":
+    if campaign is None or post is None or post.status != "approved":
         raise HTTPException(status_code=404, detail="Campaign content not found")
+    if request.offer_id is not None and request.offer_id != campaign.offer_id:
+        raise HTTPException(status_code=409, detail="This campaign now sells a different offer")
     return await open_order(
         gateway=gateway,
         store=store,
         workspace_id=workspace_id,
-        offer=offer,
+        offer=campaign.offer,
         campaign_id=request.campaign_id,
         content_id=request.content_id,
     )

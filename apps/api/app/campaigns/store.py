@@ -21,6 +21,7 @@ from app.campaigns.models import (
     review_transition,
 )
 from app.config import get_settings
+from app.offers import DEFAULT_OFFER_ID
 
 
 @dataclass(frozen=True)
@@ -460,12 +461,24 @@ class PostgresCampaignStore:
             await self._session.execute(
                 text(
                     f"""
-                    select {CAMPAIGN_COLUMNS}
+                    select {CAMPAIGN_COLUMNS},
+                           coalesce((
+                             select event.detail->>'offer_id'
+                             from growthreceipt.campaign_events event
+                             where event.campaign_id = campaigns.id
+                               and event.action = 'offer_changed'
+                             order by event.created_at desc, event.id desc
+                             limit 1
+                           ), :default_offer_id) as offer_id
                     from growthreceipt.campaigns
                     where id = :campaign_id and workspace_id = :workspace_id
                     """
                 ),
-                {"campaign_id": campaign_id, "workspace_id": workspace_id},
+                {
+                    "campaign_id": campaign_id,
+                    "workspace_id": workspace_id,
+                    "default_offer_id": DEFAULT_OFFER_ID,
+                },
             )
         ).one_or_none()
         if campaign is None:
@@ -667,3 +680,8 @@ class FakeCampaignStore:
             created_at=datetime.now(UTC),
         )
         self.event_log.append((campaign_id, event))
+        if action == "offer_changed":
+            campaign = self.campaigns[campaign_id]
+            self.campaigns[campaign_id] = campaign.model_copy(
+                update={"offer_id": detail["offer_id"]}
+            )

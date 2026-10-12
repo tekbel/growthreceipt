@@ -48,6 +48,18 @@ export type Campaign = {
   created_at: string;
   status: CampaignStatus;
   posts: Post[];
+  // What every buy link of the campaign sells right now.
+  offer_id: string;
+  offer: Offer;
+};
+
+export type Offer = {
+  id: string;
+  name: string;
+  description: string;
+  amount: string;
+  currency: string;
+  credits: number;
 };
 
 export type BriefSuggestion = Omit<CampaignBrief, "channels" | "days" | "product_icon_url"> & {
@@ -181,6 +193,7 @@ export const campaignApi = {
   approve: (campaignId: string) =>
     request<Campaign>(`/v1/campaigns/${campaignId}/approve`, { method: "POST" }),
   events: (campaignId: string) => request<CampaignEvent[]>(`/v1/campaigns/${campaignId}/events`),
+  offers: () => request<Offer[]>("/v1/paypal/offers"),
 };
 
 export function postDate(campaign: Campaign, post: Post): string {

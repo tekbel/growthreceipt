@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.offers import DEFAULT_OFFER_ID
 from app.paypal.gateway import Offer, PayPalCapture
 
 
@@ -42,6 +43,8 @@ class Receipt:
     ordered_at: datetime
     captured_at: datetime
     webhooks: list[WebhookProof] = field(default_factory=list)
+    # The catalog slug of what the customer bought.
+    offer_id: str = DEFAULT_OFFER_ID
 
 
 class PaymentStore(Protocol):
@@ -275,6 +278,7 @@ class PostgresPaymentStore:
                     """
                     select o.paypal_order_id, o.paypal_capture_id, o.content_id,
                            o.amount, o.currency, o.created_at, o.captured_at,
+                           f.slug as offer_slug,
                            coalesce((
                              select json_agg(json_build_object(
                                       'event_id', e.id,
@@ -287,6 +291,7 @@ class PostgresPaymentStore:
                                    = o.paypal_order_id
                            ), '[]'::json) as webhooks
                     from growthreceipt.payment_orders o
+                    join growthreceipt.offers f on f.id = o.offer_id
                     where o.campaign_id = :campaign_id and o.status = 'completed'
                     order by o.captured_at desc
                     limit 50
@@ -304,6 +309,7 @@ class PostgresPaymentStore:
                 currency=row.currency,
                 ordered_at=row.created_at,
                 captured_at=row.captured_at,
+                offer_id=row.offer_slug,
                 webhooks=[
                     WebhookProof(
                         event_id=event["event_id"],
@@ -330,6 +336,7 @@ class FakePaymentStore:
         self.webhooks: list[tuple[WebhookProof, dict[str, Any]]] = []
         self.ordered_at: dict[str, datetime] = {}
         self.captured_at: dict[str, datetime] = {}
+        self.offer_ids: dict[str, str] = {}
 
     async def record_order(
         self,
@@ -341,8 +348,9 @@ class FakePaymentStore:
         paypal_order_id: str,
         idempotency_key: UUID,
     ) -> None:
-        del offer, idempotency_key
+        del idempotency_key
         self.orders[paypal_order_id] = (workspace_id, campaign_id, content_id)
+        self.offer_ids[paypal_order_id] = offer.id
         self.ordered_at[paypal_order_id] = datetime.now(UTC)
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
@@ -414,6 +422,7 @@ class FakePaymentStore:
                     ordered_at=self.ordered_at[order_id],
                     captured_at=self.captured_at[order_id],
                     webhooks=webhooks,
+                    offer_id=self.offer_ids[order_id],
                 )
             )
         return sorted(receipts, key=lambda receipt: receipt.captured_at, reverse=True)

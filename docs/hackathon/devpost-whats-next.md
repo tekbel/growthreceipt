@@ -22,7 +22,9 @@ The hosted demo runs every checkout through one PayPal sandbox merchant. In prod
 
 ## Offers from the product
 
-The demo offer is fixed to the LaunchCheck 10 scan pack at 9 USD. Next, the offer comes from the founder's brief: product, plan, price and currency, with several offers per campaign so the agent can compare them.
+The demo catalog is LaunchCheck's three real scan packs: 3 scans for 4 USD, 10 for 9 USD and 30 for 19 USD. The agent can already suggest switching the buy links to another pack, and the switch happens only when the founder approves it. Next, the catalog comes from the founder's own products and plans, and an approved switch can run as a split test, so half the buy links sell each pack and the agent compares them on verified revenue.
+
+The PayPal Agent Toolkit is a later step. It would let the agent create and update PayPal products and orders directly, still behind the same founder approval.
 
 ## Publishing
 

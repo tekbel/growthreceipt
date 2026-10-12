@@ -18,7 +18,8 @@ from app.campaigns.models import Campaign, CampaignBrief, CampaignDraft, Campaig
 from app.campaigns.page_reader import PageReadError, ProductPage, read_product_page
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
-from app.paypal.store import PaymentStore
+from app.offers import DEFAULT_OFFER_ID, OFFERS, offer_for
+from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
 from app.quota import CampaignDraftRun, NextActionRun, Quota, claim_run
 from app.workspaces import WorkspaceId
@@ -36,6 +37,11 @@ class NextActionRequest(BaseModel):
     campaign_id: UUID
 
 
+class OfferChange(BaseModel):
+    offer_id: str = Field(description="An id from offer_catalog other than current_offer_id.")
+    reason: str
+
+
 class NextAction(BaseModel):
     headline: str = Field(description="The experiment in at most 10 plain words.")
     evidence_summary: str
@@ -45,6 +51,8 @@ class NextAction(BaseModel):
     confidence: Literal["low", "medium", "high"]
     needs_more_data: bool
     human_approval_required: bool
+    # Older recorded runs lack it. Code checks it before it can be approved.
+    offer_change: OfferChange | None = None
 
 
 class PaidPostEvidence(BaseModel):
@@ -53,6 +61,13 @@ class PaidPostEvidence(BaseModel):
     channel: str
     theme: str
     content: str
+    completed_orders: int
+    revenue: str
+
+
+class OfferEvidence(BaseModel):
+    offer_id: str
+    name: str
     completed_orders: int
     revenue: str
 
@@ -72,6 +87,38 @@ class RevenueEvidence(BaseModel):
     # Older recorded runs lack these, so they default.
     signal: EvidenceSignal = "none"
     evidence_through: datetime | None = None
+    current_offer_id: str = DEFAULT_OFFER_ID
+    by_offer: list[OfferEvidence] = []
+
+
+def revenue_by_offer(receipts: list[Receipt]) -> list[OfferEvidence]:
+    """Purchases and revenue for each offer customers bought, most revenue first."""
+    totals: dict[str, list[Decimal]] = {}
+    for receipt in receipts:
+        totals.setdefault(receipt.offer_id, []).append(receipt.amount)
+    return sorted(
+        (
+            OfferEvidence(
+                offer_id=offer_id,
+                name=offer_for(offer_id).name,
+                completed_orders=len(amounts),
+                revenue=f"{sum(amounts, Decimal('0')):.2f}",
+            )
+            for offer_id, amounts in totals.items()
+        ),
+        key=lambda item: (-Decimal(item.revenue), item.offer_id),
+    )
+
+
+def checked_offer_change(
+    change: OfferChange | None, *, current_offer_id: str, completed_orders: int
+) -> OfferChange | None:
+    """Keep a suggested switch only if it names another catalog offer and a purchase backs it."""
+    if change is None or completed_orders < 1:
+        return None
+    if change.offer_id not in OFFERS or change.offer_id == current_offer_id:
+        return None
+    return change
 
 
 def rank_paid_posts(paid_posts: list[PaidPostEvidence]) -> list[PaidPostEvidence]:
@@ -108,6 +155,8 @@ class NextActionDecisionRequest(BaseModel):
     decision: Literal["approved", "rejected"]
     # The founder's edited plan. Only used when approving.
     recommendation: str | None = Field(default=None, min_length=1, max_length=1200)
+    # The founder can approve the plan but keep the current offer.
+    apply_offer_change: bool = True
 
 
 class NextActionDecision(BaseModel):
@@ -116,6 +165,7 @@ class NextActionDecision(BaseModel):
     recommendation: str
     edited: bool
     decided_at: datetime
+    offer_change: OfferChange | None = None
 
 
 DECISION_ACTIONS = {"next_action_approved", "next_action_rejected"}
@@ -125,8 +175,14 @@ REVENUE_LEARNING_INSTRUCTIONS = """You are GrowthReceipt's revenue learning agen
 Use only the normalized campaign and PayPal revenue evidence supplied by the application.
 Do not invent conversion rates, traffic, customer attributes, causality, or statistical confidence.
 State the small sample size plainly. Recommend exactly one bounded marketing experiment.
-The recommendation may change messaging, audience, channel, creative, or measurement.
-It must not initiate a payment, change a price, publish content, or spend money.
+The recommendation may change messaging, audience, channel, creative, measurement, or which
+offer from offer_catalog the buy links sell.
+It must not initiate a payment, invent an offer or a price, publish content, or spend money.
+offer_catalog lists the only offers the buy links can sell. current_offer_id is the one sold now.
+by_offer shows what customers bought. Set offer_change only when there is at least one purchase
+and the evidence gives a reason to try another catalog offer, for example buyers of the current
+pack suggest a larger or a smaller pack would suit them. offer_change.reason is one short sentence.
+Otherwise set offer_change to null. Never suggest an offer that is not in offer_catalog.
 Set human_approval_required to true.
 Write for a busy founder in plain, everyday English.
 headline names the experiment in at most 10 words.
@@ -195,6 +251,7 @@ async def create_next_action(
                 )
             )
     paid_posts = rank_paid_posts(paid_posts)
+    current = campaign.offer
     evidence = RevenueEvidence(
         completed_orders=summary.completed_orders,
         gross_revenue=f"{summary.gross_revenue:.2f}",
@@ -203,6 +260,8 @@ async def create_next_action(
         paid_posts=paid_posts,
         signal=classify_evidence(paid_posts),
         evidence_through=max((receipt.captured_at for receipt in receipts), default=None),
+        current_offer_id=current.id,
+        by_offer=revenue_by_offer(receipts),
     )
     prompt = json.dumps(
         {
@@ -218,6 +277,16 @@ async def create_next_action(
                 "total_posts": len(campaign.posts),
             },
             "verified_revenue_evidence": evidence.model_dump(mode="json"),
+            "offer_catalog": [
+                {
+                    "offer_id": offer.id,
+                    "name": offer.name,
+                    "scans": offer.credits,
+                    "price": f"{offer.amount:.2f}",
+                    "currency": offer.currency,
+                }
+                for offer in OFFERS.values()
+            ],
         },
         indent=2,
     )
@@ -246,6 +315,15 @@ async def create_next_action(
             status_code=502,
             detail="Revenue learning agent crossed a safety boundary",
         )
+    next_action = run.output.model_copy(
+        update={
+            "offer_change": checked_offer_change(
+                run.output.offer_change,
+                current_offer_id=current.id,
+                completed_orders=evidence.completed_orders,
+            )
+        }
+    )
     await campaigns.record_event(
         campaign_id=campaign.id,
         actor="agent",
@@ -256,7 +334,7 @@ async def create_next_action(
             "model": get_settings().openai_model,
             "duration_ms": duration_ms,
             "evidence": evidence.model_dump(mode="json"),
-            "next_action": run.output.model_dump(),
+            "next_action": next_action.model_dump(),
         },
     )
     return NextActionResponse(
@@ -265,7 +343,7 @@ async def create_next_action(
         model=get_settings().openai_model,
         duration_ms=duration_ms,
         evidence=evidence,
-        next_action=run.output,
+        next_action=next_action,
     )
 
 
@@ -295,12 +373,23 @@ async def decide_next_action(
     proposed = NextAction.model_validate(latest.detail["next_action"])
     final = (request.recommendation or "").strip() if request.decision == "approved" else ""
     edited = bool(final) and final != proposed.recommendation
+    # Checked again, since another approval may have changed the offer since.
+    offer_change = (
+        checked_offer_change(
+            proposed.offer_change,
+            current_offer_id=campaign.offer_id,
+            completed_orders=latest.detail.get("evidence", {}).get("completed_orders", 0),
+        )
+        if request.decision == "approved" and request.apply_offer_change
+        else None
+    )
     decision = NextActionDecision(
         decision=request.decision,
         headline=proposed.headline,
         recommendation=final or proposed.recommendation,
         edited=edited,
         decided_at=datetime.now(UTC),
+        offer_change=offer_change,
     )
     detail = decision.model_dump(mode="json")
     if edited:
@@ -311,13 +400,25 @@ async def decide_next_action(
         action=f"next_action_{request.decision}",
         detail=detail,
     )
+    if offer_change is not None:
+        await campaigns.record_event(
+            campaign_id=campaign.id,
+            actor="human",
+            action="offer_changed",
+            detail={
+                "offer_id": offer_change.offer_id,
+                "previous_offer_id": campaign.offer_id,
+                "reason": offer_change.reason,
+            },
+        )
     return decision
 
 
 FOLLOW_UP_INSTRUCTIONS = """You are GrowthReceipt's campaign writer.
 Write exactly one new post that carries out the approved plan.
 Build on the source post, which earned real PayPal revenue. Keep what made it work.
-Keep the product, the offer and the price the same. Never invent metrics, customers or quotes.
+Keep the product the same. Mention only the offer given in offer, at its price.
+Never invent metrics, customers or quotes.
 Use the source post's channel unless the plan names another channel from the campaign channels.
 Preserve the brand voice. Include one clear call to action.
 Never use semicolons or dashes.
@@ -387,6 +488,12 @@ async def draft_follow_up_post(
             if source
             else None,
             "source_post_revenue": paid_posts[0]["revenue"] if source and paid_posts else None,
+            "offer": {
+                "name": campaign.offer.name,
+                "description": campaign.offer.description,
+                "price": f"{campaign.offer.amount:.2f}",
+                "currency": campaign.offer.currency,
+            },
             "day": day,
         },
         indent=2,
