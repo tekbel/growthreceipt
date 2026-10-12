@@ -10,16 +10,19 @@ import { type ReactNode, useId, useState } from "react";
 export function InfoTip({
   label = "More information",
   align = "center",
+  side = "top",
   children,
 }: {
   label?: string;
   align?: "start" | "center" | "end";
+  /** Opens below the button when there is no room above, such as in bars at the top of the page. */
+  side?: "top" | "bottom";
   children: ReactNode;
 }) {
   const tipId = useId();
   const [open, setOpen] = useState(false);
   return (
-    <span className={`tip-anchor info-tip align-${align}${open ? " open" : ""}`}>
+    <span className={`tip-anchor info-tip align-${align} side-${side}${open ? " open" : ""}`}>
       <button
         className="info-tip-button"
         type="button"

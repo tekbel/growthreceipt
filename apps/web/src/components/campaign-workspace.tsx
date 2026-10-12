@@ -1226,7 +1226,7 @@ function JudgeBar({
       <span className="status-tag review">Judge demo</span>
       <p>
         PayPal sandbox. No real money moves.
-        <InfoTip label="About the judge demo" align="end">
+        <InfoTip label="About the judge demo" align="end" side="bottom">
           Private demo workspace, prepared with a sample LaunchCheck campaign. Payments run in
           PayPal's sandbox, and each recommendation is generated live.
         </InfoTip>
@@ -3499,7 +3499,7 @@ function ExperimentPage({
         title="Next experiment"
         description="One next experiment, chosen from verified purchase signals."
         info={
-          <InfoTip label="What an experiment is" align="start">
+          <InfoTip label="What an experiment is" align="start" side="bottom">
             An experiment is one change to how you market the offer, such as a new message,
             audience, channel or image. The agent picks it from verified purchases, you approve it,
             and the purchases that follow show whether it worked.
