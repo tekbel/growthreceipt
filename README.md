@@ -16,6 +16,8 @@ The active competition build is **GrowthReceipt: marketing backed by payments**.
 
 The loop and who pays whom are explained in [docs/hackathon/architecture.md](./docs/hackathon/architecture.md).
 
+GrowthReceipt is for indie makers and small software teams who market their own product on LinkedIn or X and sell through PayPal. The audience, what it is not for yet, and the planned pricing are in [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md).
+
 ## Current implementation
 
 ```text
@@ -108,6 +110,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
+- [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
 
 ## Recommended build order
