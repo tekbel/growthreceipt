@@ -1,4 +1,4 @@
-.PHONY: setup db-up db-migrate demo-seed demo-reset dev-web dev-api dev-worker dev-paypal-relay dev-paypal-tunnel lint typecheck test check
+.PHONY: setup db-up db-migrate demo-seed demo-reset demo-purchase dev-web dev-api dev-worker dev-paypal-relay dev-paypal-tunnel lint typecheck test check
 
 setup:
 	npm install
@@ -16,6 +16,10 @@ demo-seed: db-migrate
 
 demo-reset: db-migrate
 	PYTHONPATH=apps/api .venv/bin/python scripts/seed_demo.py --reset
+
+# Sandbox purchases from buy links, for the demo video. make demo-purchase LINKS="<buy link> ..." COUNT=1
+demo-purchase:
+	node scripts/demo_purchase.mjs $(LINKS) --count $(or $(COUNT),1)
 
 dev-web:
 	npm run dev:web
