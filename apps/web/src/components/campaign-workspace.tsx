@@ -2178,6 +2178,9 @@ function NewCampaignPage({
   const iconInput = useRef<HTMLInputElement>(null);
   const iconUploaded = brief.product_icon_url.startsWith("data:");
   const [previewIcon, setPreviewIcon] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
+  const [reading, setReading] = useState(false);
+  const [pageNote, setPageNote] = useState<{ text: string; error: boolean } | null>(null);
 
   // Load the preview once typing pauses, so partial links do not flash an error.
   useEffect(() => {
@@ -2200,6 +2203,33 @@ function NewCampaignPage({
       setIconError(null);
     } catch {
       setIconError("This image could not be read. Try another file.");
+    }
+  }
+
+  async function fillFromPage() {
+    if (reading || !pageUrl.trim()) return;
+    setReading(true);
+    setPageNote(null);
+    try {
+      const { source_url, product_icon_url, ...suggestion } = await campaignApi.briefFromUrl(
+        pageUrl.trim(),
+      );
+      setBrief((current) => ({
+        ...current,
+        ...suggestion,
+        product_icon_url: product_icon_url ?? current.product_icon_url,
+      }));
+      setPageNote({
+        text: `Filled from ${source_url}. Check each field before drafting.`,
+        error: false,
+      });
+    } catch (reason) {
+      setPageNote({
+        text: reason instanceof Error ? reason.message : "That page could not be read right now.",
+        error: true,
+      });
+    } finally {
+      setReading(false);
     }
   }
 
@@ -2248,7 +2278,7 @@ function NewCampaignPage({
           <button
             className="button secondary"
             type="button"
-            disabled={generating}
+            disabled={generating || reading}
             onClick={() => setBrief(exampleBrief)}
           >
             Use example brief
@@ -2256,7 +2286,46 @@ function NewCampaignPage({
         }
       />
       <form className="settings-form brief-form" onSubmit={(event) => void submit(event)}>
-        <fieldset disabled={generating}>
+        <fieldset disabled={generating || reading}>
+          <legend>Start from a link</legend>
+          <label htmlFor="product-page">
+            Product page <span className="optional">Optional</span>
+          </label>
+          <div className="icon-field">
+            <input
+              id="product-page"
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              maxLength={2000}
+              value={pageUrl}
+              aria-describedby="product-page-hint"
+              onChange={(event) => setPageUrl(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                void fillFromPage();
+              }}
+            />
+            <button
+              className="button secondary"
+              type="button"
+              disabled={!pageUrl.trim()}
+              onClick={() => void fillFromPage()}
+            >
+              {reading ? "Reading page" : "Fill brief"}
+            </button>
+          </div>
+          <p
+            id="product-page-hint"
+            className={pageNote?.error ? "field-hint error" : "field-hint"}
+            role={pageNote?.error ? "alert" : "status"}
+          >
+            {pageNote?.text ??
+              "The agent reads the public page and suggests the fields below. Uses one agent run."}
+          </p>
+        </fieldset>
+        <fieldset disabled={generating || reading}>
           <legend>Product</legend>
           <label htmlFor="product-name">Product name</label>
           <input
@@ -2359,7 +2428,7 @@ function NewCampaignPage({
             onChange={(event) => field("audience", event.target.value)}
           />
         </fieldset>
-        <fieldset disabled={generating}>
+        <fieldset disabled={generating || reading}>
           <legend>Campaign</legend>
           <label htmlFor="objective">Revenue goal</label>
           <input
@@ -2412,7 +2481,7 @@ function NewCampaignPage({
           <AgentSteps progress={progress} thought={thought} productName={brief.product_name} />
         ) : null}
         <div className="form-actions">
-          <button className="button dark" type="submit" disabled={generating}>
+          <button className="button dark" type="submit" disabled={generating || reading}>
             <Send aria-hidden="true" /> {generating ? "Drafting campaign" : "Draft campaign"}
           </button>
           {canCancel ? (

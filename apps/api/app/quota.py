@@ -78,13 +78,17 @@ def get_agent_quota(session: Annotated[AsyncSession, Depends(get_session)]) -> A
 Quota = Annotated[AgentQuota, Depends(get_agent_quota)]
 
 
+async def claim_run(quota: AgentQuota, workspace_id: UUID, kind: RunKind) -> None:
+    if not await quota.claim(workspace_id=workspace_id, kind=kind):
+        raise HTTPException(
+            status_code=429,
+            detail="The agent has reached today's limit. Please try again tomorrow.",
+        )
+
+
 def _claim(kind: RunKind) -> Callable[[Quota, WorkspaceId], Awaitable[None]]:
     async def claim(quota: Quota, workspace_id: WorkspaceId) -> None:
-        if not await quota.claim(workspace_id=workspace_id, kind=kind):
-            raise HTTPException(
-                status_code=429,
-                detail="The agent has reached today's limit. Please try again tomorrow.",
-            )
+        await claim_run(quota, workspace_id, kind)
 
     return claim
 

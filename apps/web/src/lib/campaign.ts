@@ -50,6 +50,11 @@ export type Campaign = {
   posts: Post[];
 };
 
+export type BriefSuggestion = Omit<CampaignBrief, "channels" | "days" | "product_icon_url"> & {
+  product_icon_url: string | null;
+  source_url: string;
+};
+
 export type CampaignBrief = {
   product_name: string;
   product_icon_url: string;
@@ -163,6 +168,11 @@ export const campaignApi = {
   create: (brief: CampaignBrief) =>
     request<Campaign>("/v1/campaigns", { method: "POST", body: JSON.stringify(brief) }),
   streamCreate,
+  briefFromUrl: (url: string) =>
+    request<BriefSuggestion>("/v1/agents/brief-from-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
   updatePost: (campaignId: string, postId: string, update: PostUpdate) =>
     request<Campaign>(`/v1/campaigns/${campaignId}/posts/${postId}`, {
       method: "PATCH",

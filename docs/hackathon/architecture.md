@@ -10,7 +10,7 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 
 ## The loop
 
-1. **Brief.** The founder gives the product, price, audience and channels in the web app.
+1. **Brief.** The founder gives the product, price, audience and channels in the web app. They can also paste a link to the product page. The API reads that public page and the agent suggests the brief fields for the founder to edit. The API fetches only https pages on public addresses, checks every redirect the same way, and stops at 1 MB or 8 seconds. Page text goes to the model as data, never as instructions. A link that cannot be read does not count toward the daily agent limit.
 2. **Agent drafts.** The API calls the OpenAI agent, which returns typed campaign output. Progress streams to the browser as each real step finishes.
 3. **Founder approves.** Every post can be edited, and nothing goes out without approval. Each change is logged as a campaign event.
 4. **Buyer checks out.** Each approved post carries a public buy link. The buyer opens it without signing in and never sees GrowthReceipt. The API finds the campaign from the post, refuses posts that are not approved, creates a PayPal order tied to that post, and the buyer pays in PayPal through the JavaScript SDK v6. Public order creation is limited to 20 an hour per address.
