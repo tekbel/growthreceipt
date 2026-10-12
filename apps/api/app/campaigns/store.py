@@ -98,6 +98,18 @@ class CampaignStore(Protocol):
         detail: dict[str, Any],
     ) -> None: ...
 
+    async def record_events_if_latest(
+        self,
+        *,
+        campaign_id: UUID,
+        expected_event_id: int,
+        among: set[str],
+        events: list[tuple[EventActor, str, dict[str, Any]]],
+    ) -> bool:
+        """Writes the events only if the newest event with an action in among is still the
+        expected one. Two requests racing on the same campaign cannot both pass."""
+        ...
+
 
 CAMPAIGN_COLUMNS = """
     id, name, positioning, product_name, product_icon_url, product_description, audience,
@@ -351,6 +363,43 @@ class PostgresCampaignStore:
                 action=action,
                 detail=detail,
             )
+
+    async def record_events_if_latest(
+        self,
+        *,
+        campaign_id: UUID,
+        expected_event_id: int,
+        among: set[str],
+        events: list[tuple[EventActor, str, dict[str, Any]]],
+    ) -> bool:
+        async with self._session.begin():
+            # The campaign row lock makes a second racing request wait, then see the new events.
+            await self._session.execute(
+                text("select 1 from growthreceipt.campaigns where id = :campaign_id for update"),
+                {"campaign_id": campaign_id},
+            )
+            latest = await self._session.scalar(
+                text(
+                    """
+                    select id from growthreceipt.campaign_events
+                    where campaign_id = :campaign_id and action = any(:among)
+                    order by created_at desc, id desc
+                    limit 1
+                    """
+                ),
+                {"campaign_id": campaign_id, "among": list(among)},
+            )
+            if latest != expected_event_id:
+                return False
+            for actor, action, detail in events:
+                await self._insert_event(
+                    campaign_id=campaign_id,
+                    post_id=None,
+                    actor=actor,
+                    action=action,
+                    detail=detail,
+                )
+        return True
 
     async def add_post(
         self,
@@ -612,6 +661,28 @@ class FakeCampaignStore:
         detail: dict[str, Any],
     ) -> None:
         self._log(campaign_id, None, actor, action, detail)
+
+    async def record_events_if_latest(
+        self,
+        *,
+        campaign_id: UUID,
+        expected_event_id: int,
+        among: set[str],
+        events: list[tuple[EventActor, str, dict[str, Any]]],
+    ) -> bool:
+        latest = next(
+            (
+                event
+                for owner, event in reversed(self.event_log)
+                if owner == campaign_id and event.action in among
+            ),
+            None,
+        )
+        if latest is None or latest.id != expected_event_id:
+            return False
+        for actor, action, detail in events:
+            self._log(campaign_id, None, actor, action, detail)
+        return True
 
     async def add_post(
         self,

@@ -3,7 +3,7 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,7 +14,13 @@ from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import AgentGateway
 from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.generation import draft_campaign
-from app.campaigns.models import Campaign, CampaignBrief, CampaignDraft, CampaignPost
+from app.campaigns.models import (
+    Campaign,
+    CampaignBrief,
+    CampaignDraft,
+    CampaignPost,
+    EventActor,
+)
 from app.campaigns.page_reader import PageReadError, ProductPage, read_product_page
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
@@ -396,23 +402,29 @@ async def decide_next_action(
     detail = decision.model_dump(mode="json")
     if edited:
         detail["proposed_recommendation"] = proposed.recommendation
-    await campaigns.record_event(
-        campaign_id=campaign.id,
-        actor="human",
-        action=f"next_action_{request.decision}",
-        detail=detail,
-    )
+    writes: list[tuple[EventActor, str, dict[str, Any]]] = [
+        ("human", f"next_action_{request.decision}", detail)
+    ]
     if offer_change is not None:
-        await campaigns.record_event(
-            campaign_id=campaign.id,
-            actor="human",
-            action="offer_changed",
-            detail={
-                "offer_id": offer_change.offer_id,
-                "previous_offer_id": campaign.offer_id,
-                "reason": offer_change.reason,
-            },
+        writes.append(
+            (
+                "human",
+                "offer_changed",
+                {
+                    "offer_id": offer_change.offer_id,
+                    "previous_offer_id": campaign.offer_id,
+                    "reason": offer_change.reason,
+                },
+            )
         )
+    recorded = await campaigns.record_events_if_latest(
+        campaign_id=campaign.id,
+        expected_event_id=latest.id,
+        among={"next_action_recommended", *DECISION_ACTIONS},
+        events=writes,
+    )
+    if not recorded:
+        raise HTTPException(status_code=409, detail="This next move was already decided")
     return decision
 
 

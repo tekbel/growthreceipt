@@ -2,6 +2,7 @@ import base64
 import json
 from collections.abc import AsyncIterator, Generator
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -253,3 +254,31 @@ async def test_agent_runs_stop_at_the_daily_limit(
     assert response.status_code == 429
     assert response.json()["detail"].startswith("The agent has reached today's limit.")
     assert [kind for _, kind in agent_quota.claims] == ["campaign_draft"]
+
+
+@pytest.mark.asyncio
+async def test_only_one_of_two_racing_decisions_is_recorded() -> None:
+    store = FakeCampaignStore()
+    campaign_id = uuid4()
+    await store.record_event(
+        campaign_id=campaign_id, actor="agent", action="next_action_recommended", detail={}
+    )
+    recommended = (await store.events(workspace_id=uuid4(), campaign_id=campaign_id))[0]
+    among = {"next_action_recommended", "next_action_approved", "next_action_rejected"}
+
+    first = await store.record_events_if_latest(
+        campaign_id=campaign_id,
+        expected_event_id=recommended.id,
+        among=among,
+        events=[("human", "next_action_approved", {})],
+    )
+    second = await store.record_events_if_latest(
+        campaign_id=campaign_id,
+        expected_event_id=recommended.id,
+        among=among,
+        events=[("human", "next_action_rejected", {})],
+    )
+
+    assert (first, second) == (True, False)
+    actions = [event.action for owner, event in store.event_log if owner == campaign_id]
+    assert actions == ["next_action_recommended", "next_action_approved"]
