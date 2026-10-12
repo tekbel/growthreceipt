@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -91,7 +92,7 @@ async def paypal_client_id(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Non
     app.dependency_overrides.clear()
 
 
-async def recommend_and_approve(client: AsyncClient, **decision: object) -> dict[str, object]:
+async def recommend_and_approve(client: AsyncClient, **decision: object) -> dict[str, Any]:
     recommended = await client.post("/v1/agents/next-action", json={"campaign_id": CAMPAIGN_ID})
     assert recommended.status_code == 200
     response = await client.post(
