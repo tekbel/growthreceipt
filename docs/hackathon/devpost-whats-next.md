@@ -26,4 +26,10 @@ The demo offer is fixed to the LaunchCheck 10 scan pack at 9 USD. Next, the offe
 
 ## Publishing
 
-Channel publishing is not connected yet. Next, approved posts publish straight to the connected channels, with the same human approval step before anything goes live.
+LinkedIn publishing is live for personal profiles. A founder connects LinkedIn, then posts an approved post with one click or turns on automatic publishing, which posts each approved post on its scheduled day. Only approved posts are sent.
+
+Next:
+
+* X, with the same approval step and the same buy link per post
+* LinkedIn Company Pages, which need LinkedIn's Community Management API review
+* Reading each live post's views and clicks next to its verified purchases, so the gap between engagement and revenue is visible per post
