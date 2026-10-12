@@ -17,6 +17,9 @@ from app.routes.agents import BriefSuggestion, get_page_reader
 PAGE = b"""<html><head><title>LaunchCheck | Scan</title>
 <meta name="description" content="Find launch issues on any public page.">
 <meta property="og:image" content="/og.png">
+<link rel="icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+<link rel="apple-touch-icon" href="/apple-icon.png">
 <script>alert("ignore me")</script></head>
 <body><h1>LaunchCheck</h1><p>Scan your page before launch.</p></body></html>"""
 
@@ -66,7 +69,7 @@ async def test_read_product_page_extracts_title_description_and_text() -> None:
 
     assert page.title == "LaunchCheck | Scan"
     assert page.description == "Find launch issues on any public page."
-    assert page.image_url == "https://example.com/og.png"
+    assert page.image_url == "https://example.com/apple-icon.png"
     assert page.text == "LaunchCheck Scan your page before launch."
 
 

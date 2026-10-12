@@ -9,6 +9,7 @@ close it but breaks TLS name checks, so the timeout and size cap limit what that
 
 import asyncio
 import ipaddress
+import re
 import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -112,8 +113,9 @@ def _parse(url: str, body: bytes) -> ProductPage:
     parser = _PageParser()
     parser.feed(body.decode("utf-8", errors="replace"))
     meta = parser.meta
-    image = meta.get("og:image") or meta.get("twitter:image")
-    image_url = urljoin(url, image) if image else None
+    # The app icon, never og:image, which is a wide share card and not an icon.
+    image = max(parser.icons, default=None)
+    image_url = urljoin(url, image[2]) if image else None
     return ProductPage(
         url=url,
         title=(meta.get("og:title") or parser.title).strip()[:200],
@@ -138,6 +140,8 @@ class _PageParser(HTMLParser):
         self.text: list[str] = []
         self.skip = 0
         self.in_title = False
+        # (rank, size, href). An apple-touch-icon beats a plain PNG icon, then bigger wins.
+        self.icons: list[tuple[int, int, str]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {key: value or "" for key, value in attrs}
@@ -145,6 +149,16 @@ class _PageParser(HTMLParser):
             key = (values.get("property") or values.get("name") or "").lower()
             if key and values.get("content") and key not in self.meta:
                 self.meta[key] = values["content"]
+        elif tag == "link" and values.get("href"):
+            rel = values.get("rel", "").lower().split()
+            href = values["href"]
+            raster = href.lower().split("?")[0].endswith((".png", ".jpg", ".jpeg", ".webp"))
+            sizes = re.findall(r"(\d+)x\d+", values.get("sizes", ""))
+            size = max((int(size) for size in sizes), default=0)
+            if "apple-touch-icon" in rel:
+                self.icons.append((2, size or 180, href))
+            elif "icon" in rel and raster:
+                self.icons.append((1, size, href))
         elif tag == "title":
             self.in_title = True
         if tag in self.SKIP:

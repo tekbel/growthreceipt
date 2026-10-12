@@ -2364,7 +2364,7 @@ function NewCampaignPage({
               disabled={!pageUrl.trim()}
               onClick={() => void fillFromPage()}
             >
-              {reading ? "Reading page" : "Fill brief"}
+              {reading ? <BusyLabel text="Agent is reading the page" elapsed /> : "Fill brief"}
             </button>
           </div>
           <p
