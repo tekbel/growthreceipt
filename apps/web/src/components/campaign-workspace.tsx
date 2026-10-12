@@ -4147,7 +4147,7 @@ function ConfidenceTag({ confidence }: { confidence: Recommendation["confidence"
   );
 }
 
-function BusyLabel({ text, elapsed = false }: { text: string; elapsed?: boolean }) {
+export function BusyLabel({ text, elapsed = false }: { text: string; elapsed?: boolean }) {
   return (
     <span className="busy-label">
       <span className="spinner" aria-hidden="true" />

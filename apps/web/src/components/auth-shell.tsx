@@ -12,7 +12,11 @@ import {
 
 import { SiPaypal } from "react-icons/si";
 
-import { CampaignWorkspace, type WorkspaceIdentity } from "@/components/campaign-workspace";
+import {
+  BusyLabel,
+  CampaignWorkspace,
+  type WorkspaceIdentity,
+} from "@/components/campaign-workspace";
 import { apiFetch, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
@@ -38,6 +42,8 @@ export function AuthShell() {
   }, [resendIn]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Which button started the wait, so only that one shows the busy label.
+  const [pending, setPending] = useState<"judge" | "google" | "email" | null>(null);
   const captcha = useTurnstile();
   const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
@@ -112,6 +118,7 @@ export function AuthShell() {
     const supabase = getSupabase();
     if (!supabase) return;
     setSubmitting(true);
+    setPending("judge");
     setError(null);
     const { error: signInError } = await supabase.auth.signInAnonymously({
       options: { captchaToken: captcha.token ?? undefined },
@@ -127,6 +134,7 @@ export function AuthShell() {
     const supabase = getSupabase();
     if (!supabase) return;
     setSubmitting(true);
+    setPending("google");
     setError(null);
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -147,6 +155,7 @@ export function AuthShell() {
     const supabase = getSupabase();
     if (!supabase || !email.trim()) return;
     setSubmitting(true);
+    setPending("email");
     setError(null);
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
@@ -294,7 +303,11 @@ export function AuthShell() {
             disabled={submitting || captchaPending}
             onClick={() => void enterJudgeDemo()}
           >
-            {submitting ? "Opening your demo" : "Try the judge demo"}
+            {submitting && pending === "judge" ? (
+              <BusyLabel text="Opening your demo" />
+            ) : (
+              "Try the judge demo"
+            )}
             <ArrowRight aria-hidden="true" />
           </button>
           <ul className="auth-demo-facts">
@@ -313,7 +326,11 @@ export function AuthShell() {
               disabled={submitting || captchaPending}
               onClick={() => void signInWithGoogle()}
             >
-              Continue with Google
+              {submitting && pending === "google" ? (
+                <BusyLabel text="Opening Google" />
+              ) : (
+                "Continue with Google"
+              )}
             </button>
           ) : null}
           {emailSent ? (
@@ -365,7 +382,11 @@ export function AuthShell() {
                 type="submit"
                 disabled={submitting || captchaPending}
               >
-                Email me a sign in link
+                {submitting && pending === "email" ? (
+                  <BusyLabel text="Sending your link" />
+                ) : (
+                  "Email me a sign in link"
+                )}
               </button>
             </form>
           )}
