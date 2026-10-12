@@ -1,10 +1,10 @@
 import json
-from typing import Annotated, Literal, cast
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import Row, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentActor
@@ -27,6 +27,22 @@ class WorkspaceSession(BaseModel):
     timezone: str | None = None
 
 
+async def _owned_workspace(session: AsyncSession, user_id: UUID) -> Row[Any] | None:
+    return (
+        await session.execute(
+            text(
+                """
+                select id, name, coalesce(settings->>'kind', 'user') as mode,
+                       settings->>'timezone' as timezone
+                from growthreceipt.workspaces
+                where created_by_user_id = :user_id
+                """
+            ),
+            {"user_id": user_id},
+        )
+    ).one_or_none()
+
+
 @router.post("/bootstrap", response_model=WorkspaceSession)
 async def bootstrap_workspace(
     actor: CurrentActor,
@@ -40,19 +56,7 @@ async def bootstrap_workspace(
             is_anonymous=True,
         )
     async with session.begin():
-        row = (
-            await session.execute(
-                text(
-                    """
-                    select id, name, coalesce(settings->>'kind', 'user') as mode,
-                           settings->>'timezone' as timezone
-                    from growthreceipt.workspaces
-                    where created_by_user_id = :user_id
-                    """
-                ),
-                {"user_id": actor.user_id},
-            )
-        ).one_or_none()
+        row = await _owned_workspace(session, actor.user_id)
         if row is None:
             mode: WorkspaceMode = "judge" if actor.is_anonymous else "user"
             timezone = None
@@ -62,6 +66,8 @@ async def bootstrap_workspace(
                     """
                     insert into growthreceipt.workspaces (name, settings, created_by_user_id)
                     values (:name, cast(:settings as jsonb), :user_id)
+                    on conflict (created_by_user_id) where created_by_user_id is not null
+                    do nothing
                     returning id
                     """
                 ),
@@ -71,19 +77,22 @@ async def bootstrap_workspace(
                     "user_id": actor.user_id,
                 },
             )
-            assert workspace_id is not None
-            await session.execute(
-                text(
-                    """
-                    insert into growthreceipt.workspace_members (workspace_id, user_id, role)
-                    values (:workspace_id, :user_id, 'owner')
-                    """
-                ),
-                {"workspace_id": workspace_id, "user_id": actor.user_id},
-            )
-            if actor.is_anonymous:
-                await seed_judge_workspace(session, workspace_id=workspace_id)
-        else:
+            if workspace_id is None:
+                # A parallel first request created it, so use that one.
+                row = await _owned_workspace(session, actor.user_id)
+            else:
+                await session.execute(
+                    text(
+                        """
+                        insert into growthreceipt.workspace_members (workspace_id, user_id, role)
+                        values (:workspace_id, :user_id, 'owner')
+                        """
+                    ),
+                    {"workspace_id": workspace_id, "user_id": actor.user_id},
+                )
+                if actor.is_anonymous:
+                    await seed_judge_workspace(session, workspace_id=workspace_id)
+        if row is not None:
             workspace_id = row.id
             name = row.name
             mode = cast(WorkspaceMode, row.mode)
