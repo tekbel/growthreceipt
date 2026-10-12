@@ -2047,9 +2047,13 @@ function PayingPostsMetric({
   return (
     <Metric
       icon={<Send aria-hidden="true" />}
-      label="Paying posts"
+      label="Posts with verified revenue"
       value={`${paying} of ${approved}`}
-      detail={approved ? "Approved posts with a verified purchase" : "Approve a post first"}
+      detail={
+        approved
+          ? `Out of ${approved} approved post${approved === 1 ? "" : "s"}`
+          : "Approve a post first"
+      }
       tone={paying ? "success" : "neutral"}
     />
   );
@@ -3247,7 +3251,12 @@ function ResultsPage({
           ) : (
             <>
               <h2>Choose the next test from real results.</h2>
-              <p>The agent needs one verified purchase before it recommends what to test next.</p>
+              <p>
+                The agent compares verified purchase signals across posts and recommends one focused
+                next experiment. When several posts bring purchases, the agent ranks them by
+                verified revenue, then by order count. Fewer than 3 purchases is an early signal,
+                and equal revenue is a tie that needs a controlled test.
+              </p>
               <button
                 className="button accent"
                 disabled={!hasRevenue || recommendationLoading}
@@ -3401,7 +3410,7 @@ function SignalBasis({
 const signalCopy: Record<EvidenceSignal, string> = {
   none: "No purchases yet. The agent suggests the smallest step toward a first one.",
   early:
-    "Early signal. The leading post has fewer than 3 purchases, so the agent repeats its angle with care.",
+    "Early signal. The leading post has fewer than 3 purchases, so the agent repeats its angle with care. Keep testing before treating it as a winner.",
   leader: "Clear leader. One post earned the most from at least 3 purchases.",
   tie: "Tied. Posts earned the same amount, so the agent compares them instead of picking one.",
 };
@@ -3740,13 +3749,16 @@ function ExperimentPage({
             <span className={`status-tag ${ready ? "success" : "neutral"}`}>
               {ready ? "Ready" : "Waiting for evidence"}
             </span>
-            <h2>
-              {ready ? "Ready for a recommendation." : "Complete one verified purchase first."}
-            </h2>
+            <h2>{ready ? "Ready for a recommendation." : "Complete a verified purchase first."}</h2>
             <p>
               {ready
                 ? "There is a verified purchase to learn from. Ask the agent for one next experiment."
-                : "Recommendations begin after a verified purchase. Once there is evidence to compare, the agent selects one focused next experiment."}
+                : "Recommendations begin after a verified purchase. Additional purchases are compared as they arrive."}
+            </p>
+            <p className="move-run">
+              When several posts bring purchases, the agent ranks them by verified revenue, then by
+              order count. Fewer than 3 purchases is an early signal, and equal revenue is a tie
+              that needs a controlled test.
             </p>
             <div className="form-actions">
               {!ready ? (
@@ -4030,7 +4042,7 @@ function CheckoutPage({
       <PageHeader
         eyebrow="Customer view"
         title="Buy as your customer"
-        description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page and never sees GrowthReceipt. Open a link as your customer to make a test purchase. The payment goes to you and is credited to the post that brought it."
+        description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page and never sees GrowthReceipt. Each purchase is attributed to the post that referred it. This demo uses PayPal sandbox, so no real money moves."
       />
       <section className="checkout-preview-card">
         <div>
@@ -4256,7 +4268,7 @@ function PublishButton({
     }
   }
 
-  const label = target.url ? `Publish on ${post.channel}` : "Copy for Instagram";
+  const label = target.url ? `Open in ${post.channel}` : "Copy for Instagram";
   return (
     <span className="tip-anchor">
       <button

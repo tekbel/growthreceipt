@@ -333,7 +333,10 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                       signing up. A live store never shows this.
                     </InfoTip>
                   </p>
-                  <p>When PayPal asks you to log in, use this sandbox account.</p>
+                  <p>
+                    Demo credentials for PayPal sandbox only. When PayPal asks you to log in, use
+                    them.
+                  </p>
                   <dl>
                     <CopyRow label="Email" value={offer.sandbox_buyer_email} />
                     <CopyRow label="Password" value={offer.sandbox_buyer_password} />

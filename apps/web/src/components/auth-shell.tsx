@@ -201,7 +201,7 @@ export function AuthShell() {
   if (state === "loading" || state === "bootstrapping") {
     return (
       <AuthLoading
-        copy={state === "loading" ? "Checking your session" : "Preparing your workspace"}
+        copy={state === "loading" ? "Checking your session" : "Preparing your private demo"}
       />
     );
   }
@@ -413,6 +413,12 @@ export function AuthShell() {
 }
 
 function AuthLoading({ copy }: { copy: string }) {
+  // A slow start should never look frozen, so offer a retry after a while.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 15000);
+    return () => window.clearTimeout(timer);
+  }, []);
   return (
     <main className="auth-stage auth-loading" aria-busy="true">
       <div className="auth-loading-mark">
@@ -421,6 +427,14 @@ function AuthLoading({ copy }: { copy: string }) {
       <div className="skeleton-line wide" />
       <div className="skeleton-line short" />
       <span className="visually-hidden">{copy}</span>
+      {slow ? (
+        <p role="status">
+          Still preparing the demo.{" "}
+          <button className="text-button" type="button" onClick={() => window.location.reload()}>
+            Refresh to retry
+          </button>
+        </p>
+      ) : null}
     </main>
   );
 }
