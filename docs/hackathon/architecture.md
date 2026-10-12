@@ -25,12 +25,34 @@ The PayPal payment is a buyer paying the founder for the founder's product. It i
 
 In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offer is a one time pack of 10 scans for 9 USD. A buyer who arrives from a campaign post buys the pack for 9 USD, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and in the demo customers buy the same pack through PayPal.
 
-Hosted demo limits:
+GrowthReceipt's own pricing is separate from that payment. It is planned as a 3% fee on verified revenue, collected through the same PayPal split described below, or a monthly plan with no fee. See [who-its-for.md](./who-its-for.md).
 
-* All checkouts run through one PayPal sandbox merchant account owned by GrowthReceipt. No real money moves.
-* The checkout offer is fixed to the LaunchCheck 10 scan pack at 9 USD.
+### How the money moves in the hosted demo
 
-In production each founder connects their own PayPal account through PayPal partner onboarding (the Partner Referrals API), so buyers pay the founder directly and GrowthReceipt only reads the order and capture events it needs for attribution.
+No real money moves, and the founder receives nothing. The demo exists to prove the attribution loop.
+
+1. The buyer opens a post's buy link and clicks the PayPal button.
+2. The API creates a PayPal order with GrowthReceipt's sandbox credentials. The payee is one PayPal sandbox merchant account that GrowthReceipt owns.
+3. The buyer approves the payment and the API captures it. The sandbox money lands in that one account.
+4. PayPal sends the capture webhook, the API verifies it, and the revenue is credited to the campaign and the post.
+
+The checkout offer is fixed to the LaunchCheck 10 scan pack at 9 USD.
+
+### How the money moves in production (planned, not built)
+
+1. **Connect PayPal.** The founder goes through PayPal partner onboarding (the Partner Referrals API), signs in to their own PayPal business account and grants permission. GrowthReceipt stores their PayPal merchant ID.
+2. **Create the order.** At checkout the API creates the order as the platform, with `payee.merchant_id` set to the founder's ID.
+3. **Payment.** The money goes straight into the founder's PayPal balance, less PayPal's usual processing fee. GrowthReceipt does not hold or forward the money.
+4. **Revenue fee, Starter plan only.** The order carries a `platform_fees` entry for 3%. PayPal splits it out at capture and sends that share to GrowthReceipt's account. Maker and Team plans have no platform fee.
+5. **Attribution.** PayPal still sends GrowthReceipt the order and capture webhooks, so attribution works exactly as in the demo.
+6. **Withdrawal.** The founder moves money from PayPal to their bank the normal way. Refunds and disputes stay in their own PayPal account.
+
+What is missing to get there:
+
+* The Connect PayPal onboarding flow
+* Storing each founder's merchant ID
+* Setting the payee and the platform fee on each order
+* PayPal partner approval for multiparty payments, which can take weeks. This is the main blocker and the reason the demo uses one merchant.
 
 ## Hosting
 

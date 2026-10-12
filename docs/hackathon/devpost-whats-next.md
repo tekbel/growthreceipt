@@ -18,7 +18,7 @@ Retention by campaign is a signal that engagement based marketing tools cannot s
 
 ## Founders get paid directly
 
-The hosted demo runs every checkout through one PayPal sandbox merchant. In production each founder connects their own PayPal account through PayPal partner onboarding (the Partner Referrals API). Buyers pay the founder directly, and GrowthReceipt only reads the order, capture and subscription events it needs for attribution.
+The hosted demo runs every checkout through one PayPal sandbox merchant. In production each founder connects their own PayPal account through PayPal partner onboarding (the Partner Referrals API). Buyers pay the founder directly, and GrowthReceipt only reads the order, capture and subscription events it needs for attribution. On the free Starter plan, a 3% platform fee is split out of each payment by PayPal at capture, so GrowthReceipt does not hold the founder's money. The step by step flow is in [architecture.md](./architecture.md#how-the-money-moves-in-production-planned-not-built).
 
 ## Offers from the product
 
