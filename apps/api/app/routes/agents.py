@@ -182,6 +182,8 @@ offer_catalog lists the only offers the buy links can sell. current_offer_id is 
 by_offer shows what customers bought. Set offer_change only when there is at least one purchase
 and the evidence gives a reason to try another catalog offer, for example buyers of the current
 pack suggest a larger or a smaller pack would suit them. offer_change.reason is one short sentence.
+Once one offer has at least 2 purchases, always weigh whether a larger or a smaller pack from
+offer_catalog is worth testing next, and suggest it when buyers' posts or volume point that way.
 Otherwise set offer_change to null. Never suggest an offer that is not in offer_catalog.
 Set human_approval_required to true.
 Write for a busy founder in plain, everyday English.

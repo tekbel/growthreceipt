@@ -231,3 +231,21 @@ async def test_catalog_lists_the_three_launchcheck_packs(payments: FakePaymentSt
         (10, "9.00"),
         (30, "19.00"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_founder_picks_the_offer_by_hand(
+    payments: FakePaymentStore, campaign_store: FakeCampaignStore
+) -> None:
+    async with client_for(payments, suggestion(LARGE_PACK)) as client:
+        picked = await client.post(
+            f"/v1/paypal/campaigns/{CAMPAIGN_ID}/offer", json={"offer_id": LARGE_PACK}
+        )
+        unknown = await client.post(
+            f"/v1/paypal/campaigns/{CAMPAIGN_ID}/offer", json={"offer_id": "free-pack"}
+        )
+
+    assert picked.json()["offer"]["credits"] == 30
+    assert unknown.status_code == 404
+    events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(CAMPAIGN_ID))
+    assert events[0].action == "offer_changed"

@@ -504,6 +504,23 @@ export function CampaignWorkspace({
       ? { headline: recommendation.headline, at: recommendedAt, decision: moveDecision?.decision }
       : null;
 
+  async function chooseOffer(offerId: string) {
+    if (!campaign || offerId === campaign.offer_id) return;
+    try {
+      const response = await apiFetch(`/v1/paypal/campaigns/${campaign.id}/offer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offer_id: offerId }),
+      });
+      if (!response.ok) throw new Error("offer change failed");
+      const updated = (await response.json()) as Campaign;
+      setCampaign(updated);
+      notify(`Every buy link now sells the ${updated.offer.name}.`);
+    } catch {
+      notify("The offer could not be changed. Please try again.");
+    }
+  }
+
   async function decideNextMove(
     decision: MoveDecision["decision"],
     edited?: string,
@@ -1005,6 +1022,8 @@ export function CampaignWorkspace({
         return (
           <CheckoutPage
             offer={campaign.offer}
+            offers={offers}
+            chooseOffer={chooseOffer}
             post={checkoutPost}
             posts={posts}
             revenue={revenue}
@@ -3974,6 +3993,8 @@ function buyLink(contentId: string) {
 
 function CheckoutPage({
   offer,
+  offers,
+  chooseOffer,
   post,
   posts,
   revenue,
@@ -3983,6 +4004,8 @@ function CheckoutPage({
   notify,
 }: {
   offer: Offer;
+  offers: Offer[];
+  chooseOffer: (offerId: string) => Promise<void>;
   post: Post | null;
   posts: Post[];
   revenue: RevenueSummary | null;
@@ -4030,6 +4053,22 @@ function CheckoutPage({
           <SiPaypal aria-hidden="true" />
           <span>PayPal sandbox</span>
           <strong>{formatMoney(offer.amount, offer.currency)}</strong>
+          {offers.length > 1 ? (
+            <fieldset className="offer-picker">
+              <legend>What every buy link sells</legend>
+              {offers.map((item) => (
+                <label key={item.id}>
+                  <input
+                    type="radio"
+                    name="offer"
+                    checked={item.id === offer.id}
+                    onChange={() => void chooseOffer(item.id)}
+                  />
+                  {item.credits} scans · {formatMoney(item.amount, item.currency)}
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
           <p>Sandbox only. No real money moves.</p>
           {post ? (
             <>

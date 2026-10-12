@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
 from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.models import Campaign
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
 from app.offers import OFFERS
@@ -143,6 +144,36 @@ async def list_offers(_workspace_id: WorkspaceId) -> list[OfferResponse]:
         )
         for offer in OFFERS.values()
     ]
+
+
+class OfferChoice(BaseModel):
+    offer_id: str
+
+
+@router.post("/campaigns/{campaign_id}/offer", response_model=Campaign)
+async def choose_offer(
+    campaign_id: UUID,
+    choice: OfferChoice,
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
+) -> Campaign:
+    """The founder picks what every buy link sells. Same event as an approved agent switch."""
+    if choice.offer_id not in OFFERS:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if choice.offer_id == campaign.offer_id:
+        return campaign
+    await campaigns.record_event(
+        campaign_id=campaign.id,
+        actor="human",
+        action="offer_changed",
+        detail={"offer_id": choice.offer_id, "previous_offer_id": campaign.offer_id},
+    )
+    updated = await campaigns.get(workspace_id=workspace_id, campaign_id=campaign_id)
+    assert updated is not None
+    return updated
 
 
 @router.post("/orders", response_model=OrderResponse)

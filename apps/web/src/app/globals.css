@@ -413,6 +413,11 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .checkout-offer > span { margin-top: 13px; color: var(--muted); }
 .checkout-offer > strong { margin-top: 32px; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .checkout-offer .button { margin-top: 24px; }
+.offer-picker { margin: 20px 0 12px; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.offer-picker legend { margin-bottom: 8px; padding: 0; color: var(--muted); font-size: var(--type-sm); }
+.offer-picker label { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-md); font-size: var(--type-sm); font-variant-numeric: tabular-nums; cursor: pointer; }
+.offer-picker label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.offer-picker input { accent-color: var(--accent); }
 .checkout-offer small { margin-top: 16px; color: var(--muted); overflow-wrap: anywhere; }
 .buy-links { margin-top: 40px; }
 .buy-links h2 { margin: 0; font-size: var(--type-lg); font-weight: 500; }
@@ -1041,7 +1046,8 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .product-mark, .checkout-product-mark { position: relative; }
 .product-mark img, .checkout-product-mark img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--duration-base) var(--ease); }
 .product-mark img.loaded, .checkout-product-mark img.loaded { opacity: 1; }
-.checkout-product-mark img.loaded { background: #dce8ff; }
+/* A loaded icon shows alone, so its own rounded corners leave no tinted edge. */
+.product-mark:has(img.loaded), .checkout-product-mark:has(img.loaded) { background: transparent; border-color: transparent; box-shadow: none; }
 /* The PayPal button arrives from PayPal's own script. Hold its space and fade it in. */
 .paypal-button-frame { position: relative; min-height: 48px; }
 .paypal-button-slot { opacity: 0; transition: opacity var(--duration-base) var(--ease); }
