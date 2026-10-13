@@ -1,28 +1,39 @@
 "use client";
 
-import type { AgReportState, AgStudioApi, AgStudioMode } from "ag-studio";
-import { AgStudio, AgStudioProvider } from "ag-studio-react";
+import type { AgReportState, AgStudioApi, AgStudioMode, AgWidgetsConfig } from "ag-studio";
+import { AgStudio, AgStudioProvider, createWidgets } from "ag-studio-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { Receipt } from "@/components/receipt-proof";
 import { apiFetch, type Campaign, type Offer } from "@/lib/campaign";
 import { buildStudioData, type Checkout } from "./data";
+import { RECEIPT_WIDGET, type RevenueRegistry, receiptWidget } from "./receipt-widget";
 import { revenueReport } from "./report";
 import { revenueStudioTheme } from "./theme";
+
+type Report = AgReportState<RevenueRegistry>;
+
+// A module level function keeps one reference, so Studio does not reset on render.
+const widgets = (defaults: AgWidgetsConfig) =>
+  createWidgets<RevenueRegistry>({
+    additionalTypes: [receiptWidget],
+    menu: [...(defaults.menu ?? []), { label: "Proof", widgetIds: [RECEIPT_WIDGET] }],
+  });
 
 const reportKey = (campaignId: string) => `growthreceipt.revenue-report.${campaignId}`;
 
 // A founder's edited report stays in their browser. Storage can be blocked, so both directions
 // fall back to the built-in report.
-function savedReport(campaignId: string): AgReportState | null {
+function savedReport(campaignId: string): Report | null {
   try {
     const raw = localStorage.getItem(reportKey(campaignId));
-    return raw ? (JSON.parse(raw) as AgReportState) : null;
+    return raw ? (JSON.parse(raw) as Report) : null;
   } catch {
     return null;
   }
 }
 
-function saveReport(campaignId: string, state: AgReportState | null) {
+function saveReport(campaignId: string, state: Report | null) {
   try {
     if (state) localStorage.setItem(reportKey(campaignId), JSON.stringify(state));
     else localStorage.removeItem(reportKey(campaignId));
@@ -34,7 +45,7 @@ function saveReport(campaignId: string, state: AgReportState | null) {
 type Load =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; checkouts: Checkout[]; offers: Offer[] };
+  | { status: "ready"; checkouts: Checkout[]; offers: Offer[]; receipts: Receipt[] };
 
 export default function RevenueStudio({
   campaign,
@@ -48,20 +59,23 @@ export default function RevenueStudio({
   // Studio reads initialState once, when it is created. This component only renders in the browser.
   const [saved] = useState(() => savedReport(campaign.id));
   const [edited, setEdited] = useState(Boolean(saved));
-  const api = useRef<AgStudioApi | null>(null);
+  const api = useRef<AgStudioApi<RevenueRegistry> | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoad({ status: "loading" });
     try {
-      const [checkouts, offers] = await Promise.all([
+      const [checkouts, offers, receipts] = await Promise.all([
         apiFetch(`/v1/paypal/checkouts/${campaign.id}`),
         apiFetch("/v1/paypal/offers"),
+        apiFetch(`/v1/paypal/receipts/${campaign.id}`),
       ]);
-      if (!checkouts.ok || !offers.ok) throw new Error("Dashboard data is unavailable");
+      if (!checkouts.ok || !offers.ok || !receipts.ok)
+        throw new Error("Dashboard data is unavailable");
       setLoad({
         status: "ready",
         checkouts: ((await checkouts.json()) as { checkouts: Checkout[] }).checkouts,
         offers: (await offers.json()) as Offer[],
+        receipts: ((await receipts.json()) as { receipts: Receipt[] }).receipts,
       });
     } catch {
       setLoad({ status: "error" });
@@ -73,7 +87,10 @@ export default function RevenueStudio({
   }, [fetchData]);
 
   const data = useMemo(
-    () => (load.status === "ready" ? buildStudioData(campaign, load.checkouts, load.offers) : null),
+    () =>
+      load.status === "ready"
+        ? buildStudioData(campaign, load.checkouts, load.offers, load.receipts)
+        : null,
     [campaign, load],
   );
 
@@ -156,14 +173,16 @@ export default function RevenueStudio({
       </div>
       <div className="revenue-studio-canvas">
         <AgStudioProvider>
-          <AgStudio
+          <AgStudio<RevenueRegistry>
             style={{ height: "100%", width: "100%" }}
             theme={revenueStudioTheme}
             data={data}
+            widgets={widgets}
             initialState={saved ?? revenueReport}
             mode={mode}
             onApiReady={(event) => {
-              api.current = event.api;
+              // The ready event is typed with the default registry, the api is ours.
+              api.current = event.api as unknown as AgStudioApi<RevenueRegistry>;
             }}
           />
         </AgStudioProvider>

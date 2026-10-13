@@ -9,7 +9,9 @@ import type {
   AgRelationDefinition,
 } from "ag-studio";
 
+import type { Receipt } from "@/components/receipt-proof";
 import { type Campaign, type Offer, postDate } from "@/lib/campaign";
+import type { RevenueRegistry } from "./receipt-widget";
 
 export type Checkout = {
   order_id: string;
@@ -110,7 +112,10 @@ export function buildStudioData(
   campaign: Campaign,
   checkouts: Checkout[],
   offers: Offer[],
-): AgDataSourcesDefinition {
+  receipts: Receipt[],
+): AgDataSourcesDefinition<RevenueRegistry> {
+  // Receipts carry the capture and the signature checked PayPal webhooks for each paid order.
+  const proof = new Map(receipts.map((receipt) => [receipt.order_id, receipt]));
   const posts = campaign.posts.map((post) => ({
     id: post.id,
     label: `Day ${post.day} ${post.channel}: ${post.theme}`,
@@ -120,19 +125,25 @@ export function buildStudioData(
     date: postDate(campaign, post),
     live: Boolean(post.published_at || post.published_url),
   }));
-  const rows = checkouts.map((checkout) => ({
-    id: checkout.order_id,
-    postId: checkout.content_id,
-    offerId: checkout.offer_id,
-    status: checkout.completed ? "Verified purchase" : "Checkout started",
-    started: 1,
-    verified: checkout.completed ? 1 : 0,
-    revenue: checkout.completed ? Number(checkout.amount) : 0,
-    currency: checkout.currency,
-    orderedAt: checkout.ordered_at,
-    capturedAt: checkout.captured_at,
-    orderedOn: day(checkout.ordered_at),
-  }));
+  const rows = checkouts.map((checkout) => {
+    const receipt = proof.get(checkout.order_id);
+    return {
+      id: checkout.order_id,
+      postId: checkout.content_id,
+      offerId: checkout.offer_id,
+      status: checkout.completed ? "Verified purchase" : "Checkout started",
+      started: 1,
+      verified: checkout.completed ? 1 : 0,
+      revenue: checkout.completed ? Number(checkout.amount) : 0,
+      currency: checkout.currency,
+      orderedAt: checkout.ordered_at,
+      capturedAt: checkout.captured_at,
+      orderedOn: day(checkout.ordered_at),
+      captureId: receipt?.capture_id ?? null,
+      webhooks: receipt?.webhooks.length ?? 0,
+      lastWebhookAt: receipt?.webhooks.at(-1)?.received_at ?? null,
+    };
+  });
   const dates = rows.map((row) => row.orderedOn).sort();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -159,7 +170,8 @@ export function buildStudioData(
         id: "checkouts",
         description:
           "One row per PayPal order a buyer started. Verified is 1 when PayPal completed the capture. " +
-          "Revenue is the captured amount, 0 until then.",
+          "Revenue is the captured amount, 0 until then. Verified PayPal webhooks counts the " +
+          "signature checked PayPal events stored for the order and its capture.",
         data: rows,
         fields: fields([
           ["id", "PayPal order ID", "textFormat"],
@@ -173,6 +185,9 @@ export function buildStudioData(
           ["orderedAt", "Checkout started at", "dateTimeFormat"],
           ["capturedAt", "Captured at", "dateTimeFormat"],
           ["orderedOn", "Checkout date", "dateFormat", true],
+          ["captureId", "PayPal capture ID", "textFormat"],
+          ["webhooks", "Verified PayPal webhooks", "integerFormat"],
+          ["lastWebhookAt", "Last webhook at", "dateTimeFormat"],
         ]),
       },
       {

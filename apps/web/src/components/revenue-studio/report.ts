@@ -3,6 +3,8 @@
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from "ag-studio";
 
+import { RECEIPT_WIDGET, type RevenueRegistry } from "./receipt-widget";
+
 // Position on the canvas grid, in tracks: 24 columns wide.
 const at = (xTrack: number, yTrack: number, xSpan: number, ySpan: number): AgWidgetLayoutState => ({
   xTrack,
@@ -19,7 +21,7 @@ const kpi = (text: string, value: { id: string; aggregation?: "sum" }) => ({
   format: title(text),
 });
 
-const revenue: AgPageState = {
+const revenue: AgPageState<RevenueRegistry> = {
   id: "revenue",
   widgets: {
     "kpi-revenue": kpi("Verified revenue", sum("checkouts.revenue")),
@@ -93,6 +95,11 @@ const revenue: AgPageState = {
       sort: [{ field: sum("checkouts.revenue"), direction: "desc" }],
       format: title("Posts ranked by verified revenue"),
     },
+    receipts: {
+      type: RECEIPT_WIDGET,
+      dataMapping: {},
+      format: title("PayPal receipts"),
+    },
     "revenue-by-week": {
       type: "pivot-grid",
       dataMapping: {
@@ -120,11 +127,12 @@ const revenue: AgPageState = {
     "revenue-over-time": at(0, 33, 14, 18),
     "funnel-by-channel": at(14, 33, 10, 18),
     "revenue-by-week": at(0, 51, 24, 16),
-    posts: at(0, 67, 24, 20),
+    receipts: at(0, 67, 24, 24),
+    posts: at(0, 91, 24, 20),
   },
 };
 
-export const revenueReport: AgReportState = {
+export const revenueReport: AgReportState<RevenueRegistry> = {
   selectedPageId: revenue.id,
   pages: [revenue],
   panels: { filters: { collapsed: false } },
