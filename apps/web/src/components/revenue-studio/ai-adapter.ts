@@ -320,7 +320,7 @@ function executeTurn(request: AgLlmRequest, signal?: AbortSignal): AgLlmResponse
   const { tools = [], toolChoice, responseFormat, input, instructions, model } = request;
   const body: Raw = {
     input: input.map(encodeItem),
-    instructions,
+    instructions: sampleData ? `${instructions ?? ""}\n\n${SAMPLE_NOTE}` : instructions,
     tools: tools.map((tool) => ({
       type: "function",
       name: tool.name,
@@ -370,6 +370,16 @@ function executeTurn(request: AgLlmRequest, signal?: AbortSignal): AgLlmResponse
 
   const stream = events();
   return { stream: { [Symbol.asyncIterator]: () => stream }, complete };
+}
+
+// While the dashboard shows sample orders, every answer must say so.
+const SAMPLE_NOTE =
+  "The checkouts in this dashboard are sample data, not real PayPal orders. Say that every " +
+  "figure comes from sample data. Never call a sample purchase verified.";
+let sampleData = false;
+
+export function setSampleData(on: boolean) {
+  sampleData = on;
 }
 
 export const growthReceiptAdapter: AgLlmAdapter = {

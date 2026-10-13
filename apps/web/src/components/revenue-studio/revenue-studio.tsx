@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Receipt } from "@/components/receipt-proof";
 import { apiFetch, type Campaign, type Offer } from "@/lib/campaign";
-import { growthReceiptAdapter } from "./ai-adapter";
+import { growthReceiptAdapter, setSampleData } from "./ai-adapter";
 import { buildStudioData, type Checkout } from "./data";
 import { RECEIPT_WIDGET, type RevenueRegistry, receiptWidget } from "./receipt-widget";
 import { revenueReport } from "./report";
@@ -115,6 +115,7 @@ export default function RevenueStudio({
   const [saved] = useState(() => savedReport(campaign.id));
   const [edited, setEdited] = useState(Boolean(saved));
   const api = useRef<AgStudioApi<RevenueRegistry> | null>(null);
+  const opened = useRef("");
 
   const fetchData = useCallback(async () => {
     setLoad({ status: "loading" });
@@ -149,6 +150,7 @@ export default function RevenueStudio({
         : [],
     [campaign, load],
   );
+  useEffect(() => setSampleData(sample.length > 0), [sample]);
   const data = useMemo(
     () =>
       load.status === "ready"
@@ -160,14 +162,18 @@ export default function RevenueStudio({
   );
 
   function startEditing(withAssistant: boolean) {
+    opened.current = JSON.stringify(api.current?.getState() ?? null);
     setAssistant(withAssistant);
     setMode("edit");
   }
 
   function finishEditing() {
     const state = api.current?.getState() ?? null;
-    saveReport(campaign.id, state);
-    setEdited(Boolean(state));
+    // Only a real change is saved, so opening the editor alone never marks the layout as edited.
+    if (JSON.stringify(state) !== opened.current) {
+      saveReport(campaign.id, state);
+      setEdited(Boolean(state));
+    }
     setMode("view");
   }
 
@@ -255,7 +261,7 @@ export default function RevenueStudio({
             </>
           ) : (
             <button className="button dark" type="button" onClick={finishEditing}>
-              Save layout
+              {assistant ? "Done" : "Save layout"}
             </button>
           )}
         </div>
