@@ -21,6 +21,7 @@ import { growthReceiptAdapter } from "./ai-adapter";
 import { buildStudioData, type Checkout } from "./data";
 import { RECEIPT_WIDGET, type RevenueRegistry, receiptWidget } from "./receipt-widget";
 import { revenueReport } from "./report";
+import { sampleCheckouts } from "./sample";
 import { revenueStudioTheme } from "./theme";
 
 type Report = AgReportState<RevenueRegistry>;
@@ -140,12 +141,22 @@ export default function RevenueStudio({
     void fetchData();
   }, [fetchData]);
 
+  // With no real checkouts yet, the dashboard shows labelled sample orders until the first one.
+  const sample = useMemo(
+    () =>
+      load.status === "ready" && !load.checkouts.length
+        ? sampleCheckouts(campaign, load.offers)
+        : [],
+    [campaign, load],
+  );
   const data = useMemo(
     () =>
       load.status === "ready"
-        ? buildStudioData(campaign, load.checkouts, load.offers, load.receipts)
+        ? sample.length
+          ? buildStudioData(campaign, sample, load.offers, [])
+          : buildStudioData(campaign, load.checkouts, load.offers, load.receipts)
         : null,
-    [campaign, load],
+    [campaign, load, sample],
   );
 
   function startEditing(withAssistant: boolean) {
@@ -191,7 +202,7 @@ export default function RevenueStudio({
       </div>
     );
   }
-  if (!load.checkouts.length) {
+  if (!load.checkouts.length && !sample.length) {
     return (
       <div className="empty-state boxed">
         <strong>No checkouts yet</strong>
@@ -209,10 +220,20 @@ export default function RevenueStudio({
   return (
     <section className="revenue-studio" aria-label="Revenue dashboard">
       <div className="revenue-studio-toolbar">
-        <span>
-          {load.checkouts.length} checkout{load.checkouts.length === 1 ? "" : "s"} from PayPal
-          sandbox
-        </span>
+        {sample.length ? (
+          <p className="revenue-studio-sample" role="status">
+            <strong>Sample data.</strong> Buy the offer in the PayPal sandbox to see your own orders
+            here.{" "}
+            <button className="text-button" type="button" onClick={onOpenCheckout}>
+              Open as customer
+            </button>
+          </p>
+        ) : (
+          <span>
+            {load.checkouts.length} checkout{load.checkouts.length === 1 ? "" : "s"} from PayPal
+            sandbox
+          </span>
+        )}
         <div>
           {edited && mode === "view" ? (
             <button className="button secondary" type="button" onClick={resetReport}>
