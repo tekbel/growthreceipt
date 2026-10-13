@@ -23,9 +23,21 @@ const revenue: AgPageState = {
   id: "revenue",
   widgets: {
     "kpi-revenue": kpi("Verified revenue", sum("checkouts.revenue")),
-    "kpi-purchases": kpi("Verified purchases", sum("checkouts.verified")),
-    "kpi-started": kpi("Checkouts started", sum("checkouts.started")),
+    "kpi-purchases": kpi("Purchases", sum("checkouts.verified")),
+    "kpi-average": kpi("Order value", { id: "averageOrder" }),
+    "kpi-started": kpi("Checkouts", sum("checkouts.started")),
+    "kpi-unfinished": kpi("Unfinished", { id: "unfinished" }),
     "kpi-rate": kpi("Purchase rate", { id: "purchaseRate" }),
+    "filter-channel": {
+      type: "button-filter",
+      dataMapping: { value: [{ id: "posts.channel" }] },
+      format: title("Channel"),
+    },
+    "filter-offer": {
+      type: "button-filter",
+      dataMapping: { value: [{ id: "offers.name" }] },
+      format: title("Offer"),
+    },
     "revenue-by-post": {
       type: "bar-chart-grouped",
       dataMapping: {
@@ -81,22 +93,39 @@ const revenue: AgPageState = {
       sort: [{ field: sum("checkouts.revenue"), direction: "desc" }],
       format: title("Posts ranked by verified revenue"),
     },
+    "revenue-by-week": {
+      type: "pivot-grid",
+      dataMapping: {
+        rows: [{ id: "posts.channel" }, { id: "posts.label" }],
+        columns: [{ id: "calendar::week" }],
+        values: [sum("checkouts.revenue"), sum("checkouts.verified")],
+      },
+      format: {
+        ...title("Verified revenue by channel, post and week"),
+        style: { grandTotalRow: { enabled: true } },
+      },
+    },
   },
   widgetLayout: {
-    "kpi-revenue": at(0, 0, 6, 7),
-    "kpi-purchases": at(6, 0, 6, 7),
-    "kpi-started": at(12, 0, 6, 7),
-    "kpi-rate": at(18, 0, 6, 7),
-    "revenue-by-post": at(0, 7, 14, 18),
-    "revenue-by-offer": at(14, 7, 10, 18),
-    "revenue-over-time": at(0, 25, 14, 18),
-    "funnel-by-channel": at(14, 25, 10, 18),
-    posts: at(0, 43, 24, 20),
+    "kpi-revenue": at(0, 0, 4, 7),
+    "kpi-purchases": at(4, 0, 4, 7),
+    "kpi-average": at(8, 0, 4, 7),
+    "kpi-started": at(12, 0, 4, 7),
+    "kpi-unfinished": at(16, 0, 4, 7),
+    "kpi-rate": at(20, 0, 4, 7),
+    "filter-channel": at(0, 7, 12, 8),
+    "filter-offer": at(12, 7, 12, 8),
+    "revenue-by-post": at(0, 15, 14, 18),
+    "revenue-by-offer": at(14, 15, 10, 18),
+    "revenue-over-time": at(0, 33, 14, 18),
+    "funnel-by-channel": at(14, 33, 10, 18),
+    "revenue-by-week": at(0, 51, 24, 16),
+    posts: at(0, 67, 24, 20),
   },
 };
 
 export const revenueReport: AgReportState = {
   selectedPageId: revenue.id,
   pages: [revenue],
-  panels: { filters: { collapsed: true } },
+  panels: { filters: { collapsed: false } },
 };

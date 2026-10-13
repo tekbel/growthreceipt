@@ -50,20 +50,55 @@ const manyToOne = (id: string, source: string, target: string): AgRelationDefini
   };
 };
 
-const purchaseRate: AgExpressionFieldDefinition = {
-  id: "purchaseRate",
-  name: "Purchase rate",
-  description: "Verified purchases divided by checkouts started.",
-  format: "percentageFormat",
+const measure = (
+  id: string,
+  name: string,
+  description: string,
+  format: AgFormat,
+  operator: "divide" | "subtract",
+  [left, right]: [string, string],
+): AgExpressionFieldDefinition => ({
+  id,
+  name,
+  description,
+  format,
+  ...(format === "currencyFormat" && { formatOptions: { format: usd } }),
   isMeasure: true,
   expression: {
-    operator: "divide",
+    operator,
     inputs: [
-      { id: "checkouts.verified", aggregation: "sum" },
-      { id: "checkouts.started", aggregation: "sum" },
+      { id: left, aggregation: "sum" },
+      { id: right, aggregation: "sum" },
     ],
   },
-};
+});
+
+const expressions = [
+  measure(
+    "purchaseRate",
+    "Purchase rate",
+    "Verified purchases divided by checkouts started.",
+    "percentageFormat",
+    "divide",
+    ["checkouts.verified", "checkouts.started"],
+  ),
+  measure(
+    "averageOrder",
+    "Average order value",
+    "Verified revenue divided by verified purchases.",
+    "currencyFormat",
+    "divide",
+    ["checkouts.revenue", "checkouts.verified"],
+  ),
+  measure(
+    "unfinished",
+    "Unfinished checkouts",
+    "Checkouts started that PayPal has not completed.",
+    "integerFormat",
+    "subtract",
+    ["checkouts.started", "checkouts.verified"],
+  ),
+];
 
 const day = (iso: string) => iso.slice(0, 10);
 
@@ -145,7 +180,8 @@ export function buildStudioData(
         description: "What the customer bought: credit packs at fixed prices.",
         data: offers.map((offer) => ({
           id: offer.id,
-          name: offer.name,
+          // "LaunchCheck 10 scan pack" reads as "10 scan pack" inside its own campaign.
+          name: offer.name.replace(campaign.product_name, "").trim() || offer.name,
           credits: offer.credits,
           price: Number(offer.amount),
         })),
@@ -177,6 +213,6 @@ export function buildStudioData(
         fragments: ["year", "month", "week", "day", "dayOfWeek"],
       },
     ],
-    expressions: [purchaseRate],
+    expressions,
   };
 }
