@@ -16,6 +16,7 @@ from app.routes.health import router as health_router
 from app.routes.linkedin import router as linkedin_router
 from app.routes.paypal import router as paypal_router
 from app.routes.public import router as public_router
+from app.routes.studio import router as studio_router
 from app.routes.workspace import router as workspace_router
 
 settings = get_settings()
@@ -54,6 +55,7 @@ app.include_router(paypal_router)
 app.include_router(public_router)
 app.include_router(linkedin_router)
 app.include_router(workspace_router)
+app.include_router(studio_router)
 
 
 @app.get("/v1")

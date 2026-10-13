@@ -1,11 +1,23 @@
 "use client";
 
-import type { AgReportState, AgStudioApi, AgStudioMode, AgWidgetsConfig } from "ag-studio";
+import {
+  type AgAiHarnessSetup,
+  type AgAiModel,
+  type AgAiPromptStarter,
+  type AgPanelConfig,
+  type AgReportState,
+  AgStudioAiModule,
+  type AgStudioApi,
+  type AgStudioMode,
+  type AgWidgetsConfig,
+  createAiHarness,
+} from "ag-studio";
 import { AgStudio, AgStudioProvider, createWidgets } from "ag-studio-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Receipt } from "@/components/receipt-proof";
 import { apiFetch, type Campaign, type Offer } from "@/lib/campaign";
+import { growthReceiptAdapter } from "./ai-adapter";
 import { buildStudioData, type Checkout } from "./data";
 import { RECEIPT_WIDGET, type RevenueRegistry, receiptWidget } from "./receipt-widget";
 import { revenueReport } from "./report";
@@ -19,6 +31,47 @@ const widgets = (defaults: AgWidgetsConfig) =>
     additionalTypes: [receiptWidget],
     menu: [...(defaults.menu ?? []), { label: "Proof", widgetIds: [RECEIPT_WIDGET] }],
   });
+
+const promptStarters: AgAiPromptStarter[] = [
+  {
+    label: "Best post",
+    prompt: "Which post brought the most verified revenue, and how many purchases did it get?",
+  },
+  {
+    label: "Unpaid checkouts",
+    prompt: "Which posts have checkouts that were started but not paid?",
+  },
+  {
+    label: "Chart by channel",
+    prompt: "Add a bar chart of verified revenue by channel.",
+  },
+];
+
+// The assistant runs Studio's built-in agents. Each model turn goes through the GrowthReceipt API.
+// The API picks the model. The reader picks how hard it thinks, which the API caps at medium.
+const models: AgAiModel[] = [
+  {
+    id: "growthreceipt",
+    label: "OpenAI",
+    efforts: [
+      { id: "low", label: "Fast" },
+      { id: "medium", label: "Thorough" },
+    ],
+  },
+];
+const ai: AgAiHarnessSetup = ({ api }) =>
+  createAiHarness(api, { adapter: growthReceiptAdapter, promptStarters, models });
+
+const localeText = { aiMessageInputPlaceholder: "Ask about your PayPal revenue" };
+const modules = [AgStudioAiModule];
+
+// Asking the assistant shows only the chat beside the charts. Editing shows the usual panels.
+const viewPanels: AgPanelConfig["view"] = { right: ["filters"] };
+const assistantPanels: AgPanelConfig = { view: viewPanels, edit: { left: ["ai"] } };
+const editPanels: AgPanelConfig = {
+  view: viewPanels,
+  edit: { right: ["filters", "edit", "data"] },
+};
 
 const reportKey = (campaignId: string) => `growthreceipt.revenue-report.${campaignId}`;
 
@@ -56,6 +109,7 @@ export default function RevenueStudio({
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [mode, setMode] = useState<AgStudioMode>("view");
+  const [assistant, setAssistant] = useState(false);
   // Studio reads initialState once, when it is created. This component only renders in the browser.
   const [saved] = useState(() => savedReport(campaign.id));
   const [edited, setEdited] = useState(Boolean(saved));
@@ -93,6 +147,11 @@ export default function RevenueStudio({
         : null,
     [campaign, load],
   );
+
+  function startEditing(withAssistant: boolean) {
+    setAssistant(withAssistant);
+    setMode("edit");
+  }
 
   function finishEditing() {
     const state = api.current?.getState() ?? null;
@@ -161,9 +220,18 @@ export default function RevenueStudio({
             </button>
           ) : null}
           {mode === "view" ? (
-            <button className="button secondary" type="button" onClick={() => setMode("edit")}>
-              Edit dashboard
-            </button>
+            <>
+              <button className="button secondary" type="button" onClick={() => startEditing(true)}>
+                Ask AI
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => startEditing(false)}
+              >
+                Edit dashboard
+              </button>
+            </>
           ) : (
             <button className="button dark" type="button" onClick={finishEditing}>
               Save layout
@@ -172,12 +240,15 @@ export default function RevenueStudio({
         </div>
       </div>
       <div className="revenue-studio-canvas">
-        <AgStudioProvider>
+        <AgStudioProvider modules={modules}>
           <AgStudio<RevenueRegistry>
             style={{ height: "100%", width: "100%" }}
             theme={revenueStudioTheme}
             data={data}
             widgets={widgets}
+            ai={ai}
+            panels={assistant ? assistantPanels : editPanels}
+            localeText={localeText}
             initialState={saved ?? revenueReport}
             mode={mode}
             onApiReady={(event) => {

@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.database import get_session
 from app.workspaces import WorkspaceId
 
-RunKind = Literal["campaign_draft", "next_action"]
+RunKind = Literal["campaign_draft", "next_action", "studio_turn"]
 WINDOW = timedelta(days=1)
 
 
@@ -25,6 +25,12 @@ class PostgresAgentQuota:
 
     async def claim(self, *, workspace_id: UUID, kind: RunKind) -> bool:
         settings = get_settings()
+        studio = kind == "studio_turn"
+        workspace_limit, total_limit = (
+            (settings.studio_turns_per_workspace_day, settings.studio_turns_per_day)
+            if studio
+            else (settings.agent_runs_per_workspace_day, settings.agent_runs_per_day)
+        )
         since = datetime.now(UTC) - WINDOW
         async with self._session.begin():
             # Serialize claims so two parallel requests cannot both take the last run.
@@ -38,16 +44,13 @@ class PostgresAgentQuota:
                         select count(*) filter (where workspace_id = :workspace_id) as workspace,
                                count(*) as total
                         from growthreceipt.agent_runs
-                        where created_at > :since
+                        where created_at > :since and (kind = 'studio_turn') = :studio
                         """
                     ),
-                    {"workspace_id": workspace_id, "since": since},
+                    {"workspace_id": workspace_id, "since": since, "studio": studio},
                 )
             ).one()
-            if (
-                row.workspace >= settings.agent_runs_per_workspace_day
-                or row.total >= settings.agent_runs_per_day
-            ):
+            if row.workspace >= workspace_limit or row.total >= total_limit:
                 return False
             await self._session.execute(
                 text(
