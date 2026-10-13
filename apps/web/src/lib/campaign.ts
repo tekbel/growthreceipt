@@ -149,6 +149,8 @@ export type AgentJob = {
   created_at: string;
 };
 
+export type FollowUpResult = { post_id: string; campaign: Campaign; already_drafted?: boolean };
+
 /** Waits for an agent job that is still running after a reload, then returns its result. */
 async function waitForJob<T>(jobId: string, fallback: string): Promise<T> {
   for (;;) {
@@ -226,8 +228,17 @@ export const campaignApi = {
   streamCreate,
   followDraft,
   activeJobs: () => request<AgentJob[]>("/v1/agent-jobs"),
-  job: (jobId: string) => request<AgentJob>(`/v1/agent-jobs/${jobId}`),
   waitForJob,
+  followUpPost: (campaignId: string) =>
+    request<FollowUpResult>("/v1/agents/follow-up-post", {
+      method: "POST",
+      body: JSON.stringify({ campaign_id: campaignId }),
+    }),
+  revisePost: (campaignId: string, postId: string) =>
+    request<{ post_id: string; campaign: Campaign }>("/v1/agents/revise-post", {
+      method: "POST",
+      body: JSON.stringify({ campaign_id: campaignId, post_id: postId }),
+    }),
   briefFromUrl: (url: string) =>
     request<BriefSuggestion>("/v1/agents/brief-from-url", {
       method: "POST",

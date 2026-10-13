@@ -8,7 +8,7 @@ redeploy or a crash shows an honest failure instead of a run that never ends.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
+from collections.abc import AsyncIterator, Coroutine
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Protocol
@@ -223,29 +223,41 @@ async def heartbeat(jobs: AgentJobStore, job_id: UUID) -> AsyncIterator[None]:
         task.cancel()
 
 
-async def tracked[ResultT: BaseModel](
+class TrackedJob:
+    """Set result before the block ends. It becomes the job's result."""
+
+    def __init__(self, job_id: UUID) -> None:
+        self.id = job_id
+        self.result: BaseModel | None = None
+
+
+@asynccontextmanager
+async def track(
     jobs: AgentJobStore,
     *,
     workspace_id: UUID,
     kind: JobKind,
     campaign_id: UUID | None = None,
     failure: str,
-    work: Callable[[], Awaitable[ResultT]],
-) -> ResultT:
-    """Runs a plain request as a job. The request still answers as usual, and a page that
+) -> AsyncIterator[TrackedJob]:
+    """Records a plain request as a job. The request still answers as usual, and a page that
     reloaded meanwhile finds the result through the job."""
-    job_id = await jobs.start(workspace_id=workspace_id, kind=kind, campaign_id=campaign_id)
+    job = TrackedJob(
+        await jobs.start(workspace_id=workspace_id, kind=kind, campaign_id=campaign_id)
+    )
     try:
-        async with heartbeat(jobs, job_id):
-            result = await work()
+        async with heartbeat(jobs, job.id):
+            yield job
     except HTTPException as error:
-        await jobs.fail(job_id, str(error.detail))
+        await jobs.fail(job.id, str(error.detail))
+        raise
+    except asyncio.CancelledError:
+        await jobs.fail(job.id, INTERRUPTED, status="interrupted")
         raise
     except BaseException:
-        await jobs.fail(job_id, failure)
+        await jobs.fail(job.id, failure)
         raise
-    await jobs.finish(job_id, result.model_dump(mode="json"))
-    return result
+    await jobs.finish(job.id, job.result.model_dump(mode="json") if job.result else {})
 
 
 # Runs detached from their request. Holding the tasks here keeps them from being collected.

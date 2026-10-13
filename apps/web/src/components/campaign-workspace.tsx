@@ -56,6 +56,7 @@ import {
 } from "@/components/receipt-proof";
 import { type SearchItem, WorkspaceSearch } from "@/components/workspace-search";
 import {
+  type AgentJob,
   apiFetch,
   type BriefSuggestion,
   type Campaign,
@@ -68,6 +69,7 @@ import {
   type DraftProgress,
   type DraftStage,
   exampleBrief,
+  type FollowUpResult,
   type Offer,
   type Post,
   type PostStatus,
@@ -364,6 +366,8 @@ export function CampaignWorkspace({
   const [followUpId, setFollowUpId] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [revising, setRevising] = useState(false);
+  // A brief from a product page that was still being read when the page reloaded.
+  const [briefJobId, setBriefJobId] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
@@ -520,18 +524,15 @@ export function CampaignWorkspace({
             campaignApi.followDraft(draft.id, onProgress),
           ).catch(() => undefined);
         }
-        const move = jobs.find(
-          (job) => job.kind === "next_action" && job.campaign_id === campaignId,
-        );
-        if (move) void followNextMove(move.id);
-        const followUp = jobs.find(
-          (job) => job.kind === "follow_up_post" && job.campaign_id === campaignId,
-        );
-        if (followUp) void followFollowUp(followUp.id);
-        const revision = jobs.find(
-          (job) => job.kind === "revise_post" && job.campaign_id === campaignId,
-        );
-        if (revision) void followRevision(revision.id);
+        const resume: Partial<Record<AgentJob["kind"], (jobId: string) => void>> = {
+          next_action: (jobId) => void followNextMove(jobId),
+          follow_up_post: (jobId) => void draftFollowUp(jobId),
+          revise_post: (jobId) => void revisePost("", jobId),
+        };
+        for (const job of jobs) {
+          if (job.campaign_id === campaignId) resume[job.kind]?.(job.id);
+        }
+        setBriefJobId(jobs.find((job) => job.kind === "brief_from_url")?.id ?? null);
       })
       .catch(() => {
         // Nothing to resume. The page works as usual.
@@ -670,115 +671,54 @@ export function CampaignWorkspace({
   }
 
   // The agent writes the post the approved plan asks for. It waits in review like any other.
-  async function draftFollowUp() {
+  // With a job id, it waits for a post the server kept writing while the page reloaded.
+  async function draftFollowUp(jobId?: string) {
     if (!campaign) return;
     setDrafting(true);
     try {
-      const response = await apiFetch("/v1/agents/follow-up-post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign_id: campaign.id }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        post_id?: string;
-        campaign?: Campaign;
-        already_drafted?: boolean;
-        detail?: unknown;
-      } | null;
-      if (!response.ok || !body?.post_id || !body.campaign) {
-        throw new Error(
-          typeof body?.detail === "string"
-            ? body.detail
-            : "The post could not be drafted right now.",
-        );
-      }
-      applyFollowUp({ ...body, post_id: body.post_id, campaign: body.campaign });
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "The post could not be drafted right now.");
-    } finally {
-      setDrafting(false);
-    }
-  }
-
-  // A follow up post keeps being written on the server after a reload. Wait and show it.
-  async function followFollowUp(jobId: string) {
-    setDrafting(true);
-    try {
-      applyFollowUp(
-        await campaignApi.waitForJob<FollowUpResult>(
-          jobId,
-          "The post could not be drafted right now.",
-        ),
+      const result = jobId
+        ? await campaignApi.waitForJob<FollowUpResult>(
+            jobId,
+            "The post could not be drafted right now.",
+          )
+        : await campaignApi.followUpPost(campaign.id);
+      const day = result.campaign.posts.find((post) => post.id === result.post_id)?.day;
+      setCampaign(result.campaign);
+      setFollowUpId(result.post_id);
+      openPost(result.post_id);
+      // A reload while the agent was writing loses the answer, but the post was still saved.
+      notify(
+        result.already_drafted
+          ? `The agent already drafted the day ${day} post for this move. Here it is for review.`
+          : `Day ${day} post drafted from your approved plan. Review it before it goes out.`,
       );
     } catch (error) {
       notify(error instanceof Error ? error.message : "The post could not be drafted right now.");
     } finally {
       setDrafting(false);
     }
-  }
-
-  function applyFollowUp(result: FollowUpResult) {
-    const day = result.campaign.posts.find((post) => post.id === result.post_id)?.day;
-    setCampaign(result.campaign);
-    setFollowUpId(result.post_id);
-    openPost(result.post_id);
-    // A reload while the agent was writing loses the answer, but the post was still saved.
-    notify(
-      result.already_drafted
-        ? `The agent already drafted the day ${day} post for this move. Here it is for review.`
-        : `Day ${day} post drafted from your approved plan. Review it before it goes out.`,
-    );
   }
 
   // The agent applies the founder's change request. The new version goes back to review.
-  async function revisePost(postId: string) {
+  // With a job id, it waits for a revision the server kept writing while the page reloaded.
+  async function revisePost(postId: string, jobId?: string) {
     if (!campaign) return;
     setRevising(true);
     try {
-      const response = await apiFetch("/v1/agents/revise-post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign_id: campaign.id, post_id: postId }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        campaign?: Campaign;
-        detail?: unknown;
-      } | null;
-      if (!response.ok || !body?.campaign) {
-        throw new Error(
-          typeof body?.detail === "string"
-            ? body.detail
-            : "The post could not be revised right now.",
-        );
-      }
-      applyRevision(body.campaign);
+      const { campaign: revised } = jobId
+        ? await campaignApi.waitForJob<{ campaign: Campaign }>(
+            jobId,
+            "The post could not be revised right now.",
+          )
+        : await campaignApi.revisePost(campaign.id, postId);
+      setCampaign(revised);
+      setEditingBody(null);
+      notify("The agent revised the post from your note. Review the new version.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "The post could not be revised right now.");
     } finally {
       setRevising(false);
     }
-  }
-
-  // A revision keeps running on the server after a reload. Wait and show the new version.
-  async function followRevision(jobId: string) {
-    setRevising(true);
-    try {
-      const result = await campaignApi.waitForJob<{ campaign: Campaign }>(
-        jobId,
-        "The post could not be revised right now.",
-      );
-      applyRevision(result.campaign);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "The post could not be revised right now.");
-    } finally {
-      setRevising(false);
-    }
-  }
-
-  function applyRevision(revised: Campaign) {
-    setCampaign(revised);
-    setEditingBody(null);
-    notify("The agent revised the post from your note. Review the new version.");
   }
 
   function openPost(postId: string) {
@@ -1134,6 +1074,8 @@ export function CampaignWorkspace({
           createCampaign={createCampaign}
           run={draftRun}
           keepInBackground={keepDraftInBackground}
+          resumeJobId={briefJobId}
+          onResumed={() => setBriefJobId(null)}
           onCancel={() => navigate("campaigns")}
         />
       );
@@ -2485,19 +2427,21 @@ function ProductsPage({
   );
 }
 
-type FollowUpResult = { post_id: string; campaign: Campaign; already_drafted?: boolean };
-
 function NewCampaignPage({
   canCancel,
   createCampaign,
   run,
   keepInBackground,
+  resumeJobId,
+  onResumed,
   onCancel,
 }: {
   canCancel: boolean;
   createCampaign: (brief: CampaignBrief) => Promise<void>;
   run: DraftRun | null;
   keepInBackground: () => void;
+  resumeJobId: string | null;
+  onResumed: () => void;
   onCancel: () => void;
 }) {
   const [brief, setBrief] = useState<CampaignBrief>({
@@ -2543,40 +2487,12 @@ function NewCampaignPage({
   }
 
   // A page read that was still running when the page reloaded fills the brief when it finishes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a job is handed over
   useEffect(() => {
-    let active = true;
-    campaignApi
-      .activeJobs()
-      .then(async (jobs) => {
-        const job = jobs.find((item) => item.kind === "brief_from_url");
-        if (!job || !active) return;
-        setReading(true);
-        try {
-          const suggestion = await campaignApi.waitForJob<BriefSuggestion>(
-            job.id,
-            "That page could not be read right now.",
-          );
-          if (!active) return;
-          setPageUrl(suggestion.source_url);
-          applySuggestion(suggestion);
-        } catch (reason) {
-          if (active) {
-            setPageNote({
-              text:
-                reason instanceof Error ? reason.message : "That page could not be read right now.",
-              error: true,
-            });
-          }
-        } finally {
-          if (active) setReading(false);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (!resumeJobId) return;
+    onResumed();
+    void fillFromPage(resumeJobId);
+  }, [resumeJobId]);
 
   function applySuggestion({ source_url, product_icon_url, ...suggestion }: BriefSuggestion) {
     setBrief((current) => ({
@@ -2590,12 +2506,19 @@ function NewCampaignPage({
     });
   }
 
-  async function fillFromPage() {
-    if (reading || !pageUrl.trim()) return;
+  async function fillFromPage(jobId?: string) {
+    if (reading || (!jobId && !pageUrl.trim())) return;
     setReading(true);
     setPageNote(null);
     try {
-      applySuggestion(await campaignApi.briefFromUrl(pageUrl.trim()));
+      const suggestion = jobId
+        ? await campaignApi.waitForJob<BriefSuggestion>(
+            jobId,
+            "That page could not be read right now.",
+          )
+        : await campaignApi.briefFromUrl(pageUrl.trim());
+      if (jobId) setPageUrl(suggestion.source_url);
+      applySuggestion(suggestion);
     } catch (reason) {
       setPageNote({
         text: reason instanceof Error ? reason.message : "That page could not be read right now.",
