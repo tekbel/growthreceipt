@@ -3269,7 +3269,7 @@ function ResultsPage({
           <h2>{hasRevenue ? "Verified purchase activity" : "No purchase activity yet"}</h2>
           <p>
             {hasRevenue
-              ? `GrowthReceipt received ${revenue?.completed_orders} completed sandbox order${revenue?.completed_orders === 1 ? "" : "s"}.`
+              ? `Customers bought the offer ${revenue?.completed_orders} time${revenue?.completed_orders === 1 ? "" : "s"} in the PayPal sandbox. PayPal confirmed each payment.`
               : "Complete a sandbox checkout to verify attribution from campaign to revenue."}
           </p>
           <button className="button dark" type="button" onClick={openCheckout}>
