@@ -11,6 +11,7 @@ from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import FakeAgentGateway
 from app.campaigns.models import CampaignDraft, CampaignPost
 from app.campaigns.store import FakeCampaignStore
+from app.jobs.agent_jobs import FakeAgentJobStore
 from app.main import app
 from app.quota import FakeAgentQuota
 
@@ -174,6 +175,22 @@ async def test_stream_campaign_reports_agent_steps_then_saves(client: AsyncClien
     assert campaign["product_name"] == "Ledgerly"
     latest = await client.get("/v1/campaigns/latest")
     assert latest.json()["id"] == campaign["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_reloaded_page_can_follow_the_draft_again(
+    client: AsyncClient, agent_jobs: FakeAgentJobStore
+) -> None:
+    first = sse_events((await client.post("/v1/campaigns/stream", json=BRIEF)).text)
+    name, job = first[0]
+    assert name == "job" and job["kind"] == "campaign_draft"
+
+    replay = sse_events((await client.get(f"/v1/agent-jobs/{job['id']}/stream")).text)
+
+    assert replay == first
+    assert (await client.get("/v1/agent-jobs")).json() == []
+    saved = (await client.get(f"/v1/agent-jobs/{job['id']}")).json()
+    assert saved["status"] == "succeeded" and saved["result"]["id"] == first[-1][1]["id"]
 
 
 @pytest.mark.asyncio

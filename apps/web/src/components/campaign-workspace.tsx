@@ -114,6 +114,29 @@ type ReviewStatus = Exclude<Filter, "All">;
 type Stage = "Approval" | "Publishing" | "Measurement";
 type Toast = { message: string; action?: { label: string; view: View } };
 
+/** A campaign draft the agent is working on. It runs on the server, so it survives a reload. */
+type DraftRun = {
+  progress: DraftProgress | null;
+  thought: string | null;
+  productName: string;
+  startedAt: number;
+  background: boolean;
+};
+
+/** A system notification for a run that finished while the tab was hidden, if the founder allowed it. */
+function systemNotify(title: string, body: string) {
+  try {
+    if (Notification.permission !== "granted" || document.visibilityState === "visible") return;
+    const notification = new Notification(title, { body });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  } catch {
+    // Notifications are optional. The toast still shows when the founder comes back.
+  }
+}
+
 // The current page lives in the URL hash so refresh, back, and links work.
 function viewFromHash(): View | null {
   const hash = window.location.hash.slice(1);
@@ -152,6 +175,15 @@ type PayPalCheck = {
   outcome: "confirmed" | "mismatch" | "not_found" | "unavailable";
   amount: string | null;
   currency: string | null;
+};
+
+type NextMoveResult = {
+  next_action: Recommendation;
+  evidence: MoveEvidence;
+  paypal_checks?: PayPalCheck[];
+  model: string;
+  turn_id: string;
+  duration_ms: number;
 };
 
 type MoveContext = {
@@ -302,6 +334,10 @@ export function CampaignWorkspace({
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [draftRun, setDraftRun] = useState<DraftRun | null>(null);
+  const draftBackground = useRef(false);
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   useEffect(() => {
     try {
@@ -465,6 +501,33 @@ export function CampaignWorkspace({
     setFollowUpId(null);
     void loadRevenue();
   }, [loadRevenue]);
+
+  // After a reload, pick up agent runs that are still working on the server.
+  const resumed = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the workspace is ready
+  useEffect(() => {
+    if (loadState !== "ready" || resumed.current) return;
+    resumed.current = true;
+    campaignApi
+      .activeJobs()
+      .then((jobs) => {
+        const draft = jobs.find((job) => job.kind === "campaign_draft");
+        if (draft) {
+          // With a campaign open, the draft finishes in the background. A first draft shows its steps.
+          draftBackground.current = Boolean(campaign);
+          void runDraft("", Date.parse(draft.created_at), (onProgress) =>
+            campaignApi.followDraft(draft.id, onProgress),
+          ).catch(() => undefined);
+        }
+        const move = jobs.find(
+          (job) => job.kind === "next_action" && job.campaign_id === campaignId,
+        );
+        if (move) void followNextMove(move.id);
+      })
+      .catch(() => {
+        // Nothing to resume. The page works as usual.
+      });
+  }, [loadState]);
 
   // Bring back the last next move after a reload. Every recommendation is a recorded event.
   useEffect(() => {
@@ -839,17 +902,78 @@ export function CampaignWorkspace({
     );
   }
 
-  async function createCampaign(
-    brief: CampaignBrief,
-    onProgress: (progress: DraftProgress) => void,
+  // The draft runs on the server. The founder can leave this page or reload, and it still finishes.
+  async function runDraft(
+    productName: string,
+    startedAt: number,
+    follow: (onProgress: (progress: DraftProgress) => void) => Promise<Campaign>,
   ) {
-    const created = await campaignApi.streamCreate(brief, onProgress);
-    setCampaign(created);
-    setSelectedId(created.posts[0]?.id ?? null);
-    setFilter("All");
-    setEditingBody(null);
-    navigate("content");
-    notify(`${created.posts.length} posts drafted. Review them before anything is published.`);
+    setDraftRun({
+      progress: null,
+      thought: null,
+      productName,
+      startedAt,
+      background: draftBackground.current,
+    });
+    try {
+      const created = await follow((next) =>
+        setDraftRun(
+          (run) =>
+            run && {
+              ...run,
+              progress: next,
+              thought: next.detail ?? run.thought,
+              productName: next.product_name ?? run.productName,
+            },
+        ),
+      );
+      setCampaign(created);
+      setSelectedId(created.posts[0]?.id ?? null);
+      setFilter("All");
+      setEditingBody(null);
+      const message = `${created.posts.length} posts drafted. Review them before anything is published.`;
+      if (draftBackground.current) {
+        notify(`Your campaign is ready. ${message}`, { label: "Open", view: "content" });
+      } else {
+        navigate("content");
+        notify(message);
+      }
+      systemNotify("Your campaign is ready", message);
+    } catch (error) {
+      if (draftBackground.current) {
+        notify(
+          error instanceof Error ? error.message : "The campaign could not be drafted right now.",
+        );
+      }
+      throw error;
+    } finally {
+      draftBackground.current = false;
+      setDraftRun(null);
+    }
+  }
+
+  async function createCampaign(brief: CampaignBrief) {
+    draftBackground.current = false;
+    await runDraft(brief.product_name, Date.now(), (onProgress) =>
+      campaignApi.streamCreate(brief, onProgress),
+    );
+  }
+
+  function keepDraftInBackground() {
+    draftBackground.current = true;
+    setDraftRun((run) => run && { ...run, background: true });
+    try {
+      if (Notification.permission === "default") void Notification.requestPermission();
+    } catch {
+      // No notification support. The toast still says when the campaign is ready.
+    }
+    navigate("today");
+  }
+
+  function showDraft() {
+    draftBackground.current = false;
+    setDraftRun((run) => run && { ...run, background: false });
+    navigate("new-campaign");
   }
 
   async function findNextMove() {
@@ -870,27 +994,7 @@ export function CampaignWorkspace({
             : "A next move could not be prepared right now.",
         );
       }
-      const result = (await response.json()) as {
-        next_action: Recommendation;
-        evidence: MoveEvidence;
-        paypal_checks?: PayPalCheck[];
-        model: string;
-        turn_id: string;
-        duration_ms: number;
-      };
-      setRecommendation(result.next_action);
-      setMoveContext({
-        evidence: result.evidence,
-        paypalChecks: result.paypal_checks ?? [],
-        model: result.model,
-        turnId: result.turn_id,
-        durationMs: result.duration_ms,
-      });
-      setMoveDecision(null);
-      setFollowUpId(null);
-      // Never earlier than the newest capture, so a small clock difference cannot hide it.
-      const newest = Math.max(0, ...(receipts ?? []).map((item) => Date.parse(item.captured_at)));
-      setRecommendedAt(new Date(Math.max(Date.now(), newest)).toISOString());
+      applyNextMove((await response.json()) as NextMoveResult);
     } catch (error) {
       setRecommendationError(
         error instanceof Error ? error.message : "A next move could not be prepared right now.",
@@ -898,6 +1002,51 @@ export function CampaignWorkspace({
     } finally {
       setRecommendationLoading(false);
     }
+  }
+
+  // A next move keeps running on the server after a reload. Wait for it and show the result.
+  async function followNextMove(jobId: string) {
+    setRecommendationLoading(true);
+    setRecommendationError(null);
+    try {
+      for (;;) {
+        const job = await campaignApi.job(jobId);
+        if (job.status === "succeeded" && job.result) {
+          applyNextMove(job.result as unknown as NextMoveResult);
+          return;
+        }
+        if (job.status !== "running") {
+          throw new Error(job.error ?? "A next move could not be prepared right now.");
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 3000));
+      }
+    } catch (error) {
+      setRecommendationError(
+        error instanceof Error ? error.message : "A next move could not be prepared right now.",
+      );
+    } finally {
+      setRecommendationLoading(false);
+    }
+  }
+
+  function applyNextMove(result: NextMoveResult) {
+    setRecommendation(result.next_action);
+    setMoveContext({
+      evidence: result.evidence,
+      paypalChecks: result.paypal_checks ?? [],
+      model: result.model,
+      turnId: result.turn_id,
+      durationMs: result.duration_ms,
+    });
+    setMoveDecision(null);
+    setFollowUpId(null);
+    // Never earlier than the newest capture, so a small clock difference cannot hide it.
+    const newest = Math.max(0, ...(receipts ?? []).map((item) => Date.parse(item.captured_at)));
+    setRecommendedAt(new Date(Math.max(Date.now(), newest)).toISOString());
+    if (viewRef.current !== "experiment") {
+      notify("The agent found your next move.", { label: "Open", view: "experiment" });
+    }
+    systemNotify("Your next move is ready", result.next_action.headline);
   }
 
   function renderPage() {
@@ -938,6 +1087,8 @@ export function CampaignWorkspace({
         <NewCampaignPage
           canCancel={Boolean(campaign)}
           createCampaign={createCampaign}
+          run={draftRun}
+          keepInBackground={keepDraftInBackground}
           onCancel={() => navigate("campaigns")}
         />
       );
@@ -1147,6 +1298,17 @@ export function CampaignWorkspace({
         />
         {identity.mode === "judge" && onResetDemo ? (
           <JudgeBar onReset={onResetDemo} notify={notify} />
+        ) : null}
+        {draftRun?.background ? (
+          <section className="agent-bar" aria-label="Agent working">
+            <span className="agent-bar-pulse" aria-hidden="true" />
+            <p role="status">
+              The agent is drafting the {draftRun.productName || "new"} campaign in the background.
+            </p>
+            <button className="text-button" type="button" onClick={showDraft}>
+              Show progress
+            </button>
+          </section>
         ) : null}
         <main className="page-shell" key={loadState === "ready" ? view : loadState}>
           {renderPage()}
@@ -2281,13 +2443,14 @@ function ProductsPage({
 function NewCampaignPage({
   canCancel,
   createCampaign,
+  run,
+  keepInBackground,
   onCancel,
 }: {
   canCancel: boolean;
-  createCampaign: (
-    brief: CampaignBrief,
-    onProgress: (progress: DraftProgress) => void,
-  ) => Promise<void>;
+  createCampaign: (brief: CampaignBrief) => Promise<void>;
+  run: DraftRun | null;
+  keepInBackground: () => void;
   onCancel: () => void;
 }) {
   const [brief, setBrief] = useState<CampaignBrief>({
@@ -2298,10 +2461,8 @@ function NewCampaignPage({
     audience: "",
     objective: "",
   });
-  const [generating, setGenerating] = useState(false);
+  const generating = run !== null;
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DraftProgress | null>(null);
-  const [thought, setThought] = useState<string | null>(null);
   const [iconError, setIconError] = useState<string | null>(null);
   const iconInput = useRef<HTMLInputElement>(null);
   const iconUploaded = brief.product_icon_url.startsWith("data:");
@@ -2380,20 +2541,13 @@ function NewCampaignPage({
       setError("Choose at least one channel.");
       return;
     }
-    setGenerating(true);
     setError(null);
-    setProgress(null);
-    setThought(null);
     try {
-      await createCampaign(brief, (next) => {
-        setProgress(next);
-        if (next.detail) setThought(next.detail);
-      });
+      await createCampaign(brief);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "The campaign could not be drafted right now.",
       );
-      setGenerating(false);
     }
   }
 
@@ -2605,8 +2759,23 @@ function NewCampaignPage({
             {error}
           </p>
         ) : null}
-        {generating ? (
-          <AgentSteps progress={progress} thought={thought} productName={brief.product_name} />
+        {run ? (
+          <>
+            <AgentSteps
+              progress={run.progress}
+              thought={run.thought}
+              productName={run.productName || brief.product_name}
+              startedAt={run.startedAt}
+            />
+            {canCancel ? (
+              <p className="agent-steps-background">
+                The draft keeps going if you leave this page or reload.{" "}
+                <button className="text-button" type="button" onClick={keepInBackground}>
+                  Keep working in the background
+                </button>
+              </p>
+            ) : null}
+          </>
         ) : null}
         <div className="form-actions">
           <button className="button dark" type="submit" disabled={generating || reading}>
@@ -4559,16 +4728,21 @@ function AgentSteps({
   progress,
   thought,
   productName,
+  startedAt,
 }: {
   progress: DraftProgress | null;
   thought: string | null;
   productName: string;
+  startedAt: number;
 }) {
-  const [seconds, setSeconds] = useState(0);
+  // Counted from when the run started, so a reloaded page shows the real elapsed time.
+  const elapsed = () => Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+  const [seconds, setSeconds] = useState(elapsed);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: elapsed only reads startedAt
   useEffect(() => {
-    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    const timer = window.setInterval(() => setSeconds(elapsed()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [startedAt]);
 
   const current = progress ? draftSteps.findIndex(([stage]) => stage === progress.stage) : 0;
   return (

@@ -25,6 +25,8 @@ from app.campaigns.models import (
 from app.campaigns.page_reader import PageReadError, ProductPage, read_product_page
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
+from app.jobs.agent_jobs import heartbeat
+from app.jobs.dependencies import AgentJobs
 from app.offers import DEFAULT_OFFER_ID, OFFERS, offer_for
 from app.paypal.dependencies import get_optional_paypal_gateway
 from app.paypal.gateway import PayPalAPIError, PayPalGateway
@@ -324,13 +326,38 @@ async def create_next_action(
     workspace_id: WorkspaceId,
     _run: NextActionRun,
     paypal: Annotated[PayPalGateway | None, Depends(get_optional_paypal_gateway)],
+    jobs: AgentJobs,
 ) -> NextActionResponse:
+    """A plain request finishes even when the page reloads. The job lets the page follow it."""
     campaign = await campaigns.get(
         workspace_id=workspace_id,
         campaign_id=request.campaign_id,
     )
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    job_id = await jobs.start(
+        workspace_id=workspace_id, kind="next_action", campaign_id=campaign.id
+    )
+    try:
+        async with heartbeat(jobs, job_id):
+            response = await _next_action(campaign, gateway, store, campaigns, paypal)
+    except HTTPException as error:
+        await jobs.fail(job_id, str(error.detail))
+        raise
+    except BaseException:
+        await jobs.fail(job_id, "A next move could not be prepared right now.")
+        raise
+    await jobs.finish(job_id, response.model_dump(mode="json"))
+    return response
+
+
+async def _next_action(
+    campaign: Campaign,
+    gateway: AgentGateway,
+    store: PaymentStore,
+    campaigns: CampaignStore,
+    paypal: PayPalGateway | None,
+) -> NextActionResponse:
     summary = await store.revenue_summary(campaign_id=campaign.id)
     receipts = await store.receipts(campaign_id=campaign.id)
     paid_posts = []

@@ -1,11 +1,15 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from uuid import UUID
 
 import pytest
 
-from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.dependencies import get_campaign_store, get_campaign_store_scope
 from app.campaigns.models import Campaign, Post
 from app.campaigns.store import FakeCampaignStore
+from app.jobs.agent_jobs import FakeAgentJobStore
+from app.jobs.dependencies import get_agent_job_store
 from app.main import app
 from app.paypal.dependencies import get_optional_paypal_gateway
 from app.quota import FakeAgentQuota, get_agent_quota
@@ -57,7 +61,20 @@ def demo_campaign() -> Campaign:
 def campaign_store() -> FakeCampaignStore:
     store = FakeCampaignStore([demo_campaign()])
     app.dependency_overrides[get_campaign_store] = lambda: store
+
+    @asynccontextmanager
+    async def scope() -> AsyncIterator[FakeCampaignStore]:
+        yield store
+
+    app.dependency_overrides[get_campaign_store_scope] = lambda: scope
     return store
+
+
+@pytest.fixture(autouse=True)
+def agent_jobs() -> FakeAgentJobStore:
+    jobs = FakeAgentJobStore()
+    app.dependency_overrides[get_agent_job_store] = lambda: jobs
+    return jobs
 
 
 @pytest.fixture(autouse=True)

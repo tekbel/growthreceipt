@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.config import get_settings
 from app.database import get_engine
+from app.jobs.agent_jobs import stop_running
 from app.linkedin.publisher import run_scheduled_publishing
+from app.routes.agent_jobs import router as agent_jobs_router
 from app.routes.agents import router as agents_router
 from app.routes.auth import router as auth_router
 from app.routes.campaigns import router as campaigns_router
@@ -33,6 +35,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
     if task:
         task.cancel()
+    await stop_running()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
@@ -50,6 +53,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(agents_router)
+app.include_router(agent_jobs_router)
 app.include_router(campaigns_router)
 app.include_router(paypal_router)
 app.include_router(public_router)

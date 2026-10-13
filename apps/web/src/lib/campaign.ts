@@ -119,6 +119,7 @@ export type DraftStage =
 export type DraftProgress = {
   stage: DraftStage;
   detail?: string | null;
+  product_name?: string;
   items: number;
   total: number;
 };
@@ -137,16 +138,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** Drafts a campaign and reports each step the agent reaches until the saved campaign arrives. */
-async function streamCreate(
-  brief: CampaignBrief,
+export type AgentJob = {
+  id: string;
+  kind: "campaign_draft" | "next_action";
+  campaign_id: string | null;
+  status: "running" | "succeeded" | "failed" | "interrupted";
+  progress: DraftProgress[];
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+};
+
+/** Reads a campaign draft job stream: each step the agent reached, then the saved campaign. */
+async function readDraftStream(
+  response: Response,
   onProgress: (progress: DraftProgress) => void,
+  onJob?: (jobId: string) => void,
 ): Promise<Campaign> {
-  const response = await apiFetch("/v1/campaigns/stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(brief),
-  });
   if (!response.ok || !response.body) throw await errorFrom(response);
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = "";
@@ -159,6 +167,7 @@ async function streamCreate(
     for (const block of blocks) {
       const event = /^event: (.+)$/m.exec(block)?.[1];
       const data = JSON.parse(/^data: (.+)$/m.exec(block)?.[1] ?? "null");
+      if (event === "job") onJob?.((data as { id: string }).id);
       if (event === "progress") onProgress(data as DraftProgress);
       if (event === "error") throw new ApiError((data as { detail: string }).detail);
       if (event === "campaign") {
@@ -167,7 +176,29 @@ async function streamCreate(
       }
     }
   }
-  throw new ApiError("The campaign agent stopped before it finished.");
+  throw new ApiError("The connection to the campaign agent closed before it finished.");
+}
+
+/** Drafts a campaign on the server. A reload does not stop it, and followDraft picks it up. */
+async function streamCreate(
+  brief: CampaignBrief,
+  onProgress: (progress: DraftProgress) => void,
+  onJob?: (jobId: string) => void,
+): Promise<Campaign> {
+  const response = await apiFetch("/v1/campaigns/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(brief),
+  });
+  return readDraftStream(response, onProgress, onJob);
+}
+
+/** Follows a draft that is already running, replaying every step it reached so far. */
+async function followDraft(
+  jobId: string,
+  onProgress: (progress: DraftProgress) => void,
+): Promise<Campaign> {
+  return readDraftStream(await apiFetch(`/v1/agent-jobs/${jobId}/stream`), onProgress);
 }
 
 export const campaignApi = {
@@ -183,6 +214,9 @@ export const campaignApi = {
   create: (brief: CampaignBrief) =>
     request<Campaign>("/v1/campaigns", { method: "POST", body: JSON.stringify(brief) }),
   streamCreate,
+  followDraft,
+  activeJobs: () => request<AgentJob[]>("/v1/agent-jobs"),
+  job: (jobId: string) => request<AgentJob>(`/v1/agent-jobs/${jobId}`),
   briefFromUrl: (url: string) =>
     request<BriefSuggestion>("/v1/agents/brief-from-url", {
       method: "POST",

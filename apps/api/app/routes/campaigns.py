@@ -1,7 +1,4 @@
-import asyncio
-import json
 import logging
-from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -10,7 +7,11 @@ from fastapi.responses import StreamingResponse
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import AgentGateway, AgentProgress, AgentRun
-from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.dependencies import (
+    CampaignStoreScope,
+    get_campaign_store,
+    get_campaign_store_scope,
+)
 from app.campaigns.generation import draft_campaign
 from app.campaigns.models import (
     Campaign,
@@ -20,7 +21,10 @@ from app.campaigns.models import (
     PostUpdate,
 )
 from app.campaigns.store import CampaignStore
+from app.jobs.agent_jobs import AgentJobStore, spawn
+from app.jobs.dependencies import AgentJobs
 from app.quota import CampaignDraftRun
+from app.routes.agent_jobs import job_stream
 from app.workspaces import WorkspaceId
 
 logger = logging.getLogger(__name__)
@@ -53,10 +57,6 @@ async def _save(
     )
 
 
-def _sse(event: str, data: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-
 @router.post("", response_model=Campaign, status_code=201)
 async def create_campaign(
     brief: CampaignBrief,
@@ -72,45 +72,55 @@ async def create_campaign(
 async def stream_campaign(
     brief: CampaignBrief,
     gateway: Gateway,
-    store: Store,
+    jobs: AgentJobs,
+    stores: Annotated[CampaignStoreScope, Depends(get_campaign_store_scope)],
     workspace_id: WorkspaceId,
     _run: CampaignDraftRun,
 ) -> StreamingResponse:
-    """Draft a campaign and report each step the agent reaches as server-sent events."""
+    """Draft a campaign and report each step the agent reaches as server-sent events.
 
-    async def events() -> AsyncIterator[str]:
-        queue: asyncio.Queue[AgentProgress | None] = asyncio.Queue()
-        task = asyncio.create_task(draft_campaign(gateway, brief, on_progress=queue.put))
-        task.add_done_callback(lambda _: queue.put_nowait(None))
-        try:
-            yield _sse("progress", {"stage": "brief_received", "items": 0, "total": brief.days})
-            while (progress := await queue.get()) is not None:
-                yield _sse(
-                    "progress",
-                    {
-                        "stage": progress.stage,
-                        "detail": progress.detail,
-                        "items": min(progress.items, brief.days),
-                        "total": brief.days,
-                    },
-                )
-            run = task.result()
-            yield _sse("progress", {"stage": "saving", "items": brief.days, "total": brief.days})
+    The draft runs on the server, so a reload or a closed tab does not stop it. The page can follow
+    it again from /v1/agent-jobs.
+    """
+    job_id = await jobs.start(workspace_id=workspace_id, kind="campaign_draft")
+    spawn(jobs, job_id, _draft_job(gateway, brief, jobs, job_id, stores, workspace_id))
+    return job_stream(jobs, workspace_id=workspace_id, job_id=job_id, kind="campaign_draft")
+
+
+async def _draft_job(
+    gateway: AgentGateway,
+    brief: CampaignBrief,
+    jobs: AgentJobStore,
+    job_id: UUID,
+    stores: CampaignStoreScope,
+    workspace_id: UUID,
+) -> None:
+    def step(stage: str, items: int, detail: str | None = None) -> dict[str, Any]:
+        return {
+            "stage": stage,
+            "detail": detail,
+            "items": min(items, brief.days),
+            "total": brief.days,
+        }
+
+    async def report(progress: AgentProgress) -> None:
+        await jobs.add_progress(job_id, step(progress.stage, progress.items, progress.detail))
+
+    try:
+        # The product name lets a reloaded page title the run it follows.
+        await jobs.add_progress(
+            job_id, {**step("brief_received", 0), "product_name": brief.product_name}
+        )
+        run = await draft_campaign(gateway, brief, on_progress=report)
+        await jobs.add_progress(job_id, step("saving", brief.days))
+        async with stores() as store:
             campaign = await _save(store, brief, run, workspace_id)
-            yield _sse("campaign", campaign.model_dump(mode="json"))
-        except HTTPException as error:
-            yield _sse("error", {"detail": error.detail})
-        except Exception:
-            logger.exception("Streaming campaign draft failed")
-            yield _sse("error", {"detail": "The campaign could not be drafted right now."})
-        finally:
-            task.cancel()
-
-    return StreamingResponse(
-        events(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+        await jobs.finish(job_id, campaign.model_dump(mode="json"))
+    except HTTPException as error:
+        await jobs.fail(job_id, str(error.detail))
+    except Exception:
+        logger.exception("Campaign draft job failed")
+        await jobs.fail(job_id, "The campaign could not be drafted right now.")
 
 
 @router.get("/latest", response_model=Campaign)
@@ -152,9 +162,7 @@ async def approve_campaign(
     store: Store,
     workspace_id: WorkspaceId,
 ) -> Campaign:
-    return _found(
-        await store.approve(workspace_id=workspace_id, campaign_id=campaign_id)
-    )
+    return _found(await store.approve(workspace_id=workspace_id, campaign_id=campaign_id))
 
 
 @router.get("/{campaign_id}/events", response_model=list[CampaignEvent])

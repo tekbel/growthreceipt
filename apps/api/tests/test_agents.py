@@ -8,6 +8,7 @@ from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import FakeAgentGateway
 from app.campaigns.models import CampaignDraft, CampaignPost
 from app.campaigns.store import FakeCampaignStore
+from app.jobs.agent_jobs import FakeAgentJobStore
 from app.main import app
 from app.paypal.store import FakePaymentStore
 from app.paypal.store_dependencies import get_payment_store
@@ -144,6 +145,20 @@ async def test_next_action_rejects_unknown_campaign(transport: ASGITransport) ->
         )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_next_action_records_a_job_a_reloaded_page_can_read(
+    transport: ASGITransport, agent_jobs: FakeAgentJobStore
+) -> None:
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/v1/agents/next-action", json={"campaign_id": CAMPAIGN})
+        [(_, job)] = agent_jobs.jobs.values()
+        saved = await client.get(f"/v1/agent-jobs/{job.id}")
+
+    assert job.kind == "next_action" and str(job.campaign_id) == CAMPAIGN
+    assert saved.json()["status"] == "succeeded"
+    assert saved.json()["result"] == response.json()
 
 
 async def recommend(client: AsyncClient) -> None:
