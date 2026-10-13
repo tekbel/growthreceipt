@@ -291,6 +291,11 @@ export function AuthShell() {
                 <strong>Pay when it pays.</strong> Free to start, with a 3% fee on verified revenue
                 collected through PayPal. Plans from $19 a month remove the fee.
               </li>
+              <li>
+                <strong>A smarter agent.</strong> It proposes a new pack or price within limits you
+                set, splits into writing, analysis and pricing agents, and shows how often its past
+                advice led to purchases.
+              </li>
             </ul>
           </section>
         </section>

@@ -20,6 +20,104 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 8. **Next move.** The agent reads the payment evidence and proposes one next action with its confidence. The founder approves it. Code, not the model, ranks the paying posts and labels the evidence: none, early signal (the leading post has fewer than 3 purchases), clear leader, or tie. A tie asks for a controlled comparison instead of a winner. Each recommendation shows the time of the latest purchase it read, and the Next experiment page flags new purchases that arrived after it.
 9. **Offer switch.** Once there is at least one purchase, the agent may also suggest that the buy links sell a different pack from the catalog. Code drops any suggestion that is not in the catalog or matches the current pack. The founder sees "Switch the buy link offer from X to Y" and can approve the plan with or without the switch. An approved switch is saved as an `offer_changed` campaign event, the latest one decides what every buy link sells, and Results splits revenue by offer. The agent cannot invent an offer or a price. The founder can also pick the pack by hand on the Checkout page, which saves the same event.
 
+## Diagrams
+
+Each diagram is drawn from the code. A change to one of these flows updates its diagram in the same commit. GitHub renders them, and PNG copies for Devpost are in [docs/architecture/](../architecture/).
+
+### System
+
+```mermaid
+flowchart LR
+  founder([Founder]) --> web[Next.js web app]
+  buyer([Buyer]) --> buy[Public buy page]
+  web --> api[FastAPI API]
+  buy --> api
+  buy --> sdk[PayPal JS SDK v6]
+  api --> db[(Postgres on Supabase)]
+  api --> openai[OpenAI Agents API]
+  api --> orders[PayPal Orders v2]
+  paypalhook[PayPal webhooks] --> api
+  web --> studio[AG Studio dashboard]
+  studio --> api
+  api --> linkedin[LinkedIn API]
+```
+
+### Purchase and proof
+
+```mermaid
+sequenceDiagram
+  actor Buyer
+  participant Buy as Buy page
+  participant API
+  participant PayPal
+  participant DB as Postgres
+  Buyer->>Buy: Opens the buy link of an approved post
+  Buy->>API: GET /v1/public/offers/{content_id}
+  API-->>Buy: Pack and price from the catalog
+  Buyer->>Buy: Clicks the PayPal button
+  Buy->>API: Create order
+  API->>PayPal: Create order at the catalog price
+  API->>DB: Order linked to campaign and post
+  Buyer->>PayPal: Approves the payment
+  Buy->>API: Capture
+  API->>PayPal: Capture with a request ID
+  API->>DB: Capture stored, counted only when COMPLETED
+  PayPal->>API: POST /v1/paypal/webhooks
+  API->>PayPal: Verify the signature
+  API->>DB: Webhook stored as proof
+```
+
+### Next move checked with PayPal
+
+```mermaid
+sequenceDiagram
+  actor Founder
+  participant API
+  participant Agent as OpenAI agent
+  participant PayPal
+  participant DB as Postgres
+  Founder->>API: POST /v1/agents/next-action
+  API->>DB: Paid orders of this campaign
+  API->>API: Code ranks posts and labels the evidence
+  API->>Agent: Evidence and the orders to check
+  loop Each cited order, this campaign only
+    Agent->>API: get_paypal_order
+    API->>PayPal: Get order
+    API-->>Agent: confirmed, mismatch, not_found or unavailable
+  end
+  Agent-->>API: One next move, typed output
+  API->>DB: Recommendation and checks saved
+  API-->>Founder: Next move with Checked with PayPal
+  Founder->>API: Approve or reject
+```
+
+### Campaign draft that survives a reload
+
+```mermaid
+sequenceDiagram
+  actor Founder
+  participant Web
+  participant API
+  participant Job as Detached run
+  participant DB as agent_jobs
+  Founder->>Web: Submits the brief
+  Web->>API: POST /v1/campaigns/stream
+  API->>DB: Job row, status running
+  API->>Job: Starts the draft outside the request
+  loop Every 15 seconds
+    Job->>DB: Heartbeat
+  end
+  Job->>DB: Each progress step
+  API-->>Web: Steps as server sent events
+  Founder->>Web: Reloads or leaves the page
+  Web->>API: GET /v1/agent-jobs
+  Web->>API: GET /v1/agent-jobs/{id}/stream
+  API-->>Web: Every step so far, then new ones
+  Job->>DB: Campaign saved, status succeeded
+  API-->>Web: Campaign
+  Note over DB: A running job with no update for 90 seconds reads as interrupted
+```
+
 ## Who pays whom
 
 The PayPal payment is a buyer paying the founder for the founder's product. It is not a fee for using GrowthReceipt.
@@ -54,6 +152,33 @@ What is missing to get there:
 * Storing each founder's merchant ID
 * Setting the payee and the platform fee on each order
 * PayPal partner approval for multiparty payments, which can take weeks. This is the main blocker and the reason the demo uses one merchant.
+
+## Where the agent goes next (planned, not built)
+
+The homepage lists the product features planned next. This section is about how the agent system itself grows. Dashed boxes and arrows are planned. Solid ones exist today.
+
+```mermaid
+flowchart LR
+  planner[Planner agent]
+  planner -.-> writer[Writer agent<br/>today: campaign and post drafts]
+  planner -.-> analyst[Analyst agent<br/>today: next move with get_paypal_order]
+  planner -.-> pricing[Pricing agent]
+  analyst --> paypal[PayPal Orders]
+  pricing -.-> offers[(Offers per founder)]
+  api[API] -.-> queue[[Job queue]]
+  queue -.-> worker[Worker service]
+  worker -.-> planner
+  hooks[PayPal webhooks] -.-> queue
+  buyers([Buyer agents]) -.-> api
+  classDef planned stroke-dasharray: 5 5
+  class planner,pricing,offers,queue,worker,buyers planned
+```
+
+1. **More autonomy, in steps.** Today the agent suggests and the founder approves. Next, offers move into the database so the agent can propose a new pack or price within limits the founder sets. After that, an autopilot that acts inside a budget, with every action logged and reversible.
+2. **Specialist agents.** A writer, an analyst that holds the PayPal tools and a pricing agent, coordinated by one planner. Buyer agents could also buy through the same verified checkout, which opens a new sales channel.
+3. **Scale.** Agent runs already live in the `agent_jobs` table, so a page can reattach after a reload. The runs still execute inside the API process. The next step moves them to a job queue served by the worker service (`services/worker`, a stub today), takes PayPal webhooks in through the same queue, and runs several API copies. The per workspace and global agent limits already exist.
+4. **Deeper PayPal use.** Partner onboarding so founders are paid directly (see the production money flow above), PayPal Subscriptions, and refunds and disputes in the proof chain, so a refunded purchase stops counting as evidence.
+5. **Measuring the agent.** Check each past recommendation against the purchases that came after it, and run split tests with a minimum sample size before a winner is called.
 
 ## Hosting
 

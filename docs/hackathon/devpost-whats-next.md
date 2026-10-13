@@ -35,3 +35,7 @@ Next:
 * X, with the same approval step and the same buy link per post
 * LinkedIn Company Pages, which need LinkedIn's Community Management API review
 * Reading each live post's views and clicks next to its verified purchases, so the gap between engagement and revenue is visible per post
+
+## How the agent system grows
+
+The sections above are product features. How the agent itself gains autonomy, splits into specialist agents and scales is in [architecture.md](./architecture.md#where-the-agent-goes-next-planned-not-built), with a diagram that marks what exists today and what is planned.
