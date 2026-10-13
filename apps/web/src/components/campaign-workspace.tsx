@@ -5,6 +5,7 @@ import {
   BarChart3,
   Box,
   CalendarDays,
+  ChartPie,
   Check,
   ChevronDown,
   CircleHelp,
@@ -30,6 +31,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   Fragment,
   type ReactNode,
@@ -81,6 +83,16 @@ import {
   workspaceHour,
 } from "@/lib/time";
 
+// AG Studio is large, so it loads only when the dashboard opens, and only in the browser.
+const RevenueStudio = dynamic(() => import("@/components/revenue-studio/revenue-studio"), {
+  ssr: false,
+  loading: () => (
+    <section className="skeleton" aria-busy="true" aria-label="Loading the revenue dashboard">
+      <div className="skeleton-block panel" />
+    </section>
+  ),
+});
+
 const views = [
   "today",
   "products",
@@ -89,6 +101,7 @@ const views = [
   "content",
   "calendar",
   "results",
+  "dashboard",
   "experiment",
   "integrations",
   "settings",
@@ -171,6 +184,7 @@ const workspaceNavigation = [
   ["content", "Content", FileText],
   ["calendar", "Calendar", CalendarDays],
   ["results", "Results", BarChart3],
+  ["dashboard", "Revenue dashboard", ChartPie],
   ["experiment", "Next experiment", FlaskConical],
 ] as const;
 const systemNavigation = [
@@ -183,6 +197,7 @@ const viewKeywords: Partial<Record<View, string>> = {
   today: "home dashboard overview",
   content: "posts review approve drafts queue",
   results: "revenue sales money paid orders paypal proof receipts",
+  dashboard: "charts analytics report studio ag grid funnel",
   experiment: "next move recommendation agent learn",
   checkout: "buy link pay purchase customer",
   calendar: "schedule publish dates",
@@ -197,6 +212,7 @@ const viewLabels: Record<View, string> = {
   content: "Content",
   calendar: "Calendar",
   results: "Results",
+  dashboard: "Revenue dashboard",
   experiment: "Next experiment",
   integrations: "Integrations",
   settings: "Settings",
@@ -995,6 +1011,16 @@ export function CampaignWorkspace({
             openCheckout={openCustomerView}
             navigate={navigate}
           />
+        );
+      case "dashboard":
+        return (
+          <>
+            <PageHeader
+              title="Revenue dashboard"
+              description="Checkouts and verified PayPal revenue for every post. Edit the charts or build your own."
+            />
+            <RevenueStudio campaign={campaign} onOpenCheckout={openCustomerView} />
+          </>
         );
       case "experiment":
         return (
@@ -4350,6 +4376,11 @@ const noCampaignCopy: Partial<
     title: "Results",
     empty: "No results yet",
     copy: "PayPal purchases appear here, linked to the post that earned them.",
+  },
+  dashboard: {
+    title: "Revenue dashboard",
+    empty: "No dashboard yet",
+    copy: "Charts of checkouts and verified PayPal revenue appear here for each post.",
   },
   experiment: {
     title: "Next experiment",

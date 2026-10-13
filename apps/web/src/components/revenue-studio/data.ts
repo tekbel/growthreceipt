@@ -1,0 +1,182 @@
+// AG Studio data sources for the revenue dashboard: the campaign's posts, every checkout started
+// from them and the offers customers bought. Revenue counts only PayPal-completed captures.
+
+import type {
+  AgDataSourcesDefinition,
+  AgExpressionFieldDefinition,
+  AgFieldDefinition,
+  AgFormat,
+  AgRelationDefinition,
+} from "ag-studio";
+
+import { type Campaign, type Offer, postDate } from "@/lib/campaign";
+
+export type Checkout = {
+  order_id: string;
+  content_id: string;
+  offer_id: string;
+  amount: string;
+  currency: string;
+  completed: boolean;
+  ordered_at: string;
+  captured_at: string | null;
+};
+
+const CALENDAR_ID = "calendar";
+
+// [id, name, format, hide?]
+type FieldSpec = [id: string, name: string, format: AgFormat, hide?: boolean];
+
+// Every amount is USD, so money shows with its dollar sign.
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+const fields = (specs: FieldSpec[]): AgFieldDefinition[] =>
+  specs.map(([id, name, format, hide]) => ({
+    id,
+    name,
+    format,
+    ...(format === "currencyFormat" && { formatOptions: { format: usd } }),
+    ...(hide && { hide }),
+  }));
+
+const manyToOne = (id: string, source: string, target: string): AgRelationDefinition => {
+  const [sourceTable, sourceField] = source.split(".");
+  const [targetTable, targetField] = target.split(".");
+  return {
+    id,
+    source: { tableId: sourceTable, fieldId: sourceField },
+    target: { tableId: targetTable, fieldId: targetField },
+    type: "many-to-one",
+  };
+};
+
+const purchaseRate: AgExpressionFieldDefinition = {
+  id: "purchaseRate",
+  name: "Purchase rate",
+  description: "Verified purchases divided by checkouts started.",
+  format: "percentageFormat",
+  isMeasure: true,
+  expression: {
+    operator: "divide",
+    inputs: [
+      { id: "checkouts.verified", aggregation: "sum" },
+      { id: "checkouts.started", aggregation: "sum" },
+    ],
+  },
+};
+
+const day = (iso: string) => iso.slice(0, 10);
+
+export function hasCheckouts(checkouts: Checkout[]) {
+  return checkouts.length > 0;
+}
+
+export function buildStudioData(
+  campaign: Campaign,
+  checkouts: Checkout[],
+  offers: Offer[],
+): AgDataSourcesDefinition {
+  const posts = campaign.posts.map((post) => ({
+    id: post.id,
+    label: `Day ${post.day} ${post.channel}: ${post.theme}`,
+    day: post.day,
+    channel: post.channel,
+    theme: post.theme,
+    date: postDate(campaign, post),
+    live: Boolean(post.published_at || post.published_url),
+  }));
+  const rows = checkouts.map((checkout) => ({
+    id: checkout.order_id,
+    postId: checkout.content_id,
+    offerId: checkout.offer_id,
+    status: checkout.completed ? "Verified purchase" : "Checkout started",
+    started: 1,
+    verified: checkout.completed ? 1 : 0,
+    revenue: checkout.completed ? Number(checkout.amount) : 0,
+    currency: checkout.currency,
+    orderedAt: checkout.ordered_at,
+    capturedAt: checkout.captured_at,
+    orderedOn: day(checkout.ordered_at),
+  }));
+  const dates = rows.map((row) => row.orderedOn).sort();
+  const today = new Date().toISOString().slice(0, 10);
+
+  return {
+    description:
+      `PayPal sandbox purchases for the ${campaign.product_name} campaign. Every checkout is a PayPal order ` +
+      "started from a post's buy link. Revenue counts only orders PayPal completed. All amounts are USD.",
+    sources: [
+      {
+        id: "posts",
+        description: "Campaign posts. Each post has its own buy link.",
+        data: posts,
+        fields: fields([
+          ["id", "Post ID", "textFormat", true],
+          ["label", "Post", "textFormat"],
+          ["day", "Campaign day", "integerFormat"],
+          ["channel", "Channel", "textFormat"],
+          ["theme", "Theme", "textFormat"],
+          ["date", "Post date", "dateFormat"],
+          ["live", "Published", "booleanFormat"],
+        ]),
+      },
+      {
+        id: "checkouts",
+        description:
+          "One row per PayPal order a buyer started. Verified is 1 when PayPal completed the capture. " +
+          "Revenue is the captured amount, 0 until then.",
+        data: rows,
+        fields: fields([
+          ["id", "PayPal order ID", "textFormat"],
+          ["postId", "Post ID", "textFormat", true],
+          ["offerId", "Offer ID", "textFormat", true],
+          ["status", "Payment status", "textFormat"],
+          ["started", "Checkouts started", "integerFormat"],
+          ["verified", "Verified purchases", "integerFormat"],
+          ["revenue", "Verified revenue", "currencyFormat"],
+          ["currency", "Currency", "textFormat"],
+          ["orderedAt", "Checkout started at", "dateTimeFormat"],
+          ["capturedAt", "Captured at", "dateTimeFormat"],
+          ["orderedOn", "Checkout date", "dateFormat", true],
+        ]),
+      },
+      {
+        id: "offers",
+        description: "What the customer bought: credit packs at fixed prices.",
+        data: offers.map((offer) => ({
+          id: offer.id,
+          name: offer.name,
+          credits: offer.credits,
+          price: Number(offer.amount),
+        })),
+        fields: fields([
+          ["id", "Offer ID", "textFormat", true],
+          ["name", "Offer", "textFormat"],
+          ["credits", "Credits", "integerFormat"],
+          ["price", "Price", "currencyFormat"],
+        ]),
+      },
+    ],
+    relationships: [
+      manyToOne("checkout-post", "checkouts.postId", "posts.id"),
+      manyToOne("checkout-offer", "checkouts.offerId", "offers.id"),
+      {
+        id: "checkouts-orderedOn-calendar",
+        source: { tableId: "checkouts", fieldId: "orderedOn" },
+        target: { calendarId: CALENDAR_ID },
+      },
+    ],
+    calendars: [
+      {
+        id: CALENDAR_ID,
+        label: "Calendar",
+        range: {
+          from: { type: "date", value: dates[0] ?? today },
+          to: { type: "date", value: dates.at(-1) ?? today },
+        },
+        fragments: ["year", "month", "week", "day", "dayOfWeek"],
+      },
+    ],
+    expressions: [purchaseRate],
+  };
+}

@@ -47,6 +47,20 @@ class Receipt:
     offer_id: str = DEFAULT_OFFER_ID
 
 
+@dataclass(frozen=True)
+class Checkout:
+    """A PayPal order a buyer started from a post, paid or not."""
+
+    paypal_order_id: str
+    content_id: UUID
+    offer_id: str
+    amount: Decimal
+    currency: str
+    completed: bool
+    ordered_at: datetime
+    captured_at: datetime | None
+
+
 class PaymentStore(Protocol):
     async def record_order(
         self,
@@ -76,6 +90,8 @@ class PaymentStore(Protocol):
     async def revenue_summary(self, *, campaign_id: UUID) -> RevenueSummary: ...
 
     async def receipts(self, *, campaign_id: UUID) -> list[Receipt]: ...
+
+    async def checkouts(self, *, campaign_id: UUID) -> list[Checkout]: ...
 
 
 class PostgresPaymentStore:
@@ -322,6 +338,37 @@ class PostgresPaymentStore:
             for row in rows
         ]
 
+    async def checkouts(self, *, campaign_id: UUID) -> list[Checkout]:
+        async with self._session.begin():
+            result = await self._session.execute(
+                text(
+                    """
+                    select o.paypal_order_id, o.content_id, f.slug as offer_slug,
+                           o.amount, o.currency, o.status, o.created_at, o.captured_at
+                    from growthreceipt.payment_orders o
+                    join growthreceipt.offers f on f.id = o.offer_id
+                    where o.campaign_id = :campaign_id
+                    order by o.created_at
+                    limit 2000
+                    """
+                ),
+                {"campaign_id": campaign_id},
+            )
+            rows = result.all()
+        return [
+            Checkout(
+                paypal_order_id=row.paypal_order_id,
+                content_id=row.content_id,
+                offer_id=row.offer_slug,
+                amount=Decimal(row.amount),
+                currency=row.currency,
+                completed=row.status == "completed",
+                ordered_at=row.created_at,
+                captured_at=row.captured_at,
+            )
+            for row in rows
+        ]
+
 
 def _json_list(value: Any) -> list[dict[str, Any]]:
     # The asyncpg dialect decodes json, but a plain driver hands back text.
@@ -337,6 +384,7 @@ class FakePaymentStore:
         self.ordered_at: dict[str, datetime] = {}
         self.captured_at: dict[str, datetime] = {}
         self.offer_ids: dict[str, str] = {}
+        self.offer_prices: dict[str, tuple[Decimal, str]] = {}
 
     async def record_order(
         self,
@@ -351,6 +399,7 @@ class FakePaymentStore:
         del idempotency_key
         self.orders[paypal_order_id] = (workspace_id, campaign_id, content_id)
         self.offer_ids[paypal_order_id] = offer.id
+        self.offer_prices[paypal_order_id] = (Decimal(offer.amount), offer.currency)
         self.ordered_at[paypal_order_id] = datetime.now(UTC)
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
@@ -426,3 +475,24 @@ class FakePaymentStore:
                 )
             )
         return sorted(receipts, key=lambda receipt: receipt.captured_at, reverse=True)
+
+    async def checkouts(self, *, campaign_id: UUID) -> list[Checkout]:
+        checkouts = []
+        for order_id, (_workspace_id, order_campaign_id, content_id) in self.orders.items():
+            if order_campaign_id != campaign_id:
+                continue
+            capture = self.captures.get(order_id)
+            amount, currency = self.offer_prices[order_id]
+            checkouts.append(
+                Checkout(
+                    paypal_order_id=order_id,
+                    content_id=content_id,
+                    offer_id=self.offer_ids[order_id],
+                    amount=Decimal(capture.amount) if capture else amount,
+                    currency=capture.currency if capture else currency,
+                    completed=capture is not None,
+                    ordered_at=self.ordered_at[order_id],
+                    captured_at=self.captured_at.get(order_id),
+                )
+            )
+        return checkouts

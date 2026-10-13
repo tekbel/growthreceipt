@@ -110,6 +110,22 @@ class OfferResponse(BaseModel):
     credits: int
 
 
+class CheckoutResponse(BaseModel):
+    order_id: str
+    content_id: UUID
+    offer_id: str
+    amount: str
+    currency: str
+    completed: bool
+    ordered_at: datetime
+    captured_at: datetime | None
+
+
+class CheckoutsResponse(BaseModel):
+    campaign_id: UUID
+    checkouts: list[CheckoutResponse]
+
+
 class ReceiptsResponse(BaseModel):
     campaign_id: UUID
     receipts: list[ReceiptResponse]
@@ -339,4 +355,33 @@ async def get_receipts(
     return ReceiptsResponse(
         campaign_id=campaign_id,
         receipts=[ReceiptResponse.of(receipt) for receipt in receipts],
+    )
+
+
+@router.get("/checkouts/{campaign_id}", response_model=CheckoutsResponse)
+async def get_checkouts(
+    campaign_id: UUID,
+    store: Annotated[PaymentStore, Depends(get_payment_store)],
+    campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
+    workspace_id: WorkspaceId,
+) -> CheckoutsResponse:
+    """Every checkout started from the campaign's posts, paid or not, oldest first."""
+    if await campaigns.get(workspace_id=workspace_id, campaign_id=campaign_id) is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    checkouts = await store.checkouts(campaign_id=campaign_id)
+    return CheckoutsResponse(
+        campaign_id=campaign_id,
+        checkouts=[
+            CheckoutResponse(
+                order_id=checkout.paypal_order_id,
+                content_id=checkout.content_id,
+                offer_id=checkout.offer_id,
+                amount=f"{checkout.amount:.2f}",
+                currency=checkout.currency,
+                completed=checkout.completed,
+                ordered_at=checkout.ordered_at,
+                captured_at=checkout.captured_at,
+            )
+            for checkout in checkouts
+        ],
     )

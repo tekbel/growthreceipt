@@ -380,6 +380,34 @@ async def test_receipts_hide_unknown_campaigns(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_checkouts_include_started_and_paid_orders(client: AsyncClient) -> None:
+    order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+    order_id = order.json()["order_id"]
+
+    started = await client.get(f"/v1/paypal/checkouts/{CAMPAIGN_ID}")
+    await client.post(f"/v1/public/orders/{order_id}/capture")
+    paid = await client.get(f"/v1/paypal/checkouts/{CAMPAIGN_ID}")
+
+    assert started.status_code == 200
+    [checkout] = started.json()["checkouts"]
+    assert checkout["order_id"] == order_id
+    assert checkout["content_id"] == CONTENT_ID
+    assert checkout["amount"] == "9.00"
+    assert checkout["completed"] is False
+    assert checkout["captured_at"] is None
+    [checkout] = paid.json()["checkouts"]
+    assert checkout["completed"] is True
+    assert checkout["captured_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_checkouts_hide_unknown_campaigns(client: AsyncClient) -> None:
+    response = await client.get("/v1/paypal/checkouts/99999999-9999-4999-8999-999999999999")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_a_capture_that_is_not_completed_is_not_revenue() -> None:
     store = FakePaymentStore()
     gateway = FakePayPalGateway(capture_status="PENDING")

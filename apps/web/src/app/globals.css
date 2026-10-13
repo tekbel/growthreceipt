@@ -939,7 +939,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .section-title button { min-height: 44px; }
 .info-tip-button { position: relative; }
 .info-tip-button::before { content: ""; position: absolute; inset: -8px; }
-.tip { max-width: min(280px, calc(100vw - 32px)); }
+.tip { max-width: min(280px, calc(100vw - 24px)); translate: var(--tip-shift, 0px) 0; } /* InfoTip sets the shift that keeps the tip on screen. */
 .judge-bar .info-tip { margin-left: 2px; }
 .info-tip.side-bottom .tip { top: calc(100% + 10px); bottom: auto; } /* Bars at the top of the page have no room above. */
 @media (max-width: 900px) {
@@ -1100,3 +1100,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .confirm-publish { margin: 0; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-sm); background: var(--surface); }
 .confirm-publish p { margin: 0; font-size: var(--type-sm); line-height: 1.5; }
 .confirm-publish div { display: flex; gap: 8px; }
+
+/* Revenue dashboard (AG Studio). Studio fills a sized parent, so the canvas sets the height. */
+.revenue-studio { display: grid; gap: 12px; min-width: 0; }
+.revenue-studio-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: var(--type-sm); }
+.revenue-studio-toolbar > div { display: flex; gap: 8px; }
+.revenue-studio-canvas { height: max(640px, calc(100dvh - 220px)); min-width: 0; border: 1px solid var(--line); border-radius: var(--corner-md); overflow: hidden; }
