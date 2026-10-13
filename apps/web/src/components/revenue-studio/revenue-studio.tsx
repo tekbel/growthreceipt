@@ -117,29 +117,50 @@ export default function RevenueStudio({
   const api = useRef<AgStudioApi<RevenueRegistry> | null>(null);
   const opened = useRef("");
 
-  const fetchData = useCallback(async () => {
-    setLoad({ status: "loading" });
-    try {
-      const [checkouts, offers, receipts] = await Promise.all([
-        apiFetch(`/v1/paypal/checkouts/${campaign.id}`),
-        apiFetch("/v1/paypal/offers"),
-        apiFetch(`/v1/paypal/receipts/${campaign.id}`),
-      ]);
-      if (!checkouts.ok || !offers.ok || !receipts.ok)
-        throw new Error("Dashboard data is unavailable");
-      setLoad({
-        status: "ready",
-        checkouts: ((await checkouts.json()) as { checkouts: Checkout[] }).checkouts,
-        offers: (await offers.json()) as Offer[],
-        receipts: ((await receipts.json()) as { receipts: Receipt[] }).receipts,
-      });
-    } catch {
-      setLoad({ status: "error" });
-    }
-  }, [campaign.id]);
+  const fetchData = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoad({ status: "loading" });
+      try {
+        const [checkouts, offers, receipts] = await Promise.all([
+          apiFetch(`/v1/paypal/checkouts/${campaign.id}`),
+          apiFetch("/v1/paypal/offers"),
+          apiFetch(`/v1/paypal/receipts/${campaign.id}`),
+        ]);
+        if (!checkouts.ok || !offers.ok || !receipts.ok)
+          throw new Error("Dashboard data is unavailable");
+        const next: Load = {
+          status: "ready",
+          checkouts: ((await checkouts.json()) as { checkouts: Checkout[] }).checkouts,
+          offers: (await offers.json()) as Offer[],
+          receipts: ((await receipts.json()) as { receipts: Receipt[] }).receipts,
+        };
+        // Keep the same data when nothing changed, so Studio does not redraw every refresh.
+        setLoad((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+      } catch {
+        // A failed background refresh keeps the figures already on screen.
+        if (!silent) setLoad({ status: "error" });
+      }
+    },
+    [campaign.id],
+  );
 
   useEffect(() => {
     void fetchData();
+  }, [fetchData]);
+
+  // Customers pay on the buy page in another tab. Refresh like the results page does.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void fetchData(true);
+    };
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [fetchData]);
 
   // With no real checkouts yet, the dashboard shows labelled sample orders until the first one.
