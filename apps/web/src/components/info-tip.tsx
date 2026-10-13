@@ -51,8 +51,6 @@ export function InfoTip({
   return (
     <span
       className={`tip-anchor info-tip align-${align} side-${below ? "bottom" : "top"}${open ? " open" : ""}`}
-      onPointerEnter={fit}
-      onFocus={fit}
     >
       <button
         className="info-tip-button"
@@ -60,6 +58,8 @@ export function InfoTip({
         aria-label={label}
         aria-describedby={tipId}
         aria-expanded={open}
+        onPointerEnter={fit}
+        onFocus={fit}
         onClick={() => {
           fit();
           setOpen((value) => !value);
