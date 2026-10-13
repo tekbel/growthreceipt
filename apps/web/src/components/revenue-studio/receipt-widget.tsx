@@ -14,6 +14,7 @@ import type {
 } from "ag-studio";
 import { Clock, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SAMPLE_ORDER_PREFIX } from "./sample";
 
 export const RECEIPT_WIDGET = "receipt-proof";
 
@@ -45,7 +46,7 @@ const COLUMNS = {
 } as const;
 
 type Column = keyof typeof COLUMNS;
-type Proof = Record<Column, string> & { paid: boolean; confirmed: boolean };
+type Proof = Record<Column, string> & { paid: boolean; confirmed: boolean; sample: boolean };
 
 const LIMIT = 50;
 
@@ -91,7 +92,8 @@ function ReceiptProof(params: AgWidgetParams<ReceiptProofWidget>) {
           ) as Record<Column, string>;
           const paid = Number(row[(fields.verified as AgWidgetField).key]) > 0;
           const confirmed = Number(row[(fields.webhooks as AgWidgetField).key]) > 0;
-          return { ...text, paid, confirmed };
+          const sample = text.orderId.startsWith(SAMPLE_ORDER_PREFIX);
+          return { ...text, paid, confirmed, sample };
         });
         setProofs(rows);
         widgetApi.setDisplayState(rows.length ? "displayed" : "noData");
@@ -106,12 +108,22 @@ function ReceiptProof(params: AgWidgetParams<ReceiptProofWidget>) {
 
   const paid = proofs.filter((proof) => proof.paid);
   const confirmed = paid.filter((proof) => proof.confirmed);
+  const allSample = proofs.length > 0 && proofs.every((proof) => proof.sample);
 
   return (
     <div className="receipt-widget">
       <p className="receipt-widget-summary">
-        {paid.length} of {proofs.length} {proofs.length === 1 ? "checkout" : "checkouts"} paid.{" "}
-        {confirmed.length} of {paid.length} confirmed by a verified PayPal webhook.
+        {allSample ? (
+          <>
+            These are sample orders with no PayPal receipts. Real orders and their verified PayPal
+            webhooks show here after the first purchase.
+          </>
+        ) : (
+          <>
+            {paid.length} of {proofs.length} {proofs.length === 1 ? "checkout" : "checkouts"} paid.{" "}
+            {confirmed.length} of {paid.length} confirmed by a verified PayPal webhook.
+          </>
+        )}
       </p>
       <ul>
         {proofs.map((proof) => (
@@ -139,11 +151,13 @@ function ReceiptProof(params: AgWidgetParams<ReceiptProofWidget>) {
                 <Clock aria-hidden="true" size={15} />
               )}
               <span>
-                {proof.confirmed
-                  ? `${proof.webhooks} verified ${proof.webhooks === "1" ? "webhook" : "webhooks"}`
-                  : proof.paid
-                    ? "Waiting for PayPal webhook"
-                    : "Not paid"}
+                {proof.sample
+                  ? "Sample order"
+                  : proof.confirmed
+                    ? `${proof.webhooks} verified ${proof.webhooks === "1" ? "webhook" : "webhooks"}`
+                    : proof.paid
+                      ? "Waiting for PayPal webhook"
+                      : "Not paid"}
               </span>
             </div>
           </li>
