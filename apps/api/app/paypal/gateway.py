@@ -34,6 +34,18 @@ class PayPalCapture:
     currency: str
 
 
+@dataclass(frozen=True)
+class PayPalOrderDetails:
+    """What PayPal itself reports for an order, read with the Orders API."""
+
+    order_id: str
+    status: str
+    amount: str | None = None
+    currency: str | None = None
+    capture_id: str | None = None
+    capture_status: str | None = None
+
+
 class PayPalAPIError(RuntimeError):
     def __init__(self, status_code: int, operation: str) -> None:
         super().__init__(f"PayPal {operation} failed with status {status_code}")
@@ -51,6 +63,8 @@ class PayPalGateway(Protocol):
     ) -> PayPalOrder: ...
 
     async def capture_order(self, *, order_id: str, request_id: str) -> PayPalCapture: ...
+
+    async def get_order(self, *, order_id: str) -> PayPalOrderDetails: ...
 
     async def verify_webhook(
         self,
@@ -186,6 +200,28 @@ class HttpPayPalGateway:
             currency=str(amount["currency_code"]),
         )
 
+    async def get_order(self, *, order_id: str) -> PayPalOrderDetails:
+        token = await self._token()
+        response = await self._client.get(
+            f"/v2/checkout/orders/{order_id}",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+        if response.status_code != 200:
+            raise PayPalAPIError(response.status_code, "get order")
+        payload = dict(response.json())
+        unit = (payload.get("purchase_units") or [{}])[0]
+        amount = unit.get("amount", {})
+        captures = unit.get("payments", {}).get("captures", [])
+        capture = captures[0] if captures else {}
+        return PayPalOrderDetails(
+            order_id=str(payload["id"]),
+            status=str(payload["status"]),
+            amount=amount.get("value"),
+            currency=amount.get("currency_code"),
+            capture_id=capture.get("id"),
+            capture_status=capture.get("status"),
+        )
+
     async def verify_webhook(
         self,
         *,
@@ -215,6 +251,9 @@ class FakePayPalGateway:
         self.capture_status = capture_status
         self.created_orders: list[tuple[Offer, str, str]] = []
         self.capture_request_ids: list[str] = []
+        # Orders PayPal knows about, by id. Anything else is a 404, as on PayPal.
+        self.orders: dict[str, PayPalOrderDetails] = {}
+        self.order_lookups: list[str] = []
 
     async def create_order(
         self,
@@ -235,6 +274,12 @@ class FakePayPalGateway:
             amount="9.00",
             currency="USD",
         )
+
+    async def get_order(self, *, order_id: str) -> PayPalOrderDetails:
+        self.order_lookups.append(order_id)
+        if order_id not in self.orders:
+            raise PayPalAPIError(404, "get order")
+        return self.orders[order_id]
 
     async def verify_webhook(
         self,

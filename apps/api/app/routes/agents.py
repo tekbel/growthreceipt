@@ -8,6 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from openai import APIError
+from openai.lib.beta.agents import FunctionTool
 from pydantic import BaseModel, Field
 
 from app.agents.dependencies import get_agent_gateway
@@ -25,6 +26,8 @@ from app.campaigns.page_reader import PageReadError, ProductPage, read_product_p
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
 from app.offers import DEFAULT_OFFER_ID, OFFERS, offer_for
+from app.paypal.dependencies import get_optional_paypal_gateway
+from app.paypal.gateway import PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
 from app.quota import CampaignDraftRun, NextActionRun, Quota, claim_run
@@ -147,6 +150,87 @@ def classify_evidence(ranked: list[PaidPostEvidence]) -> EvidenceSignal:
     return "leader"
 
 
+PayPalCheckOutcome = Literal["confirmed", "mismatch", "not_found", "unavailable"]
+
+# The agent may look up at most this many orders per recommendation.
+MAX_ORDER_CHECKS = 5
+
+
+class OrderLookup(BaseModel):
+    order_id: str = Field(description="A PayPal order id from orders_to_check.")
+
+
+class PayPalCheck(BaseModel):
+    """One order the agent looked up with the PayPal Orders API, as PayPal answered."""
+
+    order_id: str
+    outcome: PayPalCheckOutcome
+    status: str | None = None
+    capture_status: str | None = None
+    amount: str | None = None
+    currency: str | None = None
+
+
+def paypal_order_tool(
+    paypal: PayPalGateway, receipts: list[Receipt], checks: list[PayPalCheck]
+) -> FunctionTool[Any]:
+    """Lets the agent read an order from PayPal. Only this campaign's paid orders can be read,
+    and every lookup lands in checks, so the record shows what PayPal said, not the agent."""
+    owned = {receipt.paypal_order_id: receipt for receipt in receipts}
+
+    async def get_paypal_order(lookup: OrderLookup) -> dict[str, Any]:
+        receipt = owned.get(lookup.order_id)
+        if receipt is None:
+            return {"error": "This order is not a paid order of this campaign."}
+        if len(checks) >= MAX_ORDER_CHECKS:
+            return {"error": f"Only {MAX_ORDER_CHECKS} orders can be checked per run."}
+        try:
+            order = await paypal.get_order(order_id=lookup.order_id)
+        except PayPalAPIError as error:
+            outcome: PayPalCheckOutcome = "not_found" if error.status_code == 404 else "unavailable"
+            check = PayPalCheck(order_id=lookup.order_id, outcome=outcome)
+        else:
+            matches = (
+                order.status == "COMPLETED"
+                and order.capture_status == "COMPLETED"
+                and order.capture_id == receipt.paypal_capture_id
+                and order.amount is not None
+                and Decimal(order.amount) == receipt.amount
+                and order.currency == receipt.currency
+            )
+            check = PayPalCheck(
+                order_id=order.order_id,
+                outcome="confirmed" if matches else "mismatch",
+                status=order.status,
+                capture_status=order.capture_status,
+                amount=order.amount,
+                currency=order.currency,
+            )
+        checks.append(check)
+        return check.model_dump()
+
+    return FunctionTool(
+        OrderLookup,
+        get_paypal_order,
+        name="get_paypal_order",
+        description=(
+            "Read one order from the PayPal Orders API. Returns PayPal's order and capture status "
+            "and amount, and whether they match the purchase GrowthReceipt recorded."
+        ),
+    )
+
+
+def orders_to_check(paid_posts: list[PaidPostEvidence], receipts: list[Receipt]) -> list[str]:
+    """The newest paid orders of the strongest posts, up to the lookup limit."""
+    newest = sorted(receipts, key=lambda receipt: receipt.captured_at, reverse=True)
+    picked: list[str] = []
+    for post in paid_posts:
+        for receipt in newest:
+            if receipt.content_id == post.content_id and len(picked) < MAX_ORDER_CHECKS:
+                picked.append(receipt.paypal_order_id)
+    return picked
+
+
 class NextActionResponse(BaseModel):
     session_id: str
     turn_id: str
@@ -154,6 +238,8 @@ class NextActionResponse(BaseModel):
     duration_ms: int
     evidence: RevenueEvidence
     next_action: NextAction
+    # Orders the agent looked up with PayPal during this run. Empty when PayPal is not configured.
+    paypal_checks: list[PayPalCheck] = []
 
 
 class NextActionDecisionRequest(BaseModel):
@@ -207,6 +293,9 @@ follow up that repeats its angle, and set needs_more_data to true.
 leader: one post earned the most from at least 3 purchases. Build the experiment on that post.
 tie: two or more posts earned the same amount. Do not pick a winner. Recommend a controlled
 comparison of the tied posts and set needs_more_data to true.
+When orders_to_check is not empty, call get_paypal_order for each of those orders before you
+answer. Base the recommendation only on purchases PayPal confirmed, and say in evidence_summary
+how many of the checked orders PayPal confirmed. If an order is not confirmed, say so plainly.
 """
 
 
@@ -234,6 +323,7 @@ async def create_next_action(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
     _run: NextActionRun,
+    paypal: Annotated[PayPalGateway | None, Depends(get_optional_paypal_gateway)],
 ) -> NextActionResponse:
     campaign = await campaigns.get(
         workspace_id=workspace_id,
@@ -271,6 +361,9 @@ async def create_next_action(
         current_offer_id=current.id,
         by_offer=revenue_by_offer(receipts),
     )
+    checks: list[PayPalCheck] = []
+    to_check = orders_to_check(paid_posts, receipts) if paypal is not None else []
+    tools = [paypal_order_tool(paypal, receipts, checks)] if paypal is not None and to_check else []
     prompt = json.dumps(
         {
             "campaign": {
@@ -295,6 +388,7 @@ async def create_next_action(
                 }
                 for offer in OFFERS.values()
             ],
+            "orders_to_check": to_check,
         },
         indent=2,
     )
@@ -305,6 +399,7 @@ async def create_next_action(
             instructions=REVENUE_LEARNING_INSTRUCTIONS,
             input_text=prompt,
             output_type=NextAction,
+            tools=tools,
         )
     except (APIError, RuntimeError) as error:
         raise HTTPException(
@@ -343,6 +438,7 @@ async def create_next_action(
             "duration_ms": duration_ms,
             "evidence": evidence.model_dump(mode="json"),
             "next_action": next_action.model_dump(),
+            "paypal_checks": [check.model_dump() for check in checks],
         },
     )
     return NextActionResponse(
@@ -352,6 +448,7 @@ async def create_next_action(
         duration_ms=duration_ms,
         evidence=evidence,
         next_action=next_action,
+        paypal_checks=checks,
     )
 
 

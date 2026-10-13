@@ -1,9 +1,11 @@
+import inspect
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar, cast
 
 from openai import AsyncOpenAI
+from openai.lib.beta.agents import FunctionTool
 from pydantic import BaseModel
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -69,6 +71,7 @@ class AgentGateway(Protocol):
         input_text: str,
         output_type: type[OutputT],
         on_progress: ProgressCallback | None = None,
+        tools: Sequence[FunctionTool[Any]] = (),
     ) -> AgentRun[OutputT]: ...
 
 
@@ -87,18 +90,24 @@ class OpenAIAgentGateway:
         input_text: str,
         output_type: type[OutputT],
         on_progress: ProgressCallback | None = None,
+        tools: Sequence[FunctionTool[Any]] = (),
     ) -> AgentRun[OutputT]:
+        agent: dict[str, Any] = {
+            "model": self._model,
+            "instructions": instructions,
+            "reasoning": {"effort": "low"},
+            "text": {"verbosity": "low"},
+        }
+        if tools:
+            # Hosted tools run here: the SDK calls each handler and submits its result.
+            agent["tools"] = [tool.definition for tool in tools]
         stream = await self._client.beta.agents.sessions.create(
-            agent={
-                "model": self._model,
-                "instructions": instructions,
-                "reasoning": {"effort": "low"},
-                "text": {"verbosity": "low"},
-            },
+            agent=cast(Any, agent),
             environment={"type": "openai_hosted"},
             input=input_text,
             metadata={"workflow": workflow},
             output_type=output_type,
+            tool_handlers=cast(Any, {tool.name: tool for tool in tools}) or None,
             stream=True,
         )
         if on_progress is not None:
@@ -120,8 +129,14 @@ class OpenAIAgentGateway:
 class FakeAgentGateway:
     """Deterministic test adapter. Fixtures must be explicit at construction."""
 
-    def __init__(self, fixtures: dict[str, BaseModel]) -> None:
+    def __init__(
+        self,
+        fixtures: dict[str, BaseModel],
+        tool_calls: dict[str, list[tuple[str, dict[str, Any]]]] | None = None,
+    ) -> None:
         self._fixtures = fixtures
+        # Tool calls the fake agent makes for a workflow, in order, as (tool name, arguments).
+        self._tool_calls = tool_calls or {}
 
     async def run_structured(
         self,
@@ -131,11 +146,17 @@ class FakeAgentGateway:
         input_text: str,
         output_type: type[OutputT],
         on_progress: ProgressCallback | None = None,
+        tools: Sequence[FunctionTool[Any]] = (),
     ) -> AgentRun[OutputT]:
         del instructions, input_text
         fixture = self._fixtures.get(workflow)
         if fixture is None:
             raise LookupError(f"No fake agent fixture for workflow: {workflow}")
+        handlers = {tool.name: tool for tool in tools}
+        for name, arguments in self._tool_calls.get(workflow, []):
+            result = handlers[name](arguments)
+            if inspect.isawaitable(result):
+                await result
         if on_progress is not None:
             await on_progress(AgentProgress("session_started"))
             await on_progress(AgentProgress("thinking", detail="Planning the fixture run."))

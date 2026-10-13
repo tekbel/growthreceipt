@@ -147,8 +147,17 @@ type MoveEvidence = {
 
 type EvidenceSignal = "none" | "early" | "leader" | "tie";
 
+type PayPalCheck = {
+  order_id: string;
+  outcome: "confirmed" | "mismatch" | "not_found" | "unavailable";
+  amount: string | null;
+  currency: string | null;
+};
+
 type MoveContext = {
   evidence: MoveEvidence | null;
+  // Orders the agent read with the PayPal Orders API on this run. Missing on older runs.
+  paypalChecks?: PayPalCheck[];
   model: string | null;
   turnId?: string | null;
   durationMs?: number | null;
@@ -478,6 +487,7 @@ export function CampaignWorkspace({
           (current) =>
             current ?? {
               evidence: (latest.detail.evidence as MoveEvidence | undefined) ?? null,
+              paypalChecks: (latest.detail.paypal_checks as PayPalCheck[] | undefined) ?? [],
               model: typeof latest.detail.model === "string" ? latest.detail.model : null,
               turnId: typeof latest.detail.turn_id === "string" ? latest.detail.turn_id : null,
               durationMs:
@@ -857,6 +867,7 @@ export function CampaignWorkspace({
       const result = (await response.json()) as {
         next_action: Recommendation;
         evidence: MoveEvidence;
+        paypal_checks?: PayPalCheck[];
         model: string;
         turn_id: string;
         duration_ms: number;
@@ -864,6 +875,7 @@ export function CampaignWorkspace({
       setRecommendation(result.next_action);
       setMoveContext({
         evidence: result.evidence,
+        paypalChecks: result.paypal_checks ?? [],
         model: result.model,
         turnId: result.turn_id,
         durationMs: result.duration_ms,
@@ -3349,6 +3361,7 @@ function WhyThisMove({
 }) {
   const evidence = context?.evidence;
   const paidPosts = evidence?.paid_posts ?? [];
+  const checks = context?.paypalChecks ?? [];
   return (
     <details className="why-move">
       <summary>
@@ -3387,6 +3400,24 @@ function WhyThisMove({
             </dd>
           </div>
         ) : null}
+        {checks.length ? (
+          <div>
+            <dt>Checked with PayPal</dt>
+            <dd>
+              {checkSummary(checks)}
+              <ul>
+                {checks.map((check) => (
+                  <li key={check.order_id}>
+                    <code>{check.order_id}</code> ·{" "}
+                    {check.outcome === "confirmed" && check.amount && check.currency
+                      ? `${checkCopy.confirmed}, ${formatMoney(check.amount, check.currency)}`
+                      : checkCopy[check.outcome]}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        ) : null}
         {evidence?.signal ? (
           <div>
             <dt>Evidence strength</dt>
@@ -3412,8 +3443,8 @@ function WhyThisMove({
         <div>
           <dt>Limits</dt>
           <dd>
-            The agent cannot publish, change a price, start a payment, or spend money. Nothing
-            happens until you approve.
+            The agent can read this campaign&apos;s paid orders from PayPal. It cannot publish,
+            change a price, start a payment, or spend money. Nothing happens until you approve.
           </dd>
         </div>
       </dl>
@@ -3470,6 +3501,24 @@ function SignalBasis({
       {evidence.signal === "early" ? "Early signal." : "Clear leader."}
     </p>
   );
+}
+
+const checkCopy: Record<PayPalCheck["outcome"], string> = {
+  confirmed: "Completed and captured",
+  mismatch: "PayPal's record differs from GrowthReceipt's",
+  not_found: "PayPal did not find this order",
+  unavailable: "PayPal could not be reached",
+};
+
+function checkSummary(checks: PayPalCheck[]) {
+  const confirmed = checks.filter((check) => check.outcome === "confirmed").length;
+  if (checks.length === 1)
+    return confirmed
+      ? "The agent looked up the order with PayPal, and PayPal confirmed it."
+      : "The agent looked up the order with PayPal, and PayPal did not confirm it.";
+  return confirmed === checks.length
+    ? `The agent looked up ${checks.length} orders with PayPal, and PayPal confirmed all of them.`
+    : `The agent looked up ${checks.length} orders with PayPal. PayPal confirmed ${confirmed}.`;
 }
 
 const signalCopy: Record<EvidenceSignal, string> = {

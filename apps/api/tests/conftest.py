@@ -7,6 +7,7 @@ from app.campaigns.dependencies import get_campaign_store
 from app.campaigns.models import Campaign, Post
 from app.campaigns.store import FakeCampaignStore
 from app.main import app
+from app.paypal.dependencies import get_optional_paypal_gateway
 from app.quota import FakeAgentQuota, get_agent_quota
 
 CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"
@@ -64,3 +65,9 @@ def agent_quota() -> FakeAgentQuota:
     quota = FakeAgentQuota()
     app.dependency_overrides[get_agent_quota] = lambda: quota
     return quota
+
+
+@pytest.fixture(autouse=True)
+def no_paypal_checks() -> None:
+    # Tests never reach the real PayPal sandbox. A test that needs lookups overrides this.
+    app.dependency_overrides[get_optional_paypal_gateway] = lambda: None
