@@ -610,6 +610,7 @@ export function CampaignWorkspace({
       const body = (await response.json().catch(() => null)) as {
         post_id?: string;
         campaign?: Campaign;
+        already_drafted?: boolean;
         detail?: unknown;
       } | null;
       if (!response.ok || !body?.post_id || !body.campaign) {
@@ -623,7 +624,12 @@ export function CampaignWorkspace({
       setCampaign(body.campaign);
       setFollowUpId(body.post_id);
       openPost(body.post_id);
-      notify(`Day ${day} post drafted from your approved plan. Review it before it goes out.`);
+      // A reload while the agent was writing loses the answer, but the post was still saved.
+      notify(
+        body.already_drafted
+          ? `The agent already drafted the day ${day} post for this move. Here it is for review.`
+          : `Day ${day} post drafted from your approved plan. Review it before it goes out.`,
+      );
     } catch (error) {
       notify(error instanceof Error ? error.message : "The post could not be drafted right now.");
     } finally {

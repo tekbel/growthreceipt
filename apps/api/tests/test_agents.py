@@ -227,8 +227,13 @@ async def test_approved_move_drafts_one_post_for_review(
     assert added["status"] == "needs_review"
     assert added["day"] == last_day + 1
     assert added["theme"] == "Catch it before launch"
-    assert repeated.status_code == 409
+    # Asking again, as a page that reloaded mid draft does, returns the same post.
+    assert repeated.status_code == 200
+    assert repeated.json()["post_id"] == body["post_id"]
+    assert not body["already_drafted"] and repeated.json()["already_drafted"]
+    assert len(repeated.json()["campaign"]["posts"]) == len(body["campaign"]["posts"])
     events = await campaign_store.events(workspace_id=uuid4(), campaign_id=UUID(CAMPAIGN))
+    assert [event.action for event in events].count("follow_up_drafted") == 1
     assert events[0].action == "follow_up_drafted"
     assert events[0].post_id == UUID(body["post_id"])
 

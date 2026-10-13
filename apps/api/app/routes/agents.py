@@ -547,6 +547,7 @@ class FollowUpResponse(BaseModel):
     post_id: UUID
     source_post_id: UUID | None
     campaign: Campaign
+    already_drafted: bool = False
 
 
 @router.post("/follow-up-post", response_model=FollowUpResponse)
@@ -555,21 +556,31 @@ async def draft_follow_up_post(
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
-    _run: CampaignDraftRun,
+    quota: Quota,
 ) -> FollowUpResponse:
-    """Drafts the post an approved next move asks for. It waits in review like any other post."""
+    """Drafts the post an approved next move asks for. It waits in review like any other post.
+
+    Asking again returns the post already drafted for the move, for example after the page
+    reloaded while the agent was writing it.
+    """
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
     events = await campaigns.events(workspace_id=workspace_id, campaign_id=campaign.id)
     moves = [event for event in events if event.action in MOVE_ACTIONS]
-    if not moves or moves[0].action != "next_action_approved":
-        detail = (
-            "A post was already drafted for this move"
-            if moves and moves[0].action == "follow_up_drafted"
-            else "Approve a next move first"
+    if moves and moves[0].action == "follow_up_drafted":
+        drafted = next((post for post in campaign.posts if post.id == moves[0].post_id), None)
+        if drafted is None:
+            raise HTTPException(status_code=409, detail="A post was already drafted for this move")
+        source_id = moves[0].detail.get("source_post_id")
+        return FollowUpResponse(
+            post_id=drafted.id,
+            source_post_id=UUID(source_id) if source_id else None,
+            campaign=campaign,
+            already_drafted=True,
         )
-        raise HTTPException(status_code=409, detail=detail)
+    if not moves or moves[0].action != "next_action_approved":
+        raise HTTPException(status_code=409, detail="Approve a next move first")
     approved = moves[0].detail
     recommended = next(
         (event for event in moves if event.action == "next_action_recommended"), None
@@ -609,6 +620,7 @@ async def draft_follow_up_post(
         },
         indent=2,
     )
+    await claim_run(quota, workspace_id, "campaign_draft")
     try:
         run = await gateway.run_structured(
             workflow="follow-up-post",
