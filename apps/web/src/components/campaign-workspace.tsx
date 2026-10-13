@@ -281,6 +281,7 @@ export function CampaignWorkspace({
   onResetDemo?: () => Promise<void>;
 }) {
   const [view, setView] = useState<View>("today");
+  const [dashboardFocus, setDashboardFocus] = useState<string[] | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -758,7 +759,14 @@ export function CampaignWorkspace({
     return items;
   }
 
+  // Opens the dashboard filtered to the posts behind the recommendation.
+  function showEvidence(postIds: string[]) {
+    setDashboardFocus(postIds);
+    navigate("dashboard");
+  }
+
   function navigate(nextView: View) {
+    if (nextView !== "dashboard") setDashboardFocus(null);
     if (nextView !== view) window.history.pushState(null, "", `#${nextView}`);
     setView(nextView);
     setMobileNavigationOpen(false);
@@ -1035,7 +1043,11 @@ export function CampaignWorkspace({
               title="Revenue dashboard"
               description="Checkouts and verified PayPal revenue for every post. Edit the charts or build your own."
             />
-            <RevenueStudio campaign={campaign} onOpenCheckout={openCustomerView} />
+            <RevenueStudio
+              campaign={campaign}
+              focusPostIds={dashboardFocus}
+              onOpenCheckout={openCustomerView}
+            />
           </>
         );
       case "experiment":
@@ -1058,6 +1070,7 @@ export function CampaignWorkspace({
             recommendationLoading={recommendationLoading}
             findNextMove={findNextMove}
             navigate={navigate}
+            showEvidence={showEvidence}
           />
         );
       case "checkout":
@@ -3326,13 +3339,16 @@ function WhyThisMove({
   context,
   posts,
   openPost,
+  showEvidence,
 }: {
   recommendation: Recommendation;
   context: MoveContext | null;
   posts: Post[];
   openPost: (postId: string) => void;
+  showEvidence: (postIds: string[]) => void;
 }) {
   const evidence = context?.evidence;
+  const paidPosts = evidence?.paid_posts ?? [];
   return (
     <details className="why-move">
       <summary>
@@ -3361,6 +3377,13 @@ function WhyThisMove({
                   </li>
                 ))}
               </ul>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => showEvidence(paidPosts.map((post) => post.content_id))}
+              >
+                Show {paidPosts.length === 1 ? "this post" : "these posts"} in the dashboard
+              </button>
             </dd>
           </div>
         ) : null}
@@ -3664,6 +3687,7 @@ function ExperimentPage({
   recommendationLoading,
   findNextMove,
   navigate,
+  showEvidence,
 }: {
   revenue: RevenueSummary | null;
   context: MoveContext | null;
@@ -3682,6 +3706,7 @@ function ExperimentPage({
   recommendationLoading: boolean;
   findNextMove: () => Promise<void>;
   navigate: (view: View) => void;
+  showEvidence: (postIds: string[]) => void;
 }) {
   const ready = Boolean(revenue?.completed_orders);
   return (
@@ -3770,6 +3795,7 @@ function ExperimentPage({
               context={context}
               posts={posts}
               openPost={openPost}
+              showEvidence={showEvidence}
             />
             <MoveDecisionPanel
               recommendation={recommendation}

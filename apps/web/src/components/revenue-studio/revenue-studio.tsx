@@ -4,6 +4,7 @@ import {
   type AgAiHarnessSetup,
   type AgAiModel,
   type AgAiPromptStarter,
+  type AgFilterState,
   type AgPanelConfig,
   type AgReportState,
   AgStudioAiModule,
@@ -18,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Receipt } from "@/components/receipt-proof";
 import { apiFetch, type Campaign, type Offer } from "@/lib/campaign";
 import { growthReceiptAdapter, setSampleData } from "./ai-adapter";
-import { buildStudioData, type Checkout } from "./data";
+import { buildStudioData, type Checkout, postLabel } from "./data";
 import { RECEIPT_WIDGET, type RevenueRegistry, receiptWidget } from "./receipt-widget";
 import { revenueReport } from "./report";
 import { sampleCheckouts } from "./sample";
@@ -96,6 +97,42 @@ function saveReport(campaignId: string, state: Report | null) {
   }
 }
 
+// The evidence link opens the dashboard on the posts the agent cited, as a page filter the
+// founder can see in the filters panel and remove.
+const focusFilter = (labels: string[]): AgFilterState<RevenueRegistry> => ({
+  field: { id: "posts.label" },
+  model: { operator: "isIn", value: labels },
+});
+const isFocus = (filter: AgFilterState<RevenueRegistry>, focus: AgFilterState<RevenueRegistry>) =>
+  JSON.stringify(filter) === JSON.stringify(focus);
+
+function withFocus(report: Report, focus: AgFilterState<RevenueRegistry> | null): Report {
+  return {
+    ...report,
+    pages: report.pages?.map((page) => {
+      if (page.id !== report.selectedPageId) return page;
+      const others = (page.filter?.page ?? []).filter(
+        (filter) => !focus || !isFocus(filter, focus),
+      );
+      return { ...page, filter: { ...page.filter, page: focus ? [...others, focus] : others } };
+    }),
+  };
+}
+
+function withoutFocus(report: Report, focus: AgFilterState<RevenueRegistry> | null): Report {
+  if (!focus) return report;
+  return {
+    ...report,
+    pages: report.pages?.map((page) => ({
+      ...page,
+      filter: {
+        ...page.filter,
+        page: (page.filter?.page ?? []).filter((filter) => !isFocus(filter, focus)),
+      },
+    })),
+  };
+}
+
 type Load =
   | { status: "loading" }
   | { status: "error" }
@@ -103,9 +140,12 @@ type Load =
 
 export default function RevenueStudio({
   campaign,
+  focusPostIds = null,
   onOpenCheckout,
 }: {
   campaign: Campaign;
+  /** Posts to filter to on open, from the evidence behind a recommendation. */
+  focusPostIds?: string[] | null;
   onOpenCheckout: () => void;
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
@@ -114,6 +154,12 @@ export default function RevenueStudio({
   // Studio reads initialState once, when it is created. This component only renders in the browser.
   const [saved] = useState(() => savedReport(campaign.id));
   const [edited, setEdited] = useState(Boolean(saved));
+  const [focusLabels] = useState(() =>
+    campaign.posts.filter((post) => focusPostIds?.includes(post.id)).map(postLabel),
+  );
+  const [focus] = useState(() => (focusLabels.length ? focusFilter(focusLabels) : null));
+  const [focused, setFocused] = useState(Boolean(focus));
+  const [initialState] = useState(() => withFocus(saved ?? revenueReport, focus));
   const api = useRef<AgStudioApi<RevenueRegistry> | null>(null);
   const opened = useRef("");
 
@@ -183,13 +229,16 @@ export default function RevenueStudio({
   );
 
   function startEditing(withAssistant: boolean) {
-    opened.current = JSON.stringify(api.current?.getState() ?? null);
+    const current = api.current?.getState();
+    opened.current = JSON.stringify(current ? withoutFocus(current, focus) : null);
     setAssistant(withAssistant);
     setMode("edit");
   }
 
   function finishEditing() {
-    const state = api.current?.getState() ?? null;
+    const current = api.current?.getState();
+    // The evidence filter is for this visit. It is never saved into the layout.
+    const state = current ? withoutFocus(current, focus) : null;
     // Only a real change is saved, so opening the editor alone never marks the layout as edited.
     if (JSON.stringify(state) !== opened.current) {
       saveReport(campaign.id, state);
@@ -198,8 +247,15 @@ export default function RevenueStudio({
     setMode("view");
   }
 
+  function showAllPosts() {
+    const current = api.current?.getState();
+    if (current) api.current?.setState(withoutFocus(current, focus));
+    setFocused(false);
+  }
+
   function resetReport() {
     saveReport(campaign.id, null);
+    setFocused(false);
     api.current?.setState(revenueReport);
     api.current?.clearHistory();
     setEdited(false);
@@ -255,6 +311,13 @@ export default function RevenueStudio({
               Open as customer
             </button>
           </p>
+        ) : focused && focus ? (
+          <p className="revenue-studio-focus" role="status">
+            Showing the {focusLabels.length === 1 ? "post" : "posts"} the agent cited.{" "}
+            <button className="text-button" type="button" onClick={showAllPosts}>
+              Show all posts
+            </button>
+          </p>
         ) : (
           <span>
             {load.checkouts.length} checkout{load.checkouts.length === 1 ? "" : "s"} from PayPal
@@ -297,11 +360,20 @@ export default function RevenueStudio({
             ai={ai}
             panels={assistant ? assistantPanels : editPanels}
             localeText={localeText}
-            initialState={saved ?? revenueReport}
+            initialState={initialState}
             mode={mode}
             onApiReady={(event) => {
               // The ready event is typed with the default registry, the api is ours.
               api.current = event.api as unknown as AgStudioApi<RevenueRegistry>;
+            }}
+            onStateUpdated={(event) => {
+              // The note goes away when the founder removes the filter in the filters panel.
+              if (!focus) return;
+              const pages = (event.state as Report).pages ?? [];
+              const kept = pages.some((page) =>
+                (page.filter?.page ?? []).some((filter) => isFocus(filter, focus)),
+              );
+              setFocused(kept);
             }}
           />
         </AgStudioProvider>

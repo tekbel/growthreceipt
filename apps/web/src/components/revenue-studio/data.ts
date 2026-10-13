@@ -13,6 +13,11 @@ import type { Receipt } from "@/components/receipt-proof";
 import { type Campaign, type Offer, postDate } from "@/lib/campaign";
 import type { RevenueRegistry } from "./receipt-widget";
 
+type PostRef = Campaign["posts"][number];
+
+/** How a post is named in the dashboard. The evidence link filters on this name. */
+export const postLabel = (post: PostRef) => `Day ${post.day} ${post.channel}: ${post.theme}`;
+
 export type Checkout = {
   order_id: string;
   content_id: string;
@@ -118,7 +123,7 @@ export function buildStudioData(
   const proof = new Map(receipts.map((receipt) => [receipt.order_id, receipt]));
   const posts = campaign.posts.map((post) => ({
     id: post.id,
-    label: `Day ${post.day} ${post.channel}: ${post.theme}`,
+    label: postLabel(post),
     day: post.day,
     channel: post.channel,
     theme: post.theme,
