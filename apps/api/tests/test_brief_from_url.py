@@ -10,6 +10,7 @@ from app.campaigns.page_reader import (
     check_url,
     read_product_page,
 )
+from app.jobs.agent_jobs import FakeAgentJobStore
 from app.main import app
 from app.quota import FakeAgentQuota, get_agent_quota
 from app.routes.agents import BriefSuggestion, get_page_reader
@@ -94,7 +95,7 @@ async def test_read_product_page_rejects_non_html() -> None:
 
 
 @pytest.mark.asyncio
-async def test_brief_from_url_returns_suggestion_and_icon() -> None:
+async def test_brief_from_url_returns_suggestion_and_icon(agent_jobs: FakeAgentJobStore) -> None:
     suggestion = BriefSuggestion(
         product_name="LaunchCheck",
         product_description="Scans a public page for launch issues.",
@@ -130,6 +131,8 @@ async def test_brief_from_url_returns_suggestion_and_icon() -> None:
                 "product_icon_url": "https://example.com/og.png",
                 "source_url": "https://example.com/",
             }
+            [(_, job)] = agent_jobs.jobs.values()
+            assert job.kind == "brief_from_url" and job.result == response.json()
 
             # A link that cannot be read does not use up a run, even with none left.
             app.dependency_overrides[get_agent_quota] = lambda: FakeAgentQuota(limit=0)

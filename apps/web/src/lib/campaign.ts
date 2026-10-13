@@ -140,7 +140,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type AgentJob = {
   id: string;
-  kind: "campaign_draft" | "next_action";
+  kind: "campaign_draft" | "next_action" | "follow_up_post" | "revise_post" | "brief_from_url";
   campaign_id: string | null;
   status: "running" | "succeeded" | "failed" | "interrupted";
   progress: DraftProgress[];
@@ -148,6 +148,16 @@ export type AgentJob = {
   error: string | null;
   created_at: string;
 };
+
+/** Waits for an agent job that is still running after a reload, then returns its result. */
+async function waitForJob<T>(jobId: string, fallback: string): Promise<T> {
+  for (;;) {
+    const job = await request<AgentJob>(`/v1/agent-jobs/${jobId}`);
+    if (job.status === "succeeded" && job.result) return job.result as T;
+    if (job.status !== "running") throw new Error(job.error ?? fallback);
+    await new Promise((resolve) => window.setTimeout(resolve, 3000));
+  }
+}
 
 /** Reads a campaign draft job stream: each step the agent reached, then the saved campaign. */
 async function readDraftStream(
@@ -217,6 +227,7 @@ export const campaignApi = {
   followDraft,
   activeJobs: () => request<AgentJob[]>("/v1/agent-jobs"),
   job: (jobId: string) => request<AgentJob>(`/v1/agent-jobs/${jobId}`),
+  waitForJob,
   briefFromUrl: (url: string) =>
     request<BriefSuggestion>("/v1/agents/brief-from-url", {
       method: "POST",

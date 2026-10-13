@@ -25,14 +25,14 @@ from app.campaigns.models import (
 from app.campaigns.page_reader import PageReadError, ProductPage, read_product_page
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
-from app.jobs.agent_jobs import heartbeat
+from app.jobs.agent_jobs import tracked
 from app.jobs.dependencies import AgentJobs
 from app.offers import DEFAULT_OFFER_ID, OFFERS, offer_for
 from app.paypal.dependencies import get_optional_paypal_gateway
 from app.paypal.gateway import PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
-from app.quota import CampaignDraftRun, NextActionRun, Quota, claim_run
+from app.quota import AgentQuota, CampaignDraftRun, NextActionRun, Quota, claim_run
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
@@ -335,20 +335,14 @@ async def create_next_action(
     )
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    job_id = await jobs.start(
-        workspace_id=workspace_id, kind="next_action", campaign_id=campaign.id
+    return await tracked(
+        jobs,
+        workspace_id=workspace_id,
+        kind="next_action",
+        campaign_id=campaign.id,
+        failure="A next move could not be prepared right now.",
+        work=lambda: _next_action(campaign, gateway, store, campaigns, paypal),
     )
-    try:
-        async with heartbeat(jobs, job_id):
-            response = await _next_action(campaign, gateway, store, campaigns, paypal)
-    except HTTPException as error:
-        await jobs.fail(job_id, str(error.detail))
-        raise
-    except BaseException:
-        await jobs.fail(job_id, "A next move could not be prepared right now.")
-        raise
-    await jobs.finish(job_id, response.model_dump(mode="json"))
-    return response
 
 
 async def _next_action(
@@ -584,6 +578,7 @@ async def draft_follow_up_post(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
     quota: Quota,
+    jobs: AgentJobs,
 ) -> FollowUpResponse:
     """Drafts the post an approved next move asks for. It waits in review like any other post.
 
@@ -593,6 +588,23 @@ async def draft_follow_up_post(
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    return await tracked(
+        jobs,
+        workspace_id=workspace_id,
+        kind="follow_up_post",
+        campaign_id=campaign.id,
+        failure="The post could not be drafted right now.",
+        work=lambda: _follow_up_post(campaign, gateway, campaigns, workspace_id, quota),
+    )
+
+
+async def _follow_up_post(
+    campaign: Campaign,
+    gateway: AgentGateway,
+    campaigns: CampaignStore,
+    workspace_id: UUID,
+    quota: AgentQuota,
+) -> FollowUpResponse:
     events = await campaigns.events(workspace_id=workspace_id, campaign_id=campaign.id)
     moves = [event for event in events if event.action in MOVE_ACTIONS]
     if moves and moves[0].action == "follow_up_drafted":
@@ -713,12 +725,30 @@ async def revise_post(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
     _run: CampaignDraftRun,
+    jobs: AgentJobs,
 ) -> RevisionResponse:
     """Applies the founder's change request to one post. The result goes back to review."""
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    post = next((item for item in campaign.posts if item.id == request.post_id), None)
+    return await tracked(
+        jobs,
+        workspace_id=workspace_id,
+        kind="revise_post",
+        campaign_id=campaign.id,
+        failure="The post could not be revised right now.",
+        work=lambda: _revise_post(request.post_id, campaign, gateway, campaigns, workspace_id),
+    )
+
+
+async def _revise_post(
+    post_id: UUID,
+    campaign: Campaign,
+    gateway: AgentGateway,
+    campaigns: CampaignStore,
+    workspace_id: UUID,
+) -> RevisionResponse:
+    post = next((item for item in campaign.posts if item.id == post_id), None)
     if post is None:
         raise HTTPException(status_code=404, detail="Post not found")
     note = (post.review_note or "").strip()
@@ -810,10 +840,27 @@ async def suggest_brief_from_url(
     read_page: Annotated[PageReader, Depends(get_page_reader)],
     workspace_id: WorkspaceId,
     quota: Quota,
+    jobs: AgentJobs,
 ) -> BriefFromUrlResponse:
     """Reads a public product page and suggests a brief. The founder edits it before drafting."""
+    return await tracked(
+        jobs,
+        workspace_id=workspace_id,
+        kind="brief_from_url",
+        failure="The brief could not be suggested right now.",
+        work=lambda: _brief_from_url(request.url, gateway, read_page, workspace_id, quota),
+    )
+
+
+async def _brief_from_url(
+    url: str,
+    gateway: AgentGateway,
+    read_page: PageReader,
+    workspace_id: UUID,
+    quota: AgentQuota,
+) -> BriefFromUrlResponse:
     try:
-        page = await read_page(request.url)
+        page = await read_page(url)
     except PageReadError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     if len(page.title + page.description + page.text) < 40:

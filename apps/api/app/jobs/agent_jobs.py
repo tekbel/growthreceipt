@@ -8,19 +8,22 @@ redeploy or a crash shows an honest failure instead of a run that never ends.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Coroutine
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Protocol
 from uuid import UUID, uuid4
 
+from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
-JobKind = Literal["campaign_draft", "next_action"]
+JobKind = Literal[
+    "campaign_draft", "next_action", "follow_up_post", "revise_post", "brief_from_url"
+]
 JobStatus = Literal["running", "succeeded", "failed", "interrupted"]
 
 HEARTBEAT_SECONDS = 15.0
@@ -218,6 +221,31 @@ async def heartbeat(jobs: AgentJobStore, job_id: UUID) -> AsyncIterator[None]:
         yield
     finally:
         task.cancel()
+
+
+async def tracked[ResultT: BaseModel](
+    jobs: AgentJobStore,
+    *,
+    workspace_id: UUID,
+    kind: JobKind,
+    campaign_id: UUID | None = None,
+    failure: str,
+    work: Callable[[], Awaitable[ResultT]],
+) -> ResultT:
+    """Runs a plain request as a job. The request still answers as usual, and a page that
+    reloaded meanwhile finds the result through the job."""
+    job_id = await jobs.start(workspace_id=workspace_id, kind=kind, campaign_id=campaign_id)
+    try:
+        async with heartbeat(jobs, job_id):
+            result = await work()
+    except HTTPException as error:
+        await jobs.fail(job_id, str(error.detail))
+        raise
+    except BaseException:
+        await jobs.fail(job_id, failure)
+        raise
+    await jobs.finish(job_id, result.model_dump(mode="json"))
+    return result
 
 
 # Runs detached from their request. Holding the tasks here keeps them from being collected.

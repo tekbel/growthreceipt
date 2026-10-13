@@ -254,7 +254,9 @@ async def test_approved_move_drafts_one_post_for_review(
 
 
 @pytest.mark.asyncio
-async def test_follow_up_needs_an_approved_move(transport: ASGITransport) -> None:
+async def test_follow_up_needs_an_approved_move(
+    transport: ASGITransport, agent_jobs: FakeAgentJobStore
+) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         await recommend(client)
         await client.post(
@@ -265,11 +267,13 @@ async def test_follow_up_needs_an_approved_move(transport: ASGITransport) -> Non
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Approve a next move first"
+    [job] = [job for _, job in agent_jobs.jobs.values() if job.kind == "follow_up_post"]
+    assert job.status == "failed" and job.error == "Approve a next move first"
 
 
 @pytest.mark.asyncio
 async def test_agent_revises_a_post_from_the_review_note(
-    transport: ASGITransport, campaign_store: FakeCampaignStore
+    transport: ASGITransport, campaign_store: FakeCampaignStore, agent_jobs: FakeAgentJobStore
 ) -> None:
     post = campaign_store.campaigns[UUID(CAMPAIGN)].posts[0]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -286,6 +290,10 @@ async def test_agent_revises_a_post_from_the_review_note(
 
     assert early.status_code == 409
     assert response.status_code == 200
+    # A page that reloaded while the agent revised finds the answer through the job.
+    revisions = [job for _, job in agent_jobs.jobs.values() if job.kind == "revise_post"]
+    assert [job.status for job in revisions] == ["failed", "succeeded"]
+    assert revisions[1].result == response.json()
     [revised] = [
         item for item in response.json()["campaign"]["posts"] if item["id"] == str(post.id)
     ]
