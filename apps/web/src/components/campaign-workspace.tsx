@@ -63,6 +63,7 @@ import {
   type Channel,
   campaignApi,
   channels,
+  DEMO_RESET_KEY,
   type DraftProgress,
   type DraftStage,
   exampleBrief,
@@ -291,6 +292,21 @@ export function CampaignWorkspace({
   const [editingBody, setEditingBody] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
+
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem(DEMO_RESET_KEY)) return;
+      sessionStorage.removeItem(DEMO_RESET_KEY);
+    } catch {
+      return;
+    }
+    setToast({
+      message:
+        "Demo reset. The campaign, its posts and approvals, and all orders are back to the start.",
+    });
+    const timer = window.setTimeout(() => setToast(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [revenue, setRevenue] = useState<RevenueSummary | null>(null);
   const [revenueError, setRevenueError] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);

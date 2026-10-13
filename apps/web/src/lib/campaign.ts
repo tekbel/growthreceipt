@@ -1,3 +1,6 @@
+// Set before the page reloads after a judge demo reset, read once by the workspace.
+export const DEMO_RESET_KEY = "growthreceipt.demo-reset";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 let accessToken: string | null = null;

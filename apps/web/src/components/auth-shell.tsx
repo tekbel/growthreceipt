@@ -17,7 +17,7 @@ import {
   CampaignWorkspace,
   type WorkspaceIdentity,
 } from "@/components/campaign-workspace";
-import { apiFetch, setApiAccessToken } from "@/lib/campaign";
+import { apiFetch, DEMO_RESET_KEY, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
 
@@ -185,6 +185,12 @@ export function AuthShell() {
   async function resetJudgeDemo() {
     const response = await apiFetch("/v1/auth/demo/reset", { method: "POST" });
     if (!response.ok) throw new Error("The judge demo could not be reset.");
+    // The fresh demo looks like the old one, so the next page load confirms the reset.
+    try {
+      sessionStorage.setItem(DEMO_RESET_KEY, "1");
+    } catch {
+      // The reset still happened. Only the confirmation is lost.
+    }
     window.location.hash = "today";
     window.location.reload();
   }
