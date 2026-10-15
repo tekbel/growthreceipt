@@ -551,7 +551,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .auth-card { order: 3; width: 100%; max-width: 520px; margin: 0; }
   .auth-example { order: 4; width: 100%; max-width: 520px; margin: 36px 0 0; }
   .flow { order: 5; width: 100%; max-width: 520px; margin: 28px 0 10px; }
-  .auth-next { order: 6; width: 100%; max-width: 520px; }
   .sidebar { transform: translateX(-100%); transition: transform 180ms ease; }
   .sidebar.open { transform: translateX(0); }
   .mobile-close { display: grid; }
@@ -978,6 +977,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .result-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin: 4px 0 0; }
 .result-facts dt { color: var(--muted); font-size: var(--type-xs); }
 .result-facts dd { margin: 3px 0 0; display: grid; gap: 2px; color: var(--ink); font-size: var(--type-sm); font-weight: 600; }
+.result-facts code { overflow-wrap: anywhere; color: inherit; font-size: var(--type-xs); }
 .result-facts dd small { color: var(--muted); font-size: var(--type-xs); font-weight: 400; }
 .result-facts dd.verified { color: var(--success); }
 .result-facts dd.pending { color: var(--warning); }
@@ -1061,13 +1061,10 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .paypal-button-slot { opacity: 0; transition: opacity var(--duration-base) var(--ease); }
 .paypal-button-slot.ready { opacity: 1; }
 .paypal-button-skeleton { position: absolute; inset: 0 0 auto; height: 48px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-hover) 50%, var(--surface-subtle) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s linear infinite; }
-/* What's next on the home page, clearly marked as planned. */
-.auth-next { width: min(470px, 100%); margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
-.auth-next h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--ink-soft); font-size: var(--type-xs); font-weight: 600; }
-.auth-next h2 span { padding: 1px 7px; border-radius: 999px; background: var(--surface-hover); color: var(--muted); font-size: var(--type-2xs); font-weight: 600; }
-.auth-next ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.auth-next li { color: var(--muted); font-size: var(--type-xs); line-height: 1.55; }
-.auth-next strong { color: var(--ink-soft); font-weight: 600; }
+/* Keep planned work visible without letting it compete with the working demo. */
+.auth-next { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
+.auth-next span { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--surface-hover); font-size: var(--type-2xs); font-weight: 600; }
+.auth-next p { margin: 0; }
 
 /* Names the example product, so judges know what LaunchCheck is before they meet it. */
 .auth-example { width: min(470px, 100%); display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 12px; margin: 0 0 22px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface-subtle); }

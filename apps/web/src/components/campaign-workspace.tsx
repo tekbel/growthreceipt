@@ -2109,10 +2109,13 @@ function TodayResultCard({
             </dd>
           </div>
           <div>
-            <dt>Captured</dt>
+            <dt>PayPal capture</dt>
             <dd>
-              {captured}
-              {receipts.length > 1 ? <small>{receipts.length} purchases in total</small> : null}
+              <code>{latest.capture_id}</code>
+              <small>
+                {captured}
+                {receipts.length > 1 ? ` · ${receipts.length} purchases in total` : ""}
+              </small>
             </dd>
           </div>
         </dl>
@@ -3450,7 +3453,7 @@ function ResultsPage({
       <section className="results-evidence" aria-labelledby="evidence-title">
         <div className="column-heading">
           <h2 id="evidence-title">
-            Which post earned real revenue
+            Which posts earned verified revenue
             <InfoTip label="About this table" align="start">
               One row per post. Payment and attribution come from PayPal captures and signature
               checked webhooks. Built with AG Grid.

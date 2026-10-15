@@ -12,7 +12,7 @@ CAMPAIGN = {
         "Scans a launch page for speed, SEO and structure issues, "
         "then explains practical fixes in plain English."
     ),
-    "audience": "Indie builders and small teams getting ready to launch.",
+    "audience": "Indie founders and small teams selling digital products.",
     "objective": "Encourage builders to purchase the 10 scan pack before launch.",
     "channels": ["LinkedIn", "X", "Instagram"],
     "brand_voice": "Direct, practical, encouraging",

@@ -4,7 +4,7 @@ Draft for the README and the Devpost "Inspiration" and "What's next" sections. P
 
 ## The person
 
-An independent maker or a small software team that markets its own product. They post on LinkedIn or X a few times a week, sell something people pay for once or monthly, and take payments through PayPal.
+GrowthReceipt is for indie founders and small teams selling digital products. They market their own products, post on LinkedIn or X, and take payments through PayPal.
 
 Typical products:
 
@@ -50,4 +50,4 @@ Open risk: platform fees need PayPal partner approval for multiparty payments, w
 
 ## Short version for Devpost
 
-GrowthReceipt is for indie makers and small software teams who market their own product on LinkedIn or X and sell through PayPal. They can see which posts get likes but not which posts bring paying customers. GrowthReceipt drafts the posts, gives each one its own PayPal buy link, counts only purchases PayPal confirms, and suggests one next experiment from that evidence. It is planned to be free to start with a 3% fee on verified revenue, or $19 a month with no fee.
+GrowthReceipt is for indie founders and small teams selling digital products through PayPal. They can see which posts get likes but not which posts bring paying customers. GrowthReceipt drafts the posts, gives each one its own PayPal buy link, counts only purchases PayPal confirms, and suggests one next experiment from that evidence.

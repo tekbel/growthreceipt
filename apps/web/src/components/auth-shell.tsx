@@ -237,7 +237,7 @@ export function AuthShell() {
           </div>
           <div className="auth-promise">
             <span className="eyebrow">
-              For small software teams launching without a growth team
+              For indie founders and small teams selling digital products
             </span>
             <h1>Know which post earned the money.</h1>
             <p>
@@ -270,34 +270,6 @@ export function AuthShell() {
             </p>
           </aside>
           <SampleFlow />
-          <section className="auth-next" aria-labelledby="auth-next-title">
-            <h2 id="auth-next-title">
-              What's next <span>Planned</span>
-            </h2>
-            <ul>
-              <li>
-                <strong>More PayPal signals.</strong> Subscriptions, refunds and disputes from the
-                same verified webhooks, so the agent learns what keeps customers.
-              </li>
-              <li>
-                <strong>More publishing.</strong> Approved posts go out to X and Facebook the way
-                they already do on LinkedIn, each with its own buy link.
-              </li>
-              <li>
-                <strong>Teams and agencies.</strong> Many products in one workspace, compared by the
-                revenue each post earned.
-              </li>
-              <li>
-                <strong>Pay when it pays.</strong> Free to start, with a 3% fee on verified revenue
-                collected through PayPal. Plans from $19 a month remove the fee.
-              </li>
-              <li>
-                <strong>A smarter agent.</strong> It proposes a new pack or price within limits you
-                set, splits into writing, analysis and pricing agents, and shows how often its past
-                advice led to purchases.
-              </li>
-            </ul>
-          </section>
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
@@ -326,6 +298,10 @@ export function AuthShell() {
             <li>PayPal sandbox</li>
             <li>No real money</li>
           </ul>
+          <div className="auth-next">
+            <span>Planned</span>
+            <p>We plan to add PayPal subscriptions, refunds and more publishing channels.</p>
+          </div>
           {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
           <div className="auth-divider">
             <span>or keep your workspace</span>
