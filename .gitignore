@@ -23,3 +23,11 @@ supabase/.temp/
 northstar-*.zip
 content-review-*.png
 web-proto-type-skill/
+
+# Internal tool for video prep, not part of the submission
+scripts/sandbox_purchases.mjs
+plan.json
+
+# Local end to end tests, kept out of the submission
+/tests/
+/playwright.config.ts
