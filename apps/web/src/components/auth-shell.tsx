@@ -239,10 +239,11 @@ export function AuthShell() {
             <span className="eyebrow">
               For indie founders and small teams selling digital products
             </span>
-            <h1>Know which post earned the money.</h1>
+            <h1>Know which posts generate revenue.</h1>
             <p>
-              GrowthReceipt drafts your launch posts, links each one to PayPal, and turns every
-              verified purchase into the next experiment you approve.
+              See how each post contributes to sales through purchases verified by PayPal. The AI
+              agent identifies your best performing content and recommends what to post next to
+              increase sales, with every recommendation subject to your approval.
             </p>
             <ul className="auth-proof" aria-label="Built with">
               <li>
