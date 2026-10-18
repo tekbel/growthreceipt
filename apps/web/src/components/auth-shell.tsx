@@ -101,7 +101,8 @@ export function AuthShell() {
       else {
         loadedUser.current = null;
         setApiAccessToken(null);
-        if (window.location.hash) window.history.replaceState(null, "", "/");
+        if (window.location.pathname !== "/" || window.location.hash)
+          window.history.replaceState(null, "", "/");
         // A finished sign in leaves the buttons busy, so clear that on sign out.
         setSubmitting(false);
         setEmailSent(false);
@@ -191,8 +192,7 @@ export function AuthShell() {
     } catch {
       // The reset still happened. Only the confirmation is lost.
     }
-    window.location.hash = "today";
-    window.location.reload();
+    window.location.replace("/today");
   }
 
   // Settings saves update the name and time zone everywhere without a reload.

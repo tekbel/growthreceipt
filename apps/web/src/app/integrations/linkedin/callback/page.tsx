@@ -21,7 +21,7 @@ export default function LinkedInCallback() {
     } catch {
       // Without storage the workspace simply shows LinkedIn as not connected.
     }
-    window.location.replace("/#integrations");
+    window.location.replace("/integrations");
   }, []);
 
   return <main className="buy-page" aria-busy="true" />;

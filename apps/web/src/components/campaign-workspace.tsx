@@ -86,6 +86,7 @@ import {
   timeZoneLabel,
   workspaceHour,
 } from "@/lib/time";
+import { isView, type View, views } from "@/lib/views";
 
 // AG Studio is large, so it loads only when the dashboard opens, and only in the browser.
 const RevenueStudio = dynamic(() => import("@/components/revenue-studio/revenue-studio"), {
@@ -97,21 +98,6 @@ const RevenueStudio = dynamic(() => import("@/components/revenue-studio/revenue-
   ),
 });
 
-const views = [
-  "today",
-  "products",
-  "campaigns",
-  "new-campaign",
-  "content",
-  "calendar",
-  "results",
-  "dashboard",
-  "experiment",
-  "integrations",
-  "settings",
-  "checkout",
-] as const;
-type View = (typeof views)[number];
 type Filter = "All" | "Needs review" | "Changes requested" | "Approved";
 type ReviewStatus = Exclude<Filter, "All">;
 type Stage = "Approval" | "Publishing" | "Measurement";
@@ -140,10 +126,10 @@ function systemNotify(title: string, body: string) {
   }
 }
 
-// The current page lives in the URL hash so refresh, back, and links work.
-function viewFromHash(): View | null {
-  const hash = window.location.hash.slice(1);
-  return (views as readonly string[]).includes(hash) ? (hash as View) : null;
+// The current page lives in the URL path, such as /today, so refresh, back, and links work.
+function viewFromPath(): View | null {
+  const segment = window.location.pathname.split("/")[1];
+  return isView(segment) ? segment : null;
 }
 
 type RevenueSummary = {
@@ -408,7 +394,7 @@ export function CampaignWorkspace({
       setLoadState("ready");
       if (!latest) {
         setView("new-campaign");
-        window.history.replaceState(null, "", "#new-campaign");
+        window.history.replaceState(null, "", "/new-campaign");
       }
     } catch {
       setLoadState("error");
@@ -457,7 +443,10 @@ export function CampaignWorkspace({
   }, [campaign]);
 
   useEffect(() => {
-    const syncView = () => setView(viewFromHash() ?? "today");
+    // Links saved before pages had paths, such as /#today, move to the path once.
+    const legacy = window.location.hash.slice(1);
+    if (isView(legacy)) window.history.replaceState(null, "", `/${legacy}`);
+    const syncView = () => setView(viewFromPath() ?? "today");
     syncView();
     window.addEventListener("popstate", syncView);
     return () => window.removeEventListener("popstate", syncView);
@@ -836,7 +825,7 @@ export function CampaignWorkspace({
 
   function navigate(nextView: View) {
     if (nextView !== "dashboard") setDashboardFocus(null);
-    if (nextView !== view) window.history.pushState(null, "", `#${nextView}`);
+    if (nextView !== view) window.history.pushState(null, "", `/${nextView}`);
     setView(nextView);
     setMobileNavigationOpen(false);
     setSearchOpen(false);

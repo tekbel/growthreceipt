@@ -315,7 +315,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                 <div className="buy-founder-note">
                   <p>This purchase is already credited to the post that brought it.</p>
                   <span className="buy-founder-action">
-                    <a className="button dark" href="/#today">
+                    <a className="button dark" href="/today">
                       See it on Today
                       <ArrowRight aria-hidden="true" />
                     </a>
