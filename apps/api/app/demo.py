@@ -61,8 +61,7 @@ POSTS = [
     (
         "Instagram",
         "Before and after one scan",
-        "Same page, three fixes, a faster first impression. LaunchCheck shows you where "
-        "to start.",
+        "Same page, three fixes, a faster first impression. LaunchCheck shows you where to start.",
         "Link in bio.",
         "needs_review",
         None,
@@ -70,8 +69,7 @@ POSTS = [
     (
         "LinkedIn",
         "Every relaunch deserves a check",
-        "New pricing page? New landing page? Scan it again. Ten scans cover a whole "
-        "launch week.",
+        "New pricing page? New landing page? Scan it again. Ten scans cover a whole launch week.",
         "Get 10 scans for 9 USD.",
         "needs_review",
         None,
