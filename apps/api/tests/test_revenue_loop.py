@@ -102,6 +102,8 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                 "gross_revenue": "9.00",
                 "currency": "USD",
                 "latest_capture_id": "TEST-CAPTURE-001",
+                "refunded_orders": 0,
+                "refunded_revenue": "0.00",
             }
 
             recommendation = await client.post(

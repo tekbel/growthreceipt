@@ -181,6 +181,8 @@ async def test_capture_is_attributed_to_campaign() -> None:
         "gross_revenue": "9.00",
         "currency": "USD",
         "latest_capture_id": "TEST-CAPTURE-001",
+        "refunded_orders": 0,
+        "refunded_revenue": "0.00",
     }
 
 
@@ -460,3 +462,140 @@ async def test_webhook_with_a_body_that_is_not_json_is_refused(client: AsyncClie
     )
 
     assert response.status_code == 400
+
+
+async def paid_order(client: AsyncClient) -> str:
+    order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+    order_id = str(order.json()["order_id"])
+    await client.post(f"/v1/public/orders/{order_id}/capture")
+    return order_id
+
+
+def refund_event(event_id: str, refund_id: str, amount: str) -> dict[str, object]:
+    # PayPal links a refund to its capture with the "up" link.
+    return {
+        "id": event_id,
+        "event_type": "PAYMENT.CAPTURE.REFUNDED",
+        "resource": {
+            "id": refund_id,
+            "status": "COMPLETED",
+            "amount": {"value": amount, "currency_code": "USD"},
+            "links": [
+                {
+                    "rel": "up",
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/TEST-CAPTURE-001",
+                }
+            ],
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_refunded_purchase_stops_counting_as_revenue(client: AsyncClient) -> None:
+    order_id = await paid_order(client)
+
+    refund = await client.post(f"/v1/paypal/orders/{order_id}/refund")
+    again = await client.post(f"/v1/paypal/orders/{order_id}/refund")
+    summary = (await client.get(f"/v1/paypal/revenue/{CAMPAIGN_ID}")).json()
+    [receipt] = (await client.get(f"/v1/paypal/receipts/{CAMPAIGN_ID}")).json()["receipts"]
+
+    assert refund.status_code == 200
+    assert refund.json()["status"] == "COMPLETED"
+    assert again.status_code == 409
+    assert summary["completed_orders"] == 0
+    assert summary["gross_revenue"] == "0.00"
+    assert summary["refunded_orders"] == 1
+    assert summary["refunded_revenue"] == "9.00"
+    assert summary["latest_capture_id"] is None
+    # The receipt stays in the proof chain, marked refunded.
+    assert receipt["refunded_amount"] == "9.00"
+
+
+@pytest.mark.asyncio
+async def test_refund_refuses_unpaid_and_unknown_orders(client: AsyncClient) -> None:
+    order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
+
+    unpaid = await client.post(f"/v1/paypal/orders/{order.json()['order_id']}/refund")
+    unknown = await client.post("/v1/paypal/orders/UNKNOWN-ORDER/refund")
+
+    assert unpaid.status_code == 404
+    assert unknown.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_refund_made_in_paypal_arrives_through_the_verified_webhook(
+    client: AsyncClient,
+) -> None:
+    await paid_order(client)
+
+    await client.post("/v1/paypal/webhooks", json=refund_event("WH-REFUND", "REFUND-1", "4.00"))
+    # PayPal may deliver the same event twice. It is stored once.
+    await client.post("/v1/paypal/webhooks", json=refund_event("WH-REFUND", "REFUND-1", "4.00"))
+    summary = (await client.get(f"/v1/paypal/revenue/{CAMPAIGN_ID}")).json()
+    [receipt] = (await client.get(f"/v1/paypal/receipts/{CAMPAIGN_ID}")).json()["receipts"]
+
+    # A partial refund leaves a purchase that still counts, for what the buyer kept.
+    assert summary["completed_orders"] == 1
+    assert summary["gross_revenue"] == "5.00"
+    assert summary["refunded_revenue"] == "4.00"
+    assert receipt["refunded_amount"] == "4.00"
+    assert [event["event_id"] for event in receipt["webhooks"]] == ["WH-REFUND"]
+
+
+@pytest.mark.asyncio
+async def test_a_refund_event_for_another_capture_is_stored_but_changes_nothing(
+    client: AsyncClient,
+) -> None:
+    await paid_order(client)
+    event = refund_event("WH-OTHER-REFUND", "REFUND-2", "9.00")
+    event["resource"]["links"][0]["href"] = "https://api.paypal.com/v2/payments/captures/OTHER"  # type: ignore[index]
+
+    response = await client.post("/v1/paypal/webhooks", json=event)
+    summary = (await client.get(f"/v1/paypal/revenue/{CAMPAIGN_ID}")).json()
+
+    assert response.status_code == 200
+    assert summary["gross_revenue"] == "9.00"
+
+
+@pytest.mark.asyncio
+async def test_http_gateway_refunds_the_full_capture_with_an_idempotency_key() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/v1/oauth2/token":
+            return httpx.Response(200, json={"access_token": "token", "expires_in": 300})
+        return httpx.Response(
+            201,
+            json={
+                "id": "REFUND-123",
+                "status": "COMPLETED",
+                "amount": {"value": "9.00", "currency_code": "USD"},
+                "links": [
+                    {
+                        "rel": "up",
+                        "href": "https://api.sandbox.paypal.com/v2/payments/captures/CAP-1",
+                    }
+                ],
+            },
+        )
+
+    client = httpx.AsyncClient(
+        base_url="https://api-m.sandbox.paypal.com",
+        transport=httpx.MockTransport(handler),
+    )
+    gateway = HttpPayPalGateway(
+        client_id="client-id",
+        client_secret="client-secret",
+        webhook_id="webhook-id",
+        environment="sandbox",
+        client=client,
+    )
+
+    refund = await gateway.refund_capture(capture_id="CAP-1", request_id="refund-CAP-1")
+    await client.aclose()
+
+    assert requests[1].url.path == "/v2/payments/captures/CAP-1/refund"
+    assert requests[1].headers["PayPal-Request-Id"] == "refund-CAP-1"
+    assert json.loads(requests[1].content) == {}
+    assert (refund.refund_id, refund.capture_id, refund.amount) == ("REFUND-123", "CAP-1", "9.00")

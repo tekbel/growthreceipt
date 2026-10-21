@@ -49,10 +49,13 @@ import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
 import {
+  countsAsRevenue,
   ElapsedSeconds,
+  netAmount,
   type Receipt as PayPalReceipt,
   type ProvenMove,
   ReceiptChain,
+  RefundButton,
 } from "@/components/receipt-proof";
 import { type SearchItem, WorkspaceSearch } from "@/components/workspace-search";
 import {
@@ -138,6 +141,8 @@ type RevenueSummary = {
   gross_revenue: string;
   currency: string;
   latest_capture_id: string | null;
+  refunded_orders?: number;
+  refunded_revenue?: string;
 };
 
 type MoveEvidence = {
@@ -354,7 +359,9 @@ export function CampaignWorkspace({
   const [revising, setRevising] = useState(false);
   // A brief from a product page that was still being read when the page reloaded.
   const [briefJobId, setBriefJobId] = useState<string | null>(null);
-  const [receipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
+  // Every purchase, refunded ones too. Counts and evidence use only what still counts as revenue.
+  const [allReceipts, setReceipts] = useState<PayPalReceipt[] | null>(null);
+  const receipts = useMemo(() => allReceipts?.filter(countsAsRevenue) ?? null, [allReceipts]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -608,6 +615,19 @@ export function CampaignWorkspace({
     recommendation && recommendedAt
       ? { headline: recommendation.headline, at: recommendedAt, decision: moveDecision?.decision }
       : null;
+
+  async function refundOrder(orderId: string): Promise<boolean> {
+    try {
+      const response = await apiFetch(`/v1/paypal/orders/${orderId}/refund`, { method: "POST" });
+      if (!response.ok) throw new Error("refund failed");
+      await loadRevenue();
+      notify("Refunded through PayPal. That purchase no longer counts as revenue.");
+      return true;
+    } catch {
+      notify("The refund did not go through. Please try again.");
+      return false;
+    }
+  }
 
   async function chooseOffer(offerId: string) {
     if (!campaign || offerId === campaign.offer_id) return;
@@ -1171,6 +1191,8 @@ export function CampaignWorkspace({
             revenue={revenue}
             revenueError={revenueError}
             receipts={receipts}
+            allReceipts={allReceipts}
+            onRefund={refundOrder}
             offers={offers}
             move={provenMove}
             recommendation={recommendation}
@@ -3297,7 +3319,7 @@ function OfferSplit({
       currency: receipt.currency,
     };
     total.orders += 1;
-    total.cents += Math.round(Number(receipt.amount) * 100);
+    total.cents += Math.round(netAmount(receipt) * 100);
     totals.set(receipt.offer_id, total);
   }
   const rows = [...totals.entries()].sort((a, b) => b[1].cents - a[1].cents);
@@ -3328,6 +3350,8 @@ function ResultsPage({
   revenue,
   revenueError,
   receipts,
+  allReceipts,
+  onRefund,
   offers,
   move,
   recommendation,
@@ -3341,6 +3365,8 @@ function ResultsPage({
   revenue: RevenueSummary | null;
   revenueError: boolean;
   receipts: PayPalReceipt[] | null;
+  allReceipts: PayPalReceipt[] | null;
+  onRefund: (orderId: string) => Promise<boolean>;
   offers: Offer[];
   move: ProvenMove | null;
   nextActions: Record<string, string>;
@@ -3354,6 +3380,8 @@ function ResultsPage({
   navigate: (view: View) => void;
 }) {
   const hasRevenue = Boolean(revenue?.completed_orders);
+  const latest = receipts?.[0];
+  const earlier = (allReceipts ?? []).filter((item) => item !== latest).slice(0, 10);
   return (
     <>
       <PageHeader
@@ -3387,13 +3415,19 @@ function ResultsPage({
           icon={<Receipt aria-hidden="true" />}
           label="Completed orders"
           value={String(revenue?.completed_orders ?? 0)}
-          detail={revenue?.latest_capture_id ? "Capture verified" : "No capture yet"}
+          detail={
+            revenue?.refunded_orders
+              ? `${revenue.refunded_orders} refunded`
+              : revenue?.latest_capture_id
+                ? "Capture verified"
+                : "No capture yet"
+          }
           tone={revenue?.latest_capture_id ? "success" : "neutral"}
         />
         <CheckoutsMetric revenue={revenue} />
         <PayingPostsMetric campaign={campaign} receipts={receipts} />
       </section>
-      {receipts?.length ? (
+      {allReceipts?.length ? (
         <section className="results-receipts" aria-labelledby="receipts-title">
           <div className="column-heading">
             <h2 id="receipts-title">
@@ -3406,21 +3440,24 @@ function ResultsPage({
             </h2>
             <span>Every step below is a recorded PayPal or GrowthReceipt event</span>
           </div>
-          <ReceiptChain
-            receipt={receipts[0]}
-            receipts={receipts}
-            posts={campaign.posts}
-            move={move}
-            moveLoading={recommendationLoading}
-            onFindNextMove={() => void findNextMove()}
-            onReview={() => navigate("experiment")}
-            onOpenPost={openPost}
-          />
-          {receipts.length > 1 ? (
+          {latest && receipts ? (
+            <ReceiptChain
+              receipt={latest}
+              receipts={receipts}
+              posts={campaign.posts}
+              move={move}
+              moveLoading={recommendationLoading}
+              onFindNextMove={() => void findNextMove()}
+              onReview={() => navigate("experiment")}
+              onOpenPost={openPost}
+              onRefund={onRefund}
+            />
+          ) : null}
+          {earlier.length ? (
             <div className="earlier-receipts">
-              <h3>Earlier purchases</h3>
+              <h3>{latest ? "Earlier purchases" : "Refunded purchases"}</h3>
               <ul>
-                {receipts.slice(1, 11).map((item) => {
+                {earlier.map((item) => {
                   const post = campaign.posts.find((entry) => entry.id === item.content_id);
                   return (
                     <li key={item.order_id}>
@@ -3429,14 +3466,17 @@ function ResultsPage({
                         {post ? <PostRef post={post} onOpen={openPost} /> : "Campaign post"}
                       </span>
                       <code>{item.order_id}</code>
-                      <strong>{formatMoney(item.amount, item.currency)}</strong>
+                      <strong>{formatMoney(String(netAmount(item)), item.currency)}</strong>
+                      <RefundButton receipt={item} onRefund={onRefund} />
                     </li>
                   );
                 })}
               </ul>
             </div>
           ) : null}
-          <OfferSplit receipts={receipts} offers={offers} current={campaign.offer} />
+          {receipts?.length ? (
+            <OfferSplit receipts={receipts} offers={offers} current={campaign.offer} />
+          ) : null}
         </section>
       ) : null}
       <section className="results-evidence" aria-labelledby="evidence-title">

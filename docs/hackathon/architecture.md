@@ -177,7 +177,7 @@ flowchart LR
 1. **More autonomy, in steps.** Today the agent suggests and the founder approves. Next, offers move into the database so the agent can propose a new pack or price within limits the founder sets. After that, an autopilot that acts inside a budget, with every action logged and reversible.
 2. **Specialist agents.** A writer, an analyst that holds the PayPal tools and a pricing agent, coordinated by one planner. Buyer agents could also buy through the same verified checkout, which opens a new sales channel.
 3. **Scale.** Agent runs already live in the `agent_jobs` table, so a page can reattach after a reload. The runs still execute inside the API process. The next step moves them to a job queue served by the worker service (`services/worker`, a stub today), takes PayPal webhooks in through the same queue, and runs several API copies. The per workspace and global agent limits already exist.
-4. **Deeper PayPal use.** Partner onboarding so founders are paid directly (see the production money flow above), PayPal Subscriptions, and refunds and disputes in the proof chain, so a refunded purchase stops counting as evidence.
+4. **Deeper PayPal use.** Partner onboarding so founders are paid directly (see the production money flow above), PayPal Subscriptions, and disputes in the proof chain. Refunds are built: a refunded purchase already stops counting as revenue and as evidence.
 5. **Measuring the agent.** Check each past recommendation against the purchases that came after it, and run split tests with a minimum sample size before a winner is called.
 
 ## Hosting

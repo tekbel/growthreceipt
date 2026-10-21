@@ -27,6 +27,8 @@ export type Checkout = {
   completed: boolean;
   ordered_at: string;
   captured_at: string | null;
+  // Completed refunds. Older API responses lack it.
+  refunded_amount?: string;
 };
 
 const CALENDAR_ID = "calendar";
@@ -132,14 +134,17 @@ export function buildStudioData(
   }));
   const rows = checkouts.map((checkout) => {
     const receipt = proof.get(checkout.order_id);
+    // What the buyer kept. A fully refunded purchase no longer counts as verified revenue.
+    const kept = Number(checkout.amount) - Number(checkout.refunded_amount ?? 0);
+    const paid = checkout.completed && kept > 0;
     return {
       id: checkout.order_id,
       postId: checkout.content_id,
       offerId: checkout.offer_id,
-      status: checkout.completed ? "Verified purchase" : "Checkout started",
+      status: paid ? "Verified purchase" : checkout.completed ? "Refunded" : "Checkout started",
       started: 1,
-      verified: checkout.completed ? 1 : 0,
-      revenue: checkout.completed ? Number(checkout.amount) : 0,
+      verified: paid ? 1 : 0,
+      revenue: checkout.completed ? Math.max(kept, 0) : 0,
       currency: checkout.currency,
       orderedAt: checkout.ordered_at,
       capturedAt: checkout.captured_at,
@@ -155,7 +160,7 @@ export function buildStudioData(
   return {
     description:
       `PayPal sandbox purchases for the ${campaign.product_name} campaign. Every checkout is a PayPal order ` +
-      "started from a post's buy link. Revenue counts only orders PayPal completed. All amounts are USD.",
+      "started from a post's buy link. Revenue counts only orders PayPal completed, minus refunds. All amounts are USD.",
     sources: [
       {
         id: "posts",
@@ -174,8 +179,9 @@ export function buildStudioData(
       {
         id: "checkouts",
         description:
-          "One row per PayPal order a buyer started. Verified is 1 when PayPal completed the capture. " +
-          "Revenue is the captured amount, 0 until then. Verified PayPal webhooks counts the " +
+          "One row per PayPal order a buyer started. Verified is 1 when PayPal completed the capture " +
+          "and it was not fully refunded. Revenue is the captured amount minus refunds, 0 until the " +
+          "capture. Verified PayPal webhooks counts the " +
           "signature checked PayPal events stored for the order and its capture.",
         data: rows,
         fields: fields([

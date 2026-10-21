@@ -106,7 +106,7 @@ def revenue_by_offer(receipts: list[Receipt]) -> list[OfferEvidence]:
     """Purchases and revenue for each offer customers bought, most revenue first."""
     totals: dict[str, list[Decimal]] = {}
     for receipt in receipts:
-        totals.setdefault(receipt.offer_id, []).append(receipt.amount)
+        totals.setdefault(receipt.offer_id, []).append(receipt.net_amount)
     return sorted(
         (
             OfferEvidence(
@@ -192,9 +192,13 @@ def paypal_order_tool(
             outcome: PayPalCheckOutcome = "not_found" if error.status_code == 404 else "unavailable"
             check = PayPalCheck(order_id=lookup.order_id, outcome=outcome)
         else:
+            # A partly refunded order is still a purchase. PayPal then reports the capture so.
+            capture_ok = (
+                {"COMPLETED", "PARTIALLY_REFUNDED"} if receipt.refunded_amount else {"COMPLETED"}
+            )
             matches = (
                 order.status == "COMPLETED"
-                and order.capture_status == "COMPLETED"
+                and order.capture_status in capture_ok
                 and order.capture_id == receipt.paypal_capture_id
                 and order.amount is not None
                 and Decimal(order.amount) == receipt.amount
@@ -354,7 +358,10 @@ async def _next_action(
     paypal: PayPalGateway | None,
 ) -> NextActionResponse:
     summary = await store.revenue_summary(campaign_id=campaign.id)
-    receipts = await store.receipts(campaign_id=campaign.id)
+    # A fully refunded purchase is not evidence. A partial refund counts what the buyer kept.
+    receipts = [
+        receipt for receipt in await store.receipts(campaign_id=campaign.id) if receipt.counts
+    ]
     paid_posts = []
     for post in campaign.posts:
         paid = [receipt for receipt in receipts if receipt.content_id == post.id]
@@ -367,7 +374,7 @@ async def _next_action(
                     theme=post.theme,
                     content=post.content,
                     completed_orders=len(paid),
-                    revenue=f"{sum((receipt.amount for receipt in paid), Decimal('0')):.2f}",
+                    revenue=f"{sum((receipt.net_amount for receipt in paid), Decimal('0')):.2f}",
                 )
             )
     paid_posts = rank_paid_posts(paid_posts)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -12,16 +13,25 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.offers import DEFAULT_OFFER_ID
-from app.paypal.gateway import Offer, PayPalCapture
+from app.paypal.gateway import Offer, PayPalCapture, PayPalRefund
+
+
+def payer_hash(workspace_id: UUID, payer_id: str) -> str:
+    """Counts a buyer without storing who they are. Salted per workspace, so the same buyer cannot
+    be linked across workspaces. Postgres computes the same value in record_capture."""
+    return hashlib.sha256(f"{workspace_id}:{payer_id}".encode()).hexdigest()
 
 
 @dataclass(frozen=True)
 class RevenueSummary:
+    # Orders and revenue that still count, after completed refunds.
     completed_orders: int
     started_orders: int
     gross_revenue: Decimal
     currency: str
     latest_capture_id: str | None
+    refunded_orders: int = 0
+    refunded_revenue: Decimal = Decimal("0")
 
 
 @dataclass(frozen=True)
@@ -45,6 +55,17 @@ class Receipt:
     webhooks: list[WebhookProof] = field(default_factory=list)
     # The catalog slug of what the customer bought.
     offer_id: str = DEFAULT_OFFER_ID
+    # Completed refunds of this capture. A fully refunded receipt is no longer revenue.
+    refunded_amount: Decimal = Decimal("0")
+    payer_hash: str | None = None
+
+    @property
+    def net_amount(self) -> Decimal:
+        return self.amount - self.refunded_amount
+
+    @property
+    def counts(self) -> bool:
+        return self.net_amount > 0
 
 
 @dataclass(frozen=True)
@@ -59,6 +80,16 @@ class Checkout:
     completed: bool
     ordered_at: datetime
     captured_at: datetime | None
+    refunded_amount: Decimal = Decimal("0")
+
+
+@dataclass(frozen=True)
+class RefundTarget:
+    """A captured order that can still be refunded."""
+
+    paypal_capture_id: str
+    amount: Decimal
+    refunded_amount: Decimal
 
 
 class PaymentStore(Protocol):
@@ -74,6 +105,12 @@ class PaymentStore(Protocol):
     ) -> None: ...
 
     async def record_capture(self, capture: PayPalCapture) -> None: ...
+
+    async def record_refund(self, refund: PayPalRefund) -> bool: ...
+
+    async def refund_target(
+        self, *, workspace_id: UUID, paypal_order_id: str
+    ) -> RefundTarget | None: ...
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool: ...
 
@@ -182,6 +219,11 @@ class PostgresPaymentStore:
                             status = 'completed',
                             amount = :amount,
                             currency = :currency,
+                            payer_hash = case when cast(:payer_id as text) is null then null
+                              else encode(sha256(convert_to(
+                                workspace_id::text || ':' || cast(:payer_id as text), 'UTF8'
+                              )), 'hex')
+                            end,
                             captured_at = now(),
                             updated_at = now()
                         where paypal_order_id = :order_id
@@ -191,12 +233,72 @@ class PostgresPaymentStore:
                         "capture_id": capture.capture_id,
                         "amount": Decimal(capture.amount),
                         "currency": capture.currency,
+                        "payer_id": capture.payer_id,
                         "order_id": capture.order_id,
                     },
                 ),
             )
             if result.rowcount != 1:
                 raise LookupError("PayPal order attribution was not found")
+
+    async def record_refund(self, refund: PayPalRefund) -> bool:
+        """Stores or updates a refund. False when the capture is not one of ours."""
+        async with self._session.begin():
+            result = cast(
+                CursorResult[Any],
+                await self._session.execute(
+                    text(
+                        """
+                        insert into growthreceipt.payment_refunds (
+                          id, payment_order_id, status, amount, currency
+                        )
+                        select :refund_id, o.id, :status, :amount, :currency
+                        from growthreceipt.payment_orders o
+                        where o.paypal_capture_id = :capture_id
+                        on conflict (id) do update set
+                          status = excluded.status,
+                          updated_at = now()
+                        """
+                    ),
+                    {
+                        "refund_id": refund.refund_id,
+                        "status": refund.status,
+                        "amount": Decimal(refund.amount),
+                        "currency": refund.currency,
+                        "capture_id": refund.capture_id,
+                    },
+                ),
+            )
+        return result.rowcount == 1
+
+    async def refund_target(
+        self, *, workspace_id: UUID, paypal_order_id: str
+    ) -> RefundTarget | None:
+        async with self._session.begin():
+            result = await self._session.execute(
+                text(
+                    """
+                    select o.paypal_capture_id, o.amount,
+                           coalesce((
+                             select sum(r.amount) from growthreceipt.payment_refunds r
+                             where r.payment_order_id = o.id and r.status = 'COMPLETED'
+                           ), 0) as refunded_amount
+                    from growthreceipt.payment_orders o
+                    where o.workspace_id = :workspace_id
+                      and o.paypal_order_id = :paypal_order_id
+                      and o.status = 'completed'
+                    """
+                ),
+                {"workspace_id": workspace_id, "paypal_order_id": paypal_order_id},
+            )
+            row = result.one_or_none()
+        if row is None:
+            return None
+        return RefundTarget(
+            paypal_capture_id=row.paypal_capture_id,
+            amount=Decimal(row.amount),
+            refunded_amount=Decimal(row.refunded_amount),
+        )
 
     async def owns_order(self, *, workspace_id: UUID, paypal_order_id: str) -> bool:
         async with self._session.begin():
@@ -261,17 +363,29 @@ class PostgresPaymentStore:
             result = await self._session.execute(
                 text(
                     """
-                    select count(*) filter (where status = 'completed')::int
+                    with o as (
+                      select o.*, coalesce((
+                               select sum(r.amount) from growthreceipt.payment_refunds r
+                               where r.payment_order_id = o.id and r.status = 'COMPLETED'
+                             ), 0) as refunded
+                      from growthreceipt.payment_orders o
+                      where o.campaign_id = :campaign_id
+                    )
+                    select count(*) filter (where status = 'completed' and amount > refunded)::int
                              as completed_orders,
                            count(*)::int as started_orders,
-                           coalesce(sum(amount) filter (where status = 'completed'), 0)
+                           coalesce(sum(amount - refunded) filter (where status = 'completed'), 0)
                              as gross_revenue,
                            coalesce(max(currency) filter (where status = 'completed'), 'USD')
                              as currency,
                            (array_agg(paypal_capture_id order by captured_at desc)
-                             filter (where status = 'completed'))[1] as latest_capture_id
-                    from growthreceipt.payment_orders
-                    where campaign_id = :campaign_id
+                             filter (where status = 'completed' and amount > refunded))[1]
+                             as latest_capture_id,
+                           count(*) filter (where status = 'completed' and refunded > 0)::int
+                             as refunded_orders,
+                           coalesce(sum(refunded) filter (where status = 'completed'), 0)
+                             as refunded_revenue
+                    from o
                     """
                 ),
                 {"campaign_id": campaign_id},
@@ -283,18 +397,25 @@ class PostgresPaymentStore:
             gross_revenue=Decimal(row.gross_revenue),
             currency=row.currency,
             latest_capture_id=row.latest_capture_id,
+            refunded_orders=row.refunded_orders,
+            refunded_revenue=Decimal(row.refunded_revenue),
         )
 
     async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:
         # Only verified events are stored, so a match here is a signature checked delivery.
-        # Order events carry the order id, capture events the capture id and the order id.
+        # Order events carry the order id, capture events the capture id and the order id,
+        # refund events the refund id.
         async with self._session.begin():
             result = await self._session.execute(
                 text(
                     """
                     select o.paypal_order_id, o.paypal_capture_id, o.content_id,
-                           o.amount, o.currency, o.created_at, o.captured_at,
+                           o.amount, o.currency, o.created_at, o.captured_at, o.payer_hash,
                            f.slug as offer_slug,
+                           coalesce((
+                             select sum(r.amount) from growthreceipt.payment_refunds r
+                             where r.payment_order_id = o.id and r.status = 'COMPLETED'
+                           ), 0) as refunded_amount,
                            coalesce((
                              select json_agg(json_build_object(
                                       'event_id', e.id,
@@ -305,6 +426,10 @@ class PostgresPaymentStore:
                              where e.resource->>'id' in (o.paypal_order_id, o.paypal_capture_id)
                                 or e.resource #>> '{supplementary_data,related_ids,order_id}'
                                    = o.paypal_order_id
+                                or e.resource->>'id' in (
+                                   select r.id from growthreceipt.payment_refunds r
+                                   where r.payment_order_id = o.id
+                                )
                            ), '[]'::json) as webhooks
                     from growthreceipt.payment_orders o
                     join growthreceipt.offers f on f.id = o.offer_id
@@ -326,6 +451,8 @@ class PostgresPaymentStore:
                 ordered_at=row.created_at,
                 captured_at=row.captured_at,
                 offer_id=row.offer_slug,
+                refunded_amount=Decimal(row.refunded_amount),
+                payer_hash=row.payer_hash,
                 webhooks=[
                     WebhookProof(
                         event_id=event["event_id"],
@@ -344,7 +471,11 @@ class PostgresPaymentStore:
                 text(
                     """
                     select o.paypal_order_id, o.content_id, f.slug as offer_slug,
-                           o.amount, o.currency, o.status, o.created_at, o.captured_at
+                           o.amount, o.currency, o.status, o.created_at, o.captured_at,
+                           coalesce((
+                             select sum(r.amount) from growthreceipt.payment_refunds r
+                             where r.payment_order_id = o.id and r.status = 'COMPLETED'
+                           ), 0) as refunded_amount
                     from growthreceipt.payment_orders o
                     join growthreceipt.offers f on f.id = o.offer_id
                     where o.campaign_id = :campaign_id
@@ -365,6 +496,7 @@ class PostgresPaymentStore:
                 completed=row.status == "completed",
                 ordered_at=row.created_at,
                 captured_at=row.captured_at,
+                refunded_amount=Decimal(row.refunded_amount),
             )
             for row in rows
         ]
@@ -385,6 +517,20 @@ class FakePaymentStore:
         self.captured_at: dict[str, datetime] = {}
         self.offer_ids: dict[str, str] = {}
         self.offer_prices: dict[str, tuple[Decimal, str]] = {}
+        self.refunds: dict[str, PayPalRefund] = {}
+
+    def _refunded(self, order_id: str) -> Decimal:
+        capture = self.captures.get(order_id)
+        if capture is None:
+            return Decimal("0")
+        return sum(
+            (
+                Decimal(refund.amount)
+                for refund in self.refunds.values()
+                if refund.capture_id == capture.capture_id and refund.status == "COMPLETED"
+            ),
+            Decimal("0"),
+        )
 
     async def record_order(
         self,
@@ -416,6 +562,25 @@ class FakePaymentStore:
         self.captures[capture.order_id] = capture
         self.captured_at[capture.order_id] = datetime.now(UTC)
 
+    async def record_refund(self, refund: PayPalRefund) -> bool:
+        if not any(capture.capture_id == refund.capture_id for capture in self.captures.values()):
+            return False
+        self.refunds[refund.refund_id] = refund
+        return True
+
+    async def refund_target(
+        self, *, workspace_id: UUID, paypal_order_id: str
+    ) -> RefundTarget | None:
+        order = self.orders.get(paypal_order_id)
+        capture = self.captures.get(paypal_order_id)
+        if order is None or order[0] != workspace_id or capture is None:
+            return None
+        return RefundTarget(
+            paypal_capture_id=capture.capture_id,
+            amount=Decimal(capture.amount),
+            refunded_amount=self._refunded(paypal_order_id),
+        )
+
     async def record_webhook(
         self,
         *,
@@ -434,17 +599,21 @@ class FakePaymentStore:
 
     async def revenue_summary(self, *, campaign_id: UUID) -> RevenueSummary:
         captures = [
-            capture
+            (capture, self._refunded(order_id))
             for order_id, capture in self.captures.items()
             if self.orders[order_id][1] == campaign_id
         ]
-        gross = sum((Decimal(capture.amount) for capture in captures), Decimal("0"))
+        counted = [capture for capture, refunded in captures if Decimal(capture.amount) > refunded]
+        refunded_total = sum((refunded for _capture, refunded in captures), Decimal("0"))
+        gross = sum((Decimal(capture.amount) for capture, _ in captures), Decimal("0"))
         return RevenueSummary(
-            completed_orders=len(captures),
+            completed_orders=len(counted),
             started_orders=sum(1 for order in self.orders.values() if order[1] == campaign_id),
-            gross_revenue=gross,
-            currency=captures[-1].currency if captures else "USD",
-            latest_capture_id=captures[-1].capture_id if captures else None,
+            gross_revenue=gross - refunded_total,
+            currency=captures[-1][0].currency if captures else "USD",
+            latest_capture_id=counted[-1].capture_id if counted else None,
+            refunded_orders=sum(1 for _capture, refunded in captures if refunded > 0),
+            refunded_revenue=refunded_total,
         )
 
     async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:
@@ -453,7 +622,11 @@ class FakePaymentStore:
             _workspace_id, order_campaign_id, content_id = self.orders[order_id]
             if order_campaign_id != campaign_id:
                 continue
-            related = {order_id, capture.capture_id}
+            related = {order_id, capture.capture_id} | {
+                refund.refund_id
+                for refund in self.refunds.values()
+                if refund.capture_id == capture.capture_id
+            }
             webhooks = [
                 proof
                 for proof, resource in self.webhooks
@@ -472,6 +645,10 @@ class FakePaymentStore:
                     captured_at=self.captured_at[order_id],
                     webhooks=webhooks,
                     offer_id=self.offer_ids[order_id],
+                    refunded_amount=self._refunded(order_id),
+                    payer_hash=payer_hash(_workspace_id, capture.payer_id)
+                    if capture.payer_id
+                    else None,
                 )
             )
         return sorted(receipts, key=lambda receipt: receipt.captured_at, reverse=True)
@@ -493,6 +670,7 @@ class FakePaymentStore:
                     completed=capture is not None,
                     ordered_at=self.ordered_at[order_id],
                     captured_at=self.captured_at.get(order_id),
+                    refunded_amount=self._refunded(order_id),
                 )
             )
         return checkouts

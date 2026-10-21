@@ -785,6 +785,8 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .receipt-chain strong { color: var(--ink); font-size: var(--type-sm); font-weight: 600; line-height: 1.35; }
 .receipt-chain li > span:not(.eyebrow, .receipt-marker) { color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
 .receipt-chain .receipt-amount { font-size: var(--type-xl); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.refund-button { width: fit-content; font-size: var(--type-xs); }
+.refund-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--type-xs); color: var(--muted); }
 .receipt-chain .text-button { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-sm); }
 .receipt-chain .text-button svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
 .receipt-chain .text-button:hover svg { transform: translateX(2px); }
@@ -816,7 +818,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .earlier-receipts { margin-top: 28px; }
 .earlier-receipts h3 { margin: 0 0 4px; font-size: var(--type-sm); font-weight: 600; }
 .earlier-receipts ul { margin: 0; padding: 0; list-style: none; }
-.earlier-receipts li { min-height: 46px; display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); font-size: var(--type-sm); }
+.earlier-receipts li { min-height: 46px; display: grid; grid-template-columns: 130px minmax(0, 1fr) auto auto auto; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); font-size: var(--type-sm); }
 .earlier-receipts time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .earlier-receipts strong { font-weight: 600; font-variant-numeric: tabular-nums; }
 .offer-split li { grid-template-columns: minmax(0, 1fr) auto 96px auto; }

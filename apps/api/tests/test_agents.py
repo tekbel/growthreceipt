@@ -10,6 +10,8 @@ from app.campaigns.models import CampaignDraft, CampaignPost
 from app.campaigns.store import FakeCampaignStore
 from app.jobs.agent_jobs import FakeAgentJobStore
 from app.main import app
+from app.offers import OFFERS
+from app.paypal.gateway import PayPalCapture, PayPalRefund
 from app.paypal.store import FakePaymentStore
 from app.paypal.store_dependencies import get_payment_store
 from app.routes.agents import NextAction, PaidPostEvidence, classify_evidence, rank_paid_posts
@@ -335,3 +337,36 @@ def test_equal_revenue_is_a_tie_in_a_stable_order() -> None:
     ranked = rank_paid_posts([paid(6, 2, "18.00"), paid(2, 2, "18.00")])
     assert [post.day for post in ranked] == [2, 6]
     assert classify_evidence(ranked) == "tie"
+
+
+@pytest.mark.asyncio
+async def test_a_refunded_purchase_is_not_next_move_evidence(transport: ASGITransport) -> None:
+    store = FakePaymentStore()
+    offer = next(iter(OFFERS.values()))
+    for order_id, content_id in (
+        ("KEPT", "22222222-2222-4222-8222-222222222222"),
+        ("REFUNDED", "33333333-3333-4333-8333-333333333333"),
+    ):
+        await store.record_order(
+            workspace_id=uuid4(),
+            offer=offer,
+            campaign_id=UUID(CAMPAIGN),
+            content_id=UUID(content_id),
+            paypal_order_id=order_id,
+            idempotency_key=uuid4(),
+        )
+        await store.record_capture(
+            PayPalCapture(order_id, f"CAP-{order_id}", "COMPLETED", "9.00", "USD")
+        )
+    await store.record_refund(PayPalRefund("REF-1", "CAP-REFUNDED", "COMPLETED", "9.00", "USD"))
+    app.dependency_overrides[get_payment_store] = lambda: store
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/v1/agents/next-action", json={"campaign_id": CAMPAIGN})
+
+    evidence = response.json()["evidence"]
+    assert evidence["completed_orders"] == 1
+    assert evidence["gross_revenue"] == "9.00"
+    assert [post["content_id"] for post in evidence["paid_posts"]] == [
+        "22222222-2222-4222-8222-222222222222"
+    ]

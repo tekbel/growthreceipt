@@ -13,7 +13,7 @@ import {
 import { AgGridReact } from "ag-grid-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Receipt } from "@/components/receipt-proof";
+import { netAmount, type Receipt } from "@/components/receipt-proof";
 import { type Campaign, postDate } from "@/lib/campaign";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -131,7 +131,7 @@ export function EvidenceGrid({
         approval: approvalLabels[post.status],
         payment,
         purchases: paid.length,
-        revenue: paid.reduce((sum, receipt) => sum + Number(receipt.amount), 0),
+        revenue: paid.reduce((sum, receipt) => sum + netAmount(receipt), 0),
         attribution: confirmed.length
           ? "Verified by PayPal webhook"
           : paid.length

@@ -32,6 +32,27 @@ class PayPalCapture:
     status: str
     amount: str
     currency: str
+    # PayPal's id for the buyer's account. Stored only as a hash.
+    payer_id: str | None = None
+
+
+@dataclass(frozen=True)
+class PayPalRefund:
+    refund_id: str
+    capture_id: str
+    status: str
+    amount: str
+    currency: str
+
+
+def refund_capture_id(refund: Mapping[str, Any]) -> str | None:
+    """The capture a refund belongs to. PayPal links it as the refund's "up" link."""
+    for link in refund.get("links") or []:
+        if isinstance(link, dict) and link.get("rel") == "up":
+            href = str(link.get("href", ""))
+            if "/captures/" in href:
+                return href.rstrip("/").rsplit("/", 1)[-1]
+    return None
 
 
 @dataclass(frozen=True)
@@ -65,6 +86,8 @@ class PayPalGateway(Protocol):
     async def capture_order(self, *, order_id: str, request_id: str) -> PayPalCapture: ...
 
     async def get_order(self, *, order_id: str) -> PayPalOrderDetails: ...
+
+    async def refund_capture(self, *, capture_id: str, request_id: str) -> PayPalRefund: ...
 
     async def verify_webhook(
         self,
@@ -198,6 +221,24 @@ class HttpPayPalGateway:
             status=str(capture["status"]),
             amount=str(amount["value"]),
             currency=str(amount["currency_code"]),
+            payer_id=(payload.get("payer") or {}).get("payer_id"),
+        )
+
+    async def refund_capture(self, *, capture_id: str, request_id: str) -> PayPalRefund:
+        # An empty body refunds the full captured amount.
+        payload = await self._post(
+            f"/v2/payments/captures/{capture_id}/refund",
+            operation="refund capture",
+            request_id=request_id,
+            body={},
+        )
+        amount = payload.get("amount", {})
+        return PayPalRefund(
+            refund_id=str(payload["id"]),
+            capture_id=refund_capture_id(payload) or capture_id,
+            status=str(payload["status"]),
+            amount=str(amount["value"]),
+            currency=str(amount["currency_code"]),
         )
 
     async def get_order(self, *, order_id: str) -> PayPalOrderDetails:
@@ -254,6 +295,9 @@ class FakePayPalGateway:
         # Orders PayPal knows about, by id. Anything else is a 404, as on PayPal.
         self.orders: dict[str, PayPalOrderDetails] = {}
         self.order_lookups: list[str] = []
+        self.refund_request_ids: list[str] = []
+        self.refund_status = "COMPLETED"
+        self.payer_id: str | None = "TESTPAYER001"
 
     async def create_order(
         self,
@@ -271,6 +315,17 @@ class FakePayPalGateway:
             order_id=order_id,
             capture_id="TEST-CAPTURE-001",
             status=self.capture_status,
+            amount="9.00",
+            currency="USD",
+            payer_id=self.payer_id,
+        )
+
+    async def refund_capture(self, *, capture_id: str, request_id: str) -> PayPalRefund:
+        self.refund_request_ids.append(request_id)
+        return PayPalRefund(
+            refund_id=f"TEST-REFUND-{len(self.refund_request_ids):03d}",
+            capture_id=capture_id,
+            status=self.refund_status,
             amount="9.00",
             currency="USD",
         )

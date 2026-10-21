@@ -24,7 +24,19 @@ export type Receipt = {
   ordered_at: string;
   captured_at: string;
   webhooks: WebhookProof[];
+  // Completed refunds of this purchase. Older API responses lack it.
+  refunded_amount?: string;
 };
+
+/** What the buyer kept after refunds. */
+export function netAmount(receipt: Receipt): number {
+  return Number(receipt.amount) - Number(receipt.refunded_amount ?? 0);
+}
+
+/** A fully refunded purchase is no longer revenue or evidence. */
+export function countsAsRevenue(receipt: Receipt): boolean {
+  return netAmount(receipt) > 0;
+}
 
 export type ProvenMove = { headline: string; at: string; decision?: "approved" | "rejected" };
 
@@ -32,6 +44,7 @@ const webhookLabels: Record<string, string> = {
   "CHECKOUT.ORDER.APPROVED": "PayPal reported the buyer approval",
   "CHECKOUT.ORDER.COMPLETED": "PayPal reported the order complete",
   "PAYMENT.CAPTURE.COMPLETED": "PayPal confirmed the payment",
+  "PAYMENT.CAPTURE.REFUNDED": "PayPal confirmed the refund",
 };
 
 const stampOptions: Intl.DateTimeFormatOptions = {
@@ -78,6 +91,7 @@ export function ReceiptChain({
   onFindNextMove,
   onReview,
   onOpenPost,
+  onRefund,
   proof = true,
 }: {
   receipt: Receipt;
@@ -88,11 +102,13 @@ export function ReceiptChain({
   onFindNextMove: () => void;
   onReview: () => void;
   onOpenPost?: (postId: string) => void;
+  onRefund?: (orderId: string) => Promise<boolean>;
   proof?: boolean;
 }) {
   const post = posts.find((item) => item.id === receipt.content_id);
   const fromPost = receipts.filter((item) => item.content_id === receipt.content_id);
-  const postRevenue = fromPost.reduce((sum, item) => sum + Number(item.amount), 0);
+  const postRevenue = fromPost.reduce((sum, item) => sum + netAmount(item), 0);
+  const refunded = Number(receipt.refunded_amount ?? 0);
   const fresh = moveFor(receipt, move);
   const signal =
     receipts.length === 1
@@ -102,7 +118,7 @@ export function ReceiptChain({
   return (
     <article
       className="receipt"
-      aria-label={`PayPal purchase of ${money(receipt.amount, receipt.currency)}`}
+      aria-label={`PayPal purchase of ${money(netAmount(receipt), receipt.currency)}`}
     >
       <ol className="receipt-chain">
         <ChainStep label="Post" done>
@@ -110,8 +126,12 @@ export function ReceiptChain({
           <span>{post?.theme ?? "This post is no longer in the campaign."}</span>
         </ChainStep>
         <ChainStep label="PayPal revenue" done>
-          <strong className="receipt-amount">{money(receipt.amount, receipt.currency)}</strong>
-          <span>Captured {at(receipt.captured_at)}</span>
+          <strong className="receipt-amount">{money(netAmount(receipt), receipt.currency)}</strong>
+          <span>
+            Captured {at(receipt.captured_at)}
+            {refunded > 0 ? `. ${money(refunded, receipt.currency)} refunded` : ""}
+          </span>
+          {onRefund ? <RefundButton receipt={receipt} onRefund={onRefund} /> : null}
         </ChainStep>
         <ChainStep label="Signal" done>
           <span>{signal}</span>
@@ -166,6 +186,55 @@ export function ReceiptChain({
       </ol>
       {proof ? <TechnicalProof receipt={receipt} post={post} move={fresh} /> : null}
     </article>
+  );
+}
+
+/** Refunds a purchase in full after the founder confirms it. */
+export function RefundButton({
+  receipt,
+  onRefund,
+}: {
+  receipt: Receipt;
+  onRefund: (orderId: string) => Promise<boolean>;
+}) {
+  const [state, setState] = useState<"idle" | "confirm" | "working">("idle");
+  if (!countsAsRevenue(receipt)) return <span className="status-tag danger">Refunded</span>;
+  if (Number(receipt.refunded_amount ?? 0) > 0) return null;
+  if (state === "idle")
+    return (
+      <button
+        className="text-button refund-button"
+        type="button"
+        onClick={() => setState("confirm")}
+      >
+        Refund
+      </button>
+    );
+  async function refund() {
+    setState("working");
+    if (!(await onRefund(receipt.order_id))) setState("confirm");
+  }
+  return (
+    <span className="refund-confirm">
+      <span>Refund {money(receipt.amount, receipt.currency)} to the buyer?</span>
+      <button
+        className="button secondary small"
+        type="button"
+        disabled={state === "working"}
+        aria-busy={state === "working"}
+        onClick={() => void refund()}
+      >
+        {state === "working" ? "Refunding" : "Refund"}
+      </button>
+      <button
+        className="text-button"
+        type="button"
+        disabled={state === "working"}
+        onClick={() => setState("idle")}
+      >
+        Cancel
+      </button>
+    </span>
   );
 }
 
@@ -239,6 +308,14 @@ function TechnicalProof({
         {receipt.webhooks.length === 0 ? (
           <ProofStep title="Waiting for the PayPal webhook" pending>
             <p>PayPal usually sends it within a minute. This page refreshes on its own.</p>
+          </ProofStep>
+        ) : null}
+        {Number(receipt.refunded_amount ?? 0) > 0 ? (
+          <ProofStep title="Refund completed by PayPal">
+            <p>
+              {money(receipt.refunded_amount ?? 0, receipt.currency)} went back to the buyer. That
+              amount no longer counts as revenue or as evidence for the agent.
+            </p>
           </ProofStep>
         ) : null}
         <ProofStep title="Credited to the post" time={receipt.captured_at}>

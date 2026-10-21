@@ -11,7 +11,13 @@ from app.campaigns.store import CampaignStore
 from app.config import get_settings
 from app.offers import OFFERS
 from app.paypal.dependencies import get_paypal_gateway
-from app.paypal.gateway import Offer, PayPalAPIError, PayPalGateway
+from app.paypal.gateway import (
+    Offer,
+    PayPalAPIError,
+    PayPalGateway,
+    PayPalRefund,
+    refund_capture_id,
+)
 from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
 from app.workspaces import WorkspaceId
@@ -39,6 +45,14 @@ class CaptureResponse(BaseModel):
     currency: str
 
 
+class RefundResponse(BaseModel):
+    order_id: str
+    refund_id: str
+    status: str
+    amount: str
+    currency: str
+
+
 class WebhookResponse(BaseModel):
     accepted: bool
     event_id: str
@@ -57,9 +71,12 @@ class RevenueSummaryResponse(BaseModel):
     campaign_id: UUID
     completed_orders: int
     started_orders: int
+    # Revenue that still counts, after completed refunds.
     gross_revenue: str
     currency: str
     latest_capture_id: str | None
+    refunded_orders: int = 0
+    refunded_revenue: str = "0.00"
 
 
 class WebhookProofResponse(BaseModel):
@@ -78,6 +95,7 @@ class ReceiptResponse(BaseModel):
     ordered_at: datetime
     captured_at: datetime
     webhooks: list[WebhookProofResponse]
+    refunded_amount: str = "0.00"
 
     @classmethod
     def of(cls, receipt: Receipt) -> "ReceiptResponse":
@@ -90,6 +108,7 @@ class ReceiptResponse(BaseModel):
             currency=receipt.currency,
             ordered_at=receipt.ordered_at,
             captured_at=receipt.captured_at,
+            refunded_amount=f"{receipt.refunded_amount:.2f}",
             webhooks=[
                 WebhookProofResponse(
                     event_id=proof.event_id,
@@ -119,6 +138,7 @@ class CheckoutResponse(BaseModel):
     completed: bool
     ordered_at: datetime
     captured_at: datetime | None
+    refunded_amount: str = "0.00"
 
 
 class CheckoutsResponse(BaseModel):
@@ -285,6 +305,61 @@ async def settle_order(
     )
 
 
+@router.post("/orders/{order_id}/refund", response_model=RefundResponse)
+async def refund_order(
+    gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
+    store: Annotated[PaymentStore, Depends(get_payment_store)],
+    workspace_id: WorkspaceId,
+    order_id: Annotated[str, Path(pattern=r"^[A-Z0-9-]{6,64}$")],
+) -> RefundResponse:
+    """The founder refunds a purchase in full. Its revenue stops counting once PayPal completes
+    the refund, and the verified webhook about it joins the receipt's proof."""
+    target = await store.refund_target(workspace_id=workspace_id, paypal_order_id=order_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Paid PayPal order not found")
+    if target.refunded_amount >= target.amount:
+        raise HTTPException(status_code=409, detail="This purchase is already refunded")
+    try:
+        # One request id per capture, so a repeated click gets PayPal's first answer back.
+        refund = await gateway.refund_capture(
+            capture_id=target.paypal_capture_id,
+            request_id=f"refund-{target.paypal_capture_id}",
+        )
+    except PayPalAPIError as error:
+        raise HTTPException(status_code=502, detail="PayPal could not refund the order") from error
+    await store.record_refund(refund)
+    return RefundResponse(
+        order_id=order_id,
+        refund_id=refund.refund_id,
+        status=refund.status,
+        amount=refund.amount,
+        currency=refund.currency,
+    )
+
+
+REFUND_EVENTS = {"PAYMENT.CAPTURE.REFUNDED"}
+
+
+def refund_from_event(resource: dict[str, object]) -> PayPalRefund | None:
+    """The refund a verified PayPal event describes, or None when it is incomplete."""
+    amount = resource.get("amount")
+    capture_id = refund_capture_id(resource)
+    refund_id = resource.get("id")
+    status = resource.get("status")
+    if not (isinstance(amount, dict) and capture_id and isinstance(refund_id, str)):
+        return None
+    value, currency = amount.get("value"), amount.get("currency_code")
+    if not (isinstance(value, str) and isinstance(currency, str) and isinstance(status, str)):
+        return None
+    return PayPalRefund(
+        refund_id=refund_id,
+        capture_id=capture_id,
+        status=status,
+        amount=value,
+        currency=currency,
+    )
+
+
 @router.post("/webhooks", response_model=WebhookResponse)
 async def receive_webhook(
     request: Request,
@@ -318,6 +393,9 @@ async def receive_webhook(
         event_type=event_type,
         resource=resource,
     )
+    # A refund made in the PayPal dashboard reaches GrowthReceipt only through this event.
+    if event_type in REFUND_EVENTS and (refund := refund_from_event(resource)) is not None:
+        await store.record_refund(refund)
     return WebhookResponse(accepted=True, event_id=event_id, event_type=event_type)
 
 
@@ -338,6 +416,8 @@ async def get_revenue_summary(
         gross_revenue=f"{summary.gross_revenue:.2f}",
         currency=summary.currency,
         latest_capture_id=summary.latest_capture_id,
+        refunded_orders=summary.refunded_orders,
+        refunded_revenue=f"{summary.refunded_revenue:.2f}",
     )
 
 
@@ -381,6 +461,7 @@ async def get_checkouts(
                 completed=checkout.completed,
                 ordered_at=checkout.ordered_at,
                 captured_at=checkout.captured_at,
+                refunded_amount=f"{checkout.refunded_amount:.2f}",
             )
             for checkout in checkouts
         ],

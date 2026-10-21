@@ -301,7 +301,7 @@ export function AuthShell() {
           </ul>
           <div className="auth-next">
             <span>Planned</span>
-            <p>We plan to add PayPal subscriptions, refunds and more publishing channels.</p>
+            <p>We plan to add PayPal subscriptions, disputes and more publishing channels.</p>
           </div>
           {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
           <div className="auth-divider">
