@@ -28,6 +28,3 @@ web-proto-type-skill/
 scripts/sandbox_purchases.mjs
 plan.json
 
-# Local end to end tests, kept out of the submission
-/tests/
-/playwright.config.ts
