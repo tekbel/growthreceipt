@@ -27,6 +27,8 @@ export type Receipt = {
   webhooks: WebhookProof[];
   // Completed refunds of this purchase. Older API responses lack it.
   refunded_amount?: string;
+  // Refunds PayPal accepted but has not completed yet.
+  pending_refund_amount?: string;
 };
 
 /** What the buyer kept after refunds. */
@@ -42,8 +44,9 @@ export function countsAsRevenue(receipt: Receipt): boolean {
 const refundConfirmed = (receipt: Receipt) =>
   receipt.webhooks.some((webhook) => webhook.event_type === "PAYMENT.CAPTURE.REFUNDED");
 
-/** Refunded, but PayPal's signed refund webhook is not stored yet. */
-export function awaitingRefundWebhook(receipt: Receipt): boolean {
+/** A refund PayPal is still processing, or one whose signed webhook is not stored yet. */
+export function awaitingRefundUpdate(receipt: Receipt): boolean {
+  if (Number(receipt.pending_refund_amount ?? 0) > 0) return true;
   return Number(receipt.refunded_amount ?? 0) > 0 && !refundConfirmed(receipt);
 }
 
@@ -200,6 +203,16 @@ export function ReceiptChain({
 
 /** Refunds a purchase in full after the founder confirms it. */
 function RefundStatus({ receipt }: { receipt: Receipt }) {
+  if (Number(receipt.refunded_amount ?? 0) === 0)
+    return (
+      <span className="refund-status">
+        <span className="status-tag review">Refund pending</span>
+        <InfoTip label="About this refund" align="end">
+          PayPal accepted this refund and is still processing it. The purchase counts as revenue
+          until PayPal completes it.
+        </InfoTip>
+      </span>
+    );
   const confirmed = refundConfirmed(receipt);
   return (
     <span className="refund-status">
@@ -207,12 +220,12 @@ function RefundStatus({ receipt }: { receipt: Receipt }) {
         {countsAsRevenue(receipt) ? "Partly refunded" : "Refunded"}
       </span>
       <span className={confirmed ? "refund-note confirmed" : "refund-note"}>
-        {confirmed ? "PayPal confirmed" : "Waiting for PayPal to confirm"}
+        {confirmed ? "Webhook verified" : "Webhook on its way"}
       </span>
       <InfoTip label="About this refund" align="end">
         {confirmed
-          ? "PayPal sent a signed message confirming the refund. GrowthReceipt checked the signature with PayPal before storing it."
-          : "GrowthReceipt asked PayPal to refund this purchase. PayPal then sends a signed message to confirm it, usually within a minute. This page checks for it on its own."}
+          ? "PayPal completed this refund and sent a signed webhook as proof. GrowthReceipt checked its signature with PayPal before storing it."
+          : "PayPal completed this refund. It also sends a signed webhook as proof, usually within a minute. This page checks for it on its own."}
       </InfoTip>
     </span>
   );
@@ -226,7 +239,9 @@ export function RefundButton({
   onRefund: (orderId: string) => Promise<boolean>;
 }) {
   const [state, setState] = useState<"idle" | "confirm" | "working">("idle");
-  if (Number(receipt.refunded_amount ?? 0) > 0) return <RefundStatus receipt={receipt} />;
+  const refunded =
+    Number(receipt.refunded_amount ?? 0) + Number(receipt.pending_refund_amount ?? 0);
+  if (refunded > 0) return <RefundStatus receipt={receipt} />;
   if (state === "idle")
     return (
       <button

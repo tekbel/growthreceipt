@@ -49,7 +49,7 @@ import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
 import {
-  awaitingRefundWebhook,
+  awaitingRefundUpdate,
   countsAsRevenue,
   ElapsedSeconds,
   netAmount,
@@ -506,8 +506,8 @@ export function CampaignWorkspace({
     void loadRevenue();
   }, [loadRevenue]);
 
-  // A refund shows as waiting until PayPal's signed webhook is stored, so check again for two minutes.
-  const awaitingRefund = allReceipts?.some(awaitingRefundWebhook) ?? false;
+  // A pending refund or one whose signed webhook is not stored yet updates soon, so check again for two minutes.
+  const awaitingRefund = allReceipts?.some(awaitingRefundUpdate) ?? false;
   useEffect(() => {
     if (!awaitingRefund) return;
     let checks = 0;
@@ -636,8 +636,15 @@ export function CampaignWorkspace({
     try {
       const response = await apiFetch(`/v1/paypal/orders/${orderId}/refund`, { method: "POST" });
       if (!response.ok) throw new Error("refund failed");
+      const { status } = (await response.json()) as { status: string };
       await loadRevenue();
-      notify("Refunded through PayPal. That purchase no longer counts as revenue.");
+      notify(
+        status === "COMPLETED"
+          ? "Refunded through PayPal. That purchase no longer counts as revenue."
+          : status === "PENDING"
+            ? "PayPal accepted the refund and is still processing it."
+            : "PayPal did not complete the refund. The purchase still counts.",
+      );
       return true;
     } catch {
       notify("The refund did not go through. Please try again.");

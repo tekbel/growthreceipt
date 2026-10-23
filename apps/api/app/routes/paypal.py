@@ -98,6 +98,7 @@ class ReceiptResponse(BaseModel):
     captured_at: datetime
     webhooks: list[WebhookProofResponse]
     refunded_amount: str = "0.00"
+    pending_refund_amount: str = "0.00"
 
     @classmethod
     def of(cls, receipt: Receipt) -> "ReceiptResponse":
@@ -111,6 +112,7 @@ class ReceiptResponse(BaseModel):
             ordered_at=receipt.ordered_at,
             captured_at=receipt.captured_at,
             refunded_amount=f"{receipt.refunded_amount:.2f}",
+            pending_refund_amount=f"{receipt.pending_refund_amount:.2f}",
             webhooks=[
                 WebhookProofResponse(
                     event_id=proof.event_id,

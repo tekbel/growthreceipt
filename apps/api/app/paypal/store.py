@@ -62,6 +62,8 @@ class Receipt:
     offer_id: str = DEFAULT_OFFER_ID
     # Completed refunds of this capture. A fully refunded receipt is no longer revenue.
     refunded_amount: Decimal = Decimal("0")
+    # Refunds PayPal accepted but has not completed. They do not change revenue yet.
+    pending_refund_amount: Decimal = Decimal("0")
     payer_hash: str | None = None
 
     @property
@@ -433,6 +435,10 @@ class PostgresPaymentStore:
                              where r.payment_order_id = o.id and r.status = 'COMPLETED'
                            ), 0) as refunded_amount,
                            coalesce((
+                             select sum(r.amount) from growthreceipt.payment_refunds r
+                             where r.payment_order_id = o.id and r.status = 'PENDING'
+                           ), 0) as pending_refund_amount,
+                           coalesce((
                              select json_agg(json_build_object(
                                       'event_id', e.id,
                                       'event_type', e.event_type,
@@ -468,6 +474,7 @@ class PostgresPaymentStore:
                 captured_at=row.captured_at,
                 offer_id=row.offer_slug,
                 refunded_amount=Decimal(row.refunded_amount),
+                pending_refund_amount=Decimal(row.pending_refund_amount),
                 payer_hash=row.payer_hash,
                 webhooks=[
                     WebhookProof(
@@ -535,7 +542,7 @@ class FakePaymentStore:
         self.offer_prices: dict[str, tuple[Decimal, str]] = {}
         self.refunds: dict[str, PayPalRefund] = {}
 
-    def _refunded(self, order_id: str) -> Decimal:
+    def _refunded(self, order_id: str, status: str = "COMPLETED") -> Decimal:
         capture = self.captures.get(order_id)
         if capture is None:
             return Decimal("0")
@@ -543,7 +550,7 @@ class FakePaymentStore:
             (
                 Decimal(refund.amount)
                 for refund in self.refunds.values()
-                if refund.capture_id == capture.capture_id and refund.status == "COMPLETED"
+                if refund.capture_id == capture.capture_id and refund.status == status
             ),
             Decimal("0"),
         )
@@ -665,6 +672,7 @@ class FakePaymentStore:
                     webhooks=webhooks,
                     offer_id=self.offer_ids[order_id],
                     refunded_amount=self._refunded(order_id),
+                    pending_refund_amount=self._refunded(order_id, "PENDING"),
                     payer_hash=payer_hash(_workspace_id, capture.payer_id)
                     if capture.payer_id
                     else None,

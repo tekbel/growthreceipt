@@ -521,6 +521,30 @@ async def test_a_refunded_purchase_stops_counting_as_revenue(client: AsyncClient
 
 
 @pytest.mark.asyncio
+async def test_a_pending_refund_counts_once_paypal_completes_it(client: AsyncClient) -> None:
+    gateway = FakePayPalGateway()
+    gateway.refund_status = "PENDING"
+    app.dependency_overrides[get_paypal_gateway] = lambda: gateway
+    order_id = await paid_order(client)
+
+    refund = await client.post(f"/v1/paypal/orders/{order_id}/refund")
+    pending = (await client.get(f"/v1/paypal/receipts/{CAMPAIGN_ID}")).json()["receipts"][0]
+    pending_summary = (await client.get(f"/v1/paypal/revenue/{CAMPAIGN_ID}")).json()
+    await client.post(
+        "/v1/paypal/webhooks", json=refund_event("WH-REFUND", "TEST-REFUND-001", "9.00")
+    )
+    done = (await client.get(f"/v1/paypal/receipts/{CAMPAIGN_ID}")).json()["receipts"][0]
+
+    assert refund.json()["status"] == "PENDING"
+    # Until PayPal completes it, the purchase still counts.
+    assert pending["pending_refund_amount"] == "9.00"
+    assert pending["refunded_amount"] == "0.00"
+    assert pending_summary["gross_revenue"] == "9.00"
+    assert done["pending_refund_amount"] == "0.00"
+    assert done["refunded_amount"] == "9.00"
+
+
+@pytest.mark.asyncio
 async def test_refund_refuses_unpaid_and_unknown_orders(client: AsyncClient) -> None:
     order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
 
