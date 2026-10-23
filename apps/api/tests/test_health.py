@@ -23,3 +23,13 @@ async def test_api_root(transport: ASGITransport) -> None:
         response = await client.get("/v1")
     assert response.status_code == 200
     assert response.json()["version"] == "0.1.0"
+
+
+@pytest.mark.asyncio
+async def test_version_reports_the_deployed_commit(
+    transport: ASGITransport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "abc123")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/health/version")
+    assert response.json() == {"commit": "abc123"}

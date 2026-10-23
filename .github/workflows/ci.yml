@@ -110,3 +110,23 @@ jobs:
             exit 1
           fi
           git push origin "${GITHUB_SHA}:refs/heads/main"
+
+  deployed:
+    name: Confirm Railway deployed main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: promote
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Railway has skipped deploys before. Each service must serve the newest
+      # commit that touched it, or a later one, within 15 minutes.
+      - name: API serves the new commit
+        run: scripts/wait_for_deploy.sh api https://growthreceipt-api.addisstack.com/health/version apps/api
+
+      - name: Web serves the new commit
+        if: success() || failure()
+        run: scripts/wait_for_deploy.sh web https://growthreceipt.addisstack.com/version apps/web
