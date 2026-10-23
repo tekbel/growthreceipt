@@ -518,6 +518,10 @@ async def test_a_refunded_purchase_stops_counting_as_revenue(client: AsyncClient
     assert summary["latest_capture_id"] is None
     # The receipt stays in the proof chain, marked refunded.
     assert receipt["refunded_amount"] == "9.00"
+    [proof] = receipt["refunds"]
+    assert proof["refund_id"] == "TEST-REFUND-001"
+    assert proof["status"] == "COMPLETED"
+    assert proof["amount"] == "9.00"
 
 
 @pytest.mark.asyncio

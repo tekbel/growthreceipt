@@ -134,6 +134,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
                 "current_offer_id": "launchcheck-scan-pack",
                 "unique_customers": 1,
                 "repeat_customers": 0,
+                "refunded_orders": 0,
                 "by_offer": [
                     {
                         "offer_id": "launchcheck-scan-pack",

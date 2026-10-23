@@ -87,6 +87,13 @@ class WebhookProofResponse(BaseModel):
     received_at: datetime
 
 
+class RefundProofResponse(BaseModel):
+    refund_id: str
+    status: str
+    amount: str
+    created_at: datetime
+
+
 class ReceiptResponse(BaseModel):
     order_id: str
     capture_id: str
@@ -99,6 +106,7 @@ class ReceiptResponse(BaseModel):
     webhooks: list[WebhookProofResponse]
     refunded_amount: str = "0.00"
     pending_refund_amount: str = "0.00"
+    refunds: list[RefundProofResponse] = []
 
     @classmethod
     def of(cls, receipt: Receipt) -> "ReceiptResponse":
@@ -113,6 +121,15 @@ class ReceiptResponse(BaseModel):
             captured_at=receipt.captured_at,
             refunded_amount=f"{receipt.refunded_amount:.2f}",
             pending_refund_amount=f"{receipt.pending_refund_amount:.2f}",
+            refunds=[
+                RefundProofResponse(
+                    refund_id=refund.refund_id,
+                    status=refund.status,
+                    amount=f"{refund.amount:.2f}",
+                    created_at=refund.created_at,
+                )
+                for refund in receipt.refunds
+            ],
             webhooks=[
                 WebhookProofResponse(
                     event_id=proof.event_id,

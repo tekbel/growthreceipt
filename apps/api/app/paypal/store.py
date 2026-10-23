@@ -47,6 +47,14 @@ class WebhookProof:
 
 
 @dataclass(frozen=True)
+class RefundProof:
+    refund_id: str
+    status: str
+    amount: Decimal
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class Receipt:
     """A completed order with the post it came from and the verified PayPal events about it."""
 
@@ -64,6 +72,8 @@ class Receipt:
     refunded_amount: Decimal = Decimal("0")
     # Refunds PayPal accepted but has not completed. They do not change revenue yet.
     pending_refund_amount: Decimal = Decimal("0")
+    # Every refund PayPal reported for this capture, oldest first.
+    refunds: list[RefundProof] = field(default_factory=list)
     payer_hash: str | None = None
 
     @property
@@ -440,6 +450,16 @@ class PostgresPaymentStore:
                            ), 0) as pending_refund_amount,
                            coalesce((
                              select json_agg(json_build_object(
+                                      'refund_id', r.id,
+                                      'status', r.status,
+                                      'amount', r.amount,
+                                      'created_at', r.created_at
+                                    ) order by r.created_at)
+                             from growthreceipt.payment_refunds r
+                             where r.payment_order_id = o.id
+                           ), '[]'::json) as refunds,
+                           coalesce((
+                             select json_agg(json_build_object(
                                       'event_id', e.id,
                                       'event_type', e.event_type,
                                       'received_at', e.received_at
@@ -475,6 +495,15 @@ class PostgresPaymentStore:
                 offer_id=row.offer_slug,
                 refunded_amount=Decimal(row.refunded_amount),
                 pending_refund_amount=Decimal(row.pending_refund_amount),
+                refunds=[
+                    RefundProof(
+                        refund_id=refund["refund_id"],
+                        status=refund["status"],
+                        amount=Decimal(str(refund["amount"])),
+                        created_at=datetime.fromisoformat(refund["created_at"]),
+                    )
+                    for refund in row.refunds
+                ],
                 payer_hash=row.payer_hash,
                 webhooks=[
                     WebhookProof(
@@ -541,6 +570,7 @@ class FakePaymentStore:
         self.offer_ids: dict[str, str] = {}
         self.offer_prices: dict[str, tuple[Decimal, str]] = {}
         self.refunds: dict[str, PayPalRefund] = {}
+        self.refunded_at: dict[str, datetime] = {}
 
     def _refunded(self, order_id: str, status: str = "COMPLETED") -> Decimal:
         capture = self.captures.get(order_id)
@@ -589,6 +619,7 @@ class FakePaymentStore:
         if not any(capture.capture_id == refund.capture_id for capture in self.captures.values()):
             return False
         self.refunds[refund.refund_id] = refund
+        self.refunded_at.setdefault(refund.refund_id, datetime.now(UTC))
         return True
 
     async def refund_target(
@@ -673,6 +704,16 @@ class FakePaymentStore:
                     offer_id=self.offer_ids[order_id],
                     refunded_amount=self._refunded(order_id),
                     pending_refund_amount=self._refunded(order_id, "PENDING"),
+                    refunds=[
+                        RefundProof(
+                            refund_id=refund.refund_id,
+                            status=refund.status,
+                            amount=Decimal(refund.amount),
+                            created_at=self.refunded_at[refund.refund_id],
+                        )
+                        for refund in self.refunds.values()
+                        if refund.capture_id == capture.capture_id
+                    ],
                     payer_hash=payer_hash(_workspace_id, capture.payer_id)
                     if capture.payer_id
                     else None,

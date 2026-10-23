@@ -103,6 +103,8 @@ class RevenueEvidence(BaseModel):
     # Distinct buyers behind the counted purchases, and those who bought more than once.
     unique_customers: int = 0
     repeat_customers: int = 0
+    # Fully refunded purchases left out of the evidence.
+    refunded_orders: int = 0
 
 
 def revenue_by_offer(receipts: list[Receipt]) -> list[OfferEvidence]:
@@ -394,6 +396,7 @@ async def _next_action(
         by_offer=revenue_by_offer(receipts),
         unique_customers=summary.unique_customers,
         repeat_customers=summary.repeat_customers,
+        refunded_orders=summary.refunded_orders,
     )
     checks: list[PayPalCheck] = []
     to_check = orders_to_check(paid_posts, receipts) if paypal is not None else []

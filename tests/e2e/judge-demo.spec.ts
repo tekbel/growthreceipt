@@ -198,6 +198,10 @@ test("@paypal purchase closes the verified revenue loop", async ({
 	await expect(checkout.getByText("Webhook verified", { exact: true })).toBeVisible({
 		timeout: 130_000,
 	});
+	// The refunded purchase keeps its proof, with PayPal's refund and the verified webhook.
+	await checkout.getByText("Technical proof", { exact: true }).click();
+	await expect(checkout.getByText("Refund completed by PayPal")).toBeVisible();
+	await expect(checkout.getByText("PayPal confirmed the refund")).toBeVisible();
 
 	if (process.env.E2E_AGENT === "1") {
 		await checkout.getByRole("button", { name: "Find next move" }).click();

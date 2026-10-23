@@ -29,6 +29,8 @@ export type Receipt = {
   refunded_amount?: string;
   // Refunds PayPal accepted but has not completed yet.
   pending_refund_amount?: string;
+  // Every refund PayPal reported, oldest first. Older API responses lack it.
+  refunds?: { refund_id: string; status: string; amount: string; created_at: string }[];
 };
 
 /** What the buyer kept after refunds. */
@@ -302,14 +304,16 @@ function ChainStep({
   );
 }
 
-function TechnicalProof({
+export function TechnicalProof({
   receipt,
   post,
   move,
+  showMove = true,
 }: {
   receipt: Receipt;
   post: Post | undefined;
   move: ProvenMove | null;
+  showMove?: boolean;
 }) {
   const approval = receipt.webhooks.find((event) => event.event_type === "CHECKOUT.ORDER.APPROVED");
   return (
@@ -352,14 +356,25 @@ function TechnicalProof({
             <p>PayPal usually sends it within a minute. This page refreshes on its own.</p>
           </ProofStep>
         ) : null}
-        {Number(receipt.refunded_amount ?? 0) > 0 ? (
-          <ProofStep title="Refund completed by PayPal">
+        {(receipt.refunds ?? []).map((refund) => (
+          <ProofStep
+            key={refund.refund_id}
+            title={
+              refund.status === "COMPLETED"
+                ? "Refund completed by PayPal"
+                : `Refund ${refund.status.toLowerCase()} at PayPal`
+            }
+            time={refund.created_at}
+            pending={refund.status === "PENDING"}
+          >
+            <ProofId label="PayPal refund">{refund.refund_id}</ProofId>
             <p>
-              {money(receipt.refunded_amount ?? 0, receipt.currency)} went back to the buyer. That
-              amount no longer counts as revenue or as evidence for the agent.
+              {refund.status === "COMPLETED"
+                ? `${money(refund.amount, receipt.currency)} went back to the buyer. That amount no longer counts as revenue or as evidence for the agent.`
+                : "This refund does not change revenue until PayPal completes it."}
             </p>
           </ProofStep>
-        ) : null}
+        ))}
         <ProofStep title="Credited to the post" time={receipt.captured_at}>
           <ProofId label="Post">{receipt.content_id}</ProofId>
           <ProofId label="Buy link">{`/buy/${receipt.content_id}`}</ProofId>
@@ -369,7 +384,7 @@ function TechnicalProof({
               : "Each post has its own buy link that carries its ID. The server stored that ID with this order."}
           </p>
         </ProofStep>
-        {move ? (
+        {!showMove ? null : move ? (
           <ProofStep title="Next move recommended from this revenue" time={move.at}>
             <p>{move.headline}</p>
           </ProofStep>

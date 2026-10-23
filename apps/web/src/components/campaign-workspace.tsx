@@ -57,6 +57,7 @@ import {
   type ProvenMove,
   ReceiptChain,
   RefundButton,
+  TechnicalProof,
 } from "@/components/receipt-proof";
 import { type SearchItem, WorkspaceSearch } from "@/components/workspace-search";
 import {
@@ -163,6 +164,8 @@ type MoveEvidence = {
   // Missing on runs recorded before the signal existed.
   signal?: EvidenceSignal;
   evidence_through?: string | null;
+  // Fully refunded purchases the agent left out.
+  refunded_orders?: number;
 };
 
 type EvidenceSignal = "none" | "early" | "leader" | "tie";
@@ -3500,6 +3503,9 @@ function ResultsPage({
                       <code>{item.order_id}</code>
                       <strong>{formatMoney(String(netAmount(item)), item.currency)}</strong>
                       <RefundButton receipt={item} onRefund={onRefund} />
+                      {item.refunds?.length ? (
+                        <TechnicalProof receipt={item} post={post} move={null} showMove={false} />
+                      ) : null}
                     </li>
                   );
                 })}
@@ -4047,6 +4053,9 @@ function ExperimentPage({
                 <time dateTime={context.evidence.evidence_through}>
                   {formatMoment(context.evidence.evidence_through)}
                 </time>
+                {context.evidence.refunded_orders
+                  ? `. ${context.evidence.refunded_orders} refunded purchase${context.evidence.refunded_orders === 1 ? "" : "s"} left out`
+                  : null}
               </p>
             ) : null}
             {context?.evidence &&
