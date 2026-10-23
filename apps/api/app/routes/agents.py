@@ -100,6 +100,9 @@ class RevenueEvidence(BaseModel):
     evidence_through: datetime | None = None
     current_offer_id: str = DEFAULT_OFFER_ID
     by_offer: list[OfferEvidence] = []
+    # Distinct buyers behind the counted purchases, and those who bought more than once.
+    unique_customers: int = 0
+    repeat_customers: int = 0
 
 
 def revenue_by_offer(receipts: list[Receipt]) -> list[OfferEvidence]:
@@ -389,6 +392,8 @@ async def _next_action(
         evidence_through=max((receipt.captured_at for receipt in receipts), default=None),
         current_offer_id=current.id,
         by_offer=revenue_by_offer(receipts),
+        unique_customers=summary.unique_customers,
+        repeat_customers=summary.repeat_customers,
     )
     checks: list[PayPalCheck] = []
     to_check = orders_to_check(paid_posts, receipts) if paypal is not None else []

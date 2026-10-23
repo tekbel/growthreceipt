@@ -143,6 +143,8 @@ type RevenueSummary = {
   latest_capture_id: string | null;
   refunded_orders?: number;
   refunded_revenue?: string;
+  unique_customers?: number;
+  repeat_customers?: number;
 };
 
 type MoveEvidence = {
@@ -1854,6 +1856,21 @@ function CampaignProgress({ status }: { status: Stage }) {
   );
 }
 
+/** Who bought and what was refunded, for the completed orders card. */
+function ordersDetail(revenue: RevenueSummary | null): string {
+  if (!revenue?.completed_orders && !revenue?.refunded_orders) return "No capture yet";
+  const parts = [];
+  const customers = revenue.unique_customers ?? 0;
+  if (customers) {
+    const back = revenue.repeat_customers ?? 0;
+    parts.push(
+      `${customers} ${customers === 1 ? "customer" : "customers"}${back ? `, ${back} came back` : ""}`,
+    );
+  }
+  if (revenue.refunded_orders) parts.push(`${revenue.refunded_orders} refunded`);
+  return parts.length ? parts.join(". ") : "Capture verified";
+}
+
 function greetingFor(hour: number): string {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
@@ -3415,13 +3432,7 @@ function ResultsPage({
           icon={<Receipt aria-hidden="true" />}
           label="Completed orders"
           value={String(revenue?.completed_orders ?? 0)}
-          detail={
-            revenue?.refunded_orders
-              ? `${revenue.refunded_orders} refunded`
-              : revenue?.latest_capture_id
-                ? "Capture verified"
-                : "No capture yet"
-          }
+          detail={ordersDetail(revenue)}
           tone={revenue?.latest_capture_id ? "success" : "neutral"}
         />
         <CheckoutsMetric revenue={revenue} />

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -32,6 +33,10 @@ class RevenueSummary:
     latest_capture_id: str | None
     refunded_orders: int = 0
     refunded_revenue: Decimal = Decimal("0")
+    # Distinct buyers behind the counted orders, and how many of them bought more than once.
+    # Orders captured before payer hashes were stored are not counted here.
+    unique_customers: int = 0
+    repeat_customers: int = 0
 
 
 @dataclass(frozen=True)
@@ -384,7 +389,16 @@ class PostgresPaymentStore:
                            count(*) filter (where status = 'completed' and refunded > 0)::int
                              as refunded_orders,
                            coalesce(sum(refunded) filter (where status = 'completed'), 0)
-                             as refunded_revenue
+                             as refunded_revenue,
+                           count(distinct payer_hash)
+                             filter (where status = 'completed' and amount > refunded)::int
+                             as unique_customers,
+                           (select count(*) from (
+                              select payer_hash from o
+                              where status = 'completed' and amount > refunded
+                                and payer_hash is not null
+                              group by payer_hash having count(*) > 1
+                            ) repeat)::int as repeat_customers
                     from o
                     """
                 ),
@@ -399,6 +413,8 @@ class PostgresPaymentStore:
             latest_capture_id=row.latest_capture_id,
             refunded_orders=row.refunded_orders,
             refunded_revenue=Decimal(row.refunded_revenue),
+            unique_customers=row.unique_customers,
+            repeat_customers=row.repeat_customers,
         )
 
     async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:
@@ -604,6 +620,7 @@ class FakePaymentStore:
             if self.orders[order_id][1] == campaign_id
         ]
         counted = [capture for capture, refunded in captures if Decimal(capture.amount) > refunded]
+        buyers = Counter(capture.payer_id for capture in counted if capture.payer_id)
         refunded_total = sum((refunded for _capture, refunded in captures), Decimal("0"))
         gross = sum((Decimal(capture.amount) for capture, _ in captures), Decimal("0"))
         return RevenueSummary(
@@ -614,6 +631,8 @@ class FakePaymentStore:
             latest_capture_id=counted[-1].capture_id if counted else None,
             refunded_orders=sum(1 for _capture, refunded in captures if refunded > 0),
             refunded_revenue=refunded_total,
+            unique_customers=len(buyers),
+            repeat_customers=sum(1 for count in buyers.values() if count > 1),
         )
 
     async def receipts(self, *, campaign_id: UUID) -> list[Receipt]:

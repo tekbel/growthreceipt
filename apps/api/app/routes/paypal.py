@@ -77,6 +77,8 @@ class RevenueSummaryResponse(BaseModel):
     latest_capture_id: str | None
     refunded_orders: int = 0
     refunded_revenue: str = "0.00"
+    unique_customers: int = 0
+    repeat_customers: int = 0
 
 
 class WebhookProofResponse(BaseModel):
@@ -418,6 +420,8 @@ async def get_revenue_summary(
         latest_capture_id=summary.latest_capture_id,
         refunded_orders=summary.refunded_orders,
         refunded_revenue=f"{summary.refunded_revenue:.2f}",
+        unique_customers=summary.unique_customers,
+        repeat_customers=summary.repeat_customers,
     )
 
 

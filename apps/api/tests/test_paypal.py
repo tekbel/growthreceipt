@@ -11,8 +11,15 @@ from httpx import ASGITransport, AsyncClient
 from app.campaigns.models import PostStatus
 from app.campaigns.store import FakeCampaignStore
 from app.main import app
+from app.offers import OFFERS
 from app.paypal.dependencies import get_paypal_gateway
-from app.paypal.gateway import FakePayPalGateway, HttpPayPalGateway, Offer
+from app.paypal.gateway import (
+    FakePayPalGateway,
+    HttpPayPalGateway,
+    Offer,
+    PayPalCapture,
+    PayPalRefund,
+)
 from app.paypal.store import FakePaymentStore
 from app.paypal.store_dependencies import get_payment_store
 
@@ -183,6 +190,8 @@ async def test_capture_is_attributed_to_campaign() -> None:
         "latest_capture_id": "TEST-CAPTURE-001",
         "refunded_orders": 0,
         "refunded_revenue": "0.00",
+        "unique_customers": 1,
+        "repeat_customers": 0,
     }
 
 
@@ -599,3 +608,28 @@ async def test_http_gateway_refunds_the_full_capture_with_an_idempotency_key() -
     assert requests[1].headers["PayPal-Request-Id"] == "refund-CAP-1"
     assert json.loads(requests[1].content) == {}
     assert (refund.refund_id, refund.capture_id, refund.amount) == ("REFUND-123", "CAP-1", "9.00")
+
+
+@pytest.mark.asyncio
+async def test_customers_count_distinct_buyers_and_those_who_came_back() -> None:
+    store = FakePaymentStore()
+    offer = next(iter(OFFERS.values()))
+    purchases = [("A1", "ANNA"), ("A2", "ANNA"), ("B1", "BEN"), ("C1", "CARA"), ("X1", None)]
+    for order_id, payer in purchases:
+        await store.record_order(
+            workspace_id=UUID(CAMPAIGN_ID),
+            offer=offer,
+            campaign_id=UUID(CAMPAIGN_ID),
+            content_id=UUID(CONTENT_ID),
+            paypal_order_id=order_id,
+            idempotency_key=UUID(int=len(store.orders)),
+        )
+        await store.record_capture(
+            PayPalCapture(order_id, f"CAP-{order_id}", "COMPLETED", "9.00", "USD", payer)
+        )
+    # A fully refunded buyer is no longer a customer.
+    await store.record_refund(PayPalRefund("R-C1", "CAP-C1", "COMPLETED", "9.00", "USD"))
+
+    summary = await store.revenue_summary(campaign_id=UUID(CAMPAIGN_ID))
+
+    assert (summary.unique_customers, summary.repeat_customers) == (2, 1)
