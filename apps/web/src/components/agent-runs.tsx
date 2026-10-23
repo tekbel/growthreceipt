@@ -29,6 +29,8 @@ function runMeta(detail: Record<string, unknown>): string[] {
   if (model) meta.push(model);
   if (typeof detail.duration_ms === "number")
     meta.push(`${(detail.duration_ms / 1000).toFixed(1)} s`);
+  if (typeof detail.input_tokens === "number" && typeof detail.output_tokens === "number")
+    meta.push(`${(detail.input_tokens + detail.output_tokens).toLocaleString("en-US")} tokens`);
   const turn = text(detail.turn_id);
   if (turn) meta.push(`run ${turn.slice(-8)}`);
   return meta;

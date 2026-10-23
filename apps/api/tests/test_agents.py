@@ -136,6 +136,9 @@ async def test_next_action_returns_verified_evidence_and_approval_boundary(
     )
     assert events[0].action == "next_action_recommended"
     assert events[0].actor == "agent"
+    # Token counts are kept with the run so its cost can be worked out later.
+    assert events[0].detail["input_tokens"] == 1200
+    assert events[0].detail["output_tokens"] == 300
 
 
 @pytest.mark.asyncio

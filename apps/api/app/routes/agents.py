@@ -471,6 +471,7 @@ async def _next_action(
         detail={
             "session_id": run.session_id,
             "turn_id": run.turn_id,
+            **run.usage,
             "model": get_settings().openai_model,
             "duration_ms": duration_ms,
             "evidence": evidence.model_dump(mode="json"),
@@ -692,6 +693,7 @@ async def draft_follow_up_post(
             detail={
                 "session_id": run.session_id,
                 "turn_id": run.turn_id,
+                **run.usage,
                 "source_post_id": str(source.id) if source else None,
                 "source_day": source.day if source else None,
                 "headline": approved.get("headline"),
@@ -786,6 +788,7 @@ async def revise_post(
             detail={
                 "session_id": run.session_id,
                 "turn_id": run.turn_id,
+                **run.usage,
                 "model": get_settings().openai_model,
                 "review_note": note,
                 "before": post.content,

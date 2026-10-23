@@ -16,6 +16,13 @@ class AgentRun[ResultT: BaseModel]:
     output: ResultT
     session_id: str | None = None
     turn_id: str | None = None
+    # OpenAI's best effort token count for the turn. None when it did not report one.
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+    @property
+    def usage(self) -> dict[str, int | None]:
+        return {"input_tokens": self.input_tokens, "output_tokens": self.output_tokens}
 
 
 @dataclass(frozen=True)
@@ -119,10 +126,13 @@ class OpenAIAgentGateway:
         result = await stream.get_final_result()
         if result.output_parsed is None:
             raise RuntimeError("Agent completed without structured output")
+        usage = result.turn.usage
         return AgentRun(
             output=result.output_parsed,
             session_id=result.session_id,
             turn_id=result.turn_id,
+            input_tokens=usage.input_tokens if usage else None,
+            output_tokens=usage.output_tokens if usage else None,
         )
 
 
@@ -166,4 +176,6 @@ class FakeAgentGateway:
             output=output_type.model_validate(fixture.model_dump()),
             session_id="fake-session",
             turn_id="fake-turn",
+            input_tokens=1200,
+            output_tokens=300,
         )
