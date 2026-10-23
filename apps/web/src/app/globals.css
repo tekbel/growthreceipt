@@ -787,6 +787,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .receipt-chain .receipt-amount { font-size: var(--type-xl); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .refund-button { width: fit-content; font-size: var(--type-xs); }
 .refund-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--type-xs); color: var(--muted); }
+.refund-status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--type-xs); }
+.refund-note { color: var(--muted); }
+.refund-note.confirmed { color: var(--success); font-weight: 600; }
 .receipt-chain .text-button { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-size: var(--type-sm); }
 .receipt-chain .text-button svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
 .receipt-chain .text-button:hover svg { transform: translateX(2px); }

@@ -49,6 +49,7 @@ import { EvidenceGrid } from "@/components/evidence-grid";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
 import {
+  awaitingRefundWebhook,
   countsAsRevenue,
   ElapsedSeconds,
   netAmount,
@@ -504,6 +505,19 @@ export function CampaignWorkspace({
     setFollowUpId(null);
     void loadRevenue();
   }, [loadRevenue]);
+
+  // A refund shows as waiting until PayPal's signed webhook is stored, so check again for two minutes.
+  const awaitingRefund = allReceipts?.some(awaitingRefundWebhook) ?? false;
+  useEffect(() => {
+    if (!awaitingRefund) return;
+    let checks = 0;
+    const timer = window.setInterval(() => {
+      checks += 1;
+      if (checks >= 12) window.clearInterval(timer);
+      void loadRevenue();
+    }, 10_000);
+    return () => window.clearInterval(timer);
+  }, [awaitingRefund, loadRevenue]);
 
   // After a reload, pick up agent runs that are still working on the server.
   const resumed = useRef(false);

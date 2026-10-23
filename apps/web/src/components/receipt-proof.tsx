@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { Post } from "@/lib/campaign";
 import { formatMoment } from "@/lib/time";
 
+import { InfoTip } from "./info-tip";
 import { PostRef } from "./post-ref";
 
 export type WebhookProof = {
@@ -36,6 +37,14 @@ export function netAmount(receipt: Receipt): number {
 /** A fully refunded purchase is no longer revenue or evidence. */
 export function countsAsRevenue(receipt: Receipt): boolean {
   return netAmount(receipt) > 0;
+}
+
+const refundConfirmed = (receipt: Receipt) =>
+  receipt.webhooks.some((webhook) => webhook.event_type === "PAYMENT.CAPTURE.REFUNDED");
+
+/** Refunded, but PayPal's signed refund webhook is not stored yet. */
+export function awaitingRefundWebhook(receipt: Receipt): boolean {
+  return Number(receipt.refunded_amount ?? 0) > 0 && !refundConfirmed(receipt);
 }
 
 export type ProvenMove = { headline: string; at: string; decision?: "approved" | "rejected" };
@@ -190,6 +199,25 @@ export function ReceiptChain({
 }
 
 /** Refunds a purchase in full after the founder confirms it. */
+function RefundStatus({ receipt }: { receipt: Receipt }) {
+  const confirmed = refundConfirmed(receipt);
+  return (
+    <span className="refund-status">
+      <span className="status-tag danger">
+        {countsAsRevenue(receipt) ? "Partly refunded" : "Refunded"}
+      </span>
+      <span className={confirmed ? "refund-note confirmed" : "refund-note"}>
+        {confirmed ? "PayPal confirmed" : "Waiting for PayPal to confirm"}
+      </span>
+      <InfoTip label="About this refund" align="end">
+        {confirmed
+          ? "PayPal sent a signed message confirming the refund. GrowthReceipt checked the signature with PayPal before storing it."
+          : "GrowthReceipt asked PayPal to refund this purchase. PayPal then sends a signed message to confirm it, usually within a minute. This page checks for it on its own."}
+      </InfoTip>
+    </span>
+  );
+}
+
 export function RefundButton({
   receipt,
   onRefund,
@@ -198,8 +226,7 @@ export function RefundButton({
   onRefund: (orderId: string) => Promise<boolean>;
 }) {
   const [state, setState] = useState<"idle" | "confirm" | "working">("idle");
-  if (!countsAsRevenue(receipt)) return <span className="status-tag danger">Refunded</span>;
-  if (Number(receipt.refunded_amount ?? 0) > 0) return null;
+  if (Number(receipt.refunded_amount ?? 0) > 0) return <RefundStatus receipt={receipt} />;
   if (state === "idle")
     return (
       <button
