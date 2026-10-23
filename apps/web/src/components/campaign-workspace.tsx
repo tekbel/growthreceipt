@@ -1321,7 +1321,7 @@ export function CampaignWorkspace({
           onSignOut={onSignOut}
         />
         {identity.mode === "judge" && onResetDemo ? (
-          <JudgeBar onReset={onResetDemo} notify={notify} />
+          <JudgeBar onReset={onResetDemo} notify={notify} preparedAt={campaign?.created_at} />
         ) : null}
         {draftRun?.background ? (
           <section className="agent-bar" aria-label="Agent working">
@@ -1510,12 +1510,41 @@ function NavigationGroup({
   );
 }
 
+function agoLabel(at: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - Date.parse(at)) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return `on ${formatMoment(at)}`;
+}
+
+/** When the sample campaign of this judge demo was created. A reset creates it again. */
+function PreparedAgo({ at }: { at: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <span className="judge-bar-stamp">
+      Sample campaign prepared{" "}
+      <time dateTime={at} title={formatMoment(at)}>
+        {agoLabel(at, now)}
+      </time>
+      .
+    </span>
+  );
+}
+
 function JudgeBar({
   onReset,
   notify,
+  preparedAt,
 }: {
   onReset: () => Promise<void>;
   notify: (message: string) => void;
+  preparedAt?: string;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -1536,6 +1565,7 @@ function JudgeBar({
       <span className="status-tag review">Judge demo</span>
       <p>
         PayPal sandbox. No real money moves.
+        {preparedAt ? <PreparedAgo at={preparedAt} /> : null}
         <InfoTip label="About the judge demo" align="end" side="bottom">
           Private demo workspace, prepared with a sample LaunchCheck campaign. Payments run in
           PayPal's sandbox, and each recommendation is generated live.

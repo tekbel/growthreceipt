@@ -60,6 +60,7 @@ test("hosted judge demo exposes the complete seeded story", async ({
 	watchForBrowserErrors(page, errors, "workspace");
 
 	await enterJudgeDemo(page);
+	await expect(page.getByText(/Sample campaign prepared (just now|\d+ minutes? ago)/)).toBeVisible();
 
 	await openWorkspacePage(page, "Content", "content");
 	await expect(
