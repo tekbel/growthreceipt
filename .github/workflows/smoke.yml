@@ -1,0 +1,41 @@
+# Daily check that the live judge demo still works, through judging on 2026-12-21.
+# Runs the hosted browser tests without the PayPal purchase, so it costs nothing.
+# GitHub emails the owner when a scheduled run fails.
+name: Smoke
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+jobs:
+  hosted:
+    name: Hosted judge demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The tests run against the live site, so only the test runner is installed.
+      - run: npm install --no-save --no-package-lock @playwright/test@1.64.1
+      - run: |
+          curl -fsS https://growthreceipt.addisstack.com/version
+          echo
+          curl -fsS https://growthreceipt-api.addisstack.com/health/version
+          echo
+          curl -fsS https://growthreceipt-api.addisstack.com/health/ready
+      - run: npx playwright test
+        env:
+          E2E_BASE_URL: https://growthreceipt.addisstack.com
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: /tmp/growthreceipt-playwright
+          retention-days: 7
