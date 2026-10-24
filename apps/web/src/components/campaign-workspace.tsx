@@ -46,7 +46,7 @@ import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { AgentRuns } from "@/components/agent-runs";
 import { EvidenceGrid } from "@/components/evidence-grid";
-import { GuidedTour, takeFirstTour } from "@/components/guided-tour";
+import { GuidedTour, savedTourStep, saveTourStep, takeFirstTour } from "@/components/guided-tour";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
 import {
@@ -525,13 +525,19 @@ export function CampaignWorkspace({
     return () => window.clearInterval(timer);
   }, [awaitingRefund, loadRevenue]);
 
-  // A judge's first visit opens the tour.
+  // A judge's first visit opens the tour. Later visits pick up a tour that is still open.
   const touredOnEntry = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the judge workspace is ready
   useEffect(() => {
     if (loadState !== "ready" || touredOnEntry.current) return;
     touredOnEntry.current = true;
-    if (identity.mode === "judge" && campaign && takeFirstTour()) openTour();
+    if (!campaign) return;
+    if (identity.mode === "judge" && takeFirstTour()) openTour();
+    else {
+      // A tour still open in another tab, or before a reload, carries on here.
+      const saved = savedTourStep();
+      if (saved !== null && tourSteps[saved]) openTour(saved);
+    }
   }, [loadState]);
 
   // After a reload, pick up agent runs that are still working on the server.
@@ -891,10 +897,29 @@ export function CampaignWorkspace({
   // Each step's page depends on the loaded campaign, so the tour waits for the workspace.
   const tourReady = loadState === "ready";
 
+  // When the purchase the tour is waiting on is confirmed, it moves on to the results.
+  // Only a change seen while waiting counts, so Back from the results stays on the purchase.
+  const purchaseIndex = tourSteps.findIndex((step) => step.id === "purchase");
+  const purchased = tourSteps[purchaseIndex].complete;
+  const waitingOnPurchase = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reacts to the step and the purchase only
+  useEffect(() => {
+    if (tourStep !== purchaseIndex) {
+      waitingOnPurchase.current = false;
+      return;
+    }
+    if (!purchased) waitingOnPurchase.current = true;
+    else if (waitingOnPurchase.current) {
+      waitingOnPurchase.current = false;
+      openTour(purchaseIndex + 1);
+    }
+  }, [tourStep, purchased]);
+
   function openTour(index = 0) {
     if (!tourReady) return;
     setHelpOpen(false);
     setTourStep(index);
+    saveTourStep(index);
     navigate(tourSteps[index].view);
   }
 
@@ -1404,7 +1429,10 @@ export function CampaignWorkspace({
           steps={tourSteps}
           index={tourStep}
           onStep={openTour}
-          onClose={() => setTourStep(null)}
+          onClose={() => {
+            setTourStep(null);
+            saveTourStep(null);
+          }}
         />
       ) : null}
     </div>

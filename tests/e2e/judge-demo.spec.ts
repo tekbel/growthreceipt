@@ -140,6 +140,12 @@ test("guided tour walks a first time judge through the loop", async ({
 	await tour.getByRole("button", { name: "Back" }).click();
 	await expect(page).toHaveURL(/\/results$/);
 	await expect(tour.getByText("Your purchase shows up here once PayPal confirms it.")).toBeVisible();
+	// An open tour carries on after a reload, on the same step.
+	await page.reload();
+	await expect(tour.getByRole("heading", { name: "Read verified results" })).toBeVisible({
+		timeout: 30_000,
+	});
+	await expect(page).toHaveURL(/\/results$/);
 	await tour.getByRole("button", { name: "Next" }).click();
 	await tour.getByRole("button", { name: "Finish" }).click();
 	await expect(tour).toHaveCount(0);
@@ -239,20 +245,23 @@ test("@paypal purchase closes the verified revenue loop", async ({
 	const captureId = (await success.locator("dd").last().innerText()).trim();
 	expect(captureId.length).toBeGreaterThan(8);
 
-	// The workspace refreshes revenue on focus and every 15 seconds.
+	// The workspace refreshes revenue on focus and every 15 seconds. Once the purchase is
+	// confirmed, the tour moves on to the results by itself.
 	await page.bringToFront();
-	await expect(tour.getByText("Done", { exact: true })).toBeVisible({ timeout: 45_000 });
-	await expect(tour.getByText(/^Waiting for your purchase/)).toHaveCount(0);
-	await tour.getByRole("button", { name: "Close tour" }).click();
-
-	await checkout.getByRole("link", { name: "See it on Today" }).click();
-	await expect(checkout).toHaveURL(/\/today$/);
-	await expect(checkout.getByText(captureId, { exact: true })).toBeVisible({
-		timeout: 30_000,
+	await expect(tour.getByRole("heading", { name: "Read verified results" })).toBeVisible({
+		timeout: 45_000,
 	});
-	await expect(checkout.getByText(/captured through PayPal/)).toBeVisible();
+	await expect(page).toHaveURL(/\/results$/);
 
-	await openWorkspacePage(checkout, "Results", "results");
+	// The checkout tab opens the workspace too, and the tour continues there on the results.
+	await checkout.getByRole("link", { name: "See it on Today" }).click();
+	const checkoutTour = checkout.locator(".tour-card");
+	await expect(
+		checkoutTour.getByRole("heading", { name: "Read verified results" }),
+	).toBeVisible({ timeout: 30_000 });
+	await expect(checkout).toHaveURL(/\/results$/);
+	await checkoutTour.getByRole("button", { name: "Close tour" }).click();
+
 	await checkout.getByText("Technical proof", { exact: true }).click();
 	await expect(checkout.getByText(captureId, { exact: true })).toBeVisible();
 

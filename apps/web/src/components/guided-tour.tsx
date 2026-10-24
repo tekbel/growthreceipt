@@ -5,6 +5,7 @@ import { useEffect, useId } from "react";
 import type { WorkflowStep, WorkflowStepId } from "@/lib/workflow";
 
 const SEEN_KEY = "growthreceipt.tour-seen";
+const STEP_KEY = "growthreceipt.tour-step";
 
 // What the tour says at each step, written for someone opening the demo for the first time.
 const tourCopy: Record<WorkflowStepId, string> = {
@@ -41,6 +42,24 @@ export function takeFirstTour() {
     // Storage can be blocked. The tour then opens on every visit, which is harmless.
   }
   return true;
+}
+
+// The open step is shared by every tab, so the tour continues in the tab the checkout opens
+// and after a reload. Closing the tour clears it.
+export function savedTourStep() {
+  try {
+    const saved = localStorage.getItem(STEP_KEY);
+    return saved === null ? null : Number(saved);
+  } catch {
+    return null;
+  }
+}
+
+export function saveTourStep(index: number | null) {
+  try {
+    if (index === null) localStorage.removeItem(STEP_KEY);
+    else localStorage.setItem(STEP_KEY, String(index));
+  } catch {}
 }
 
 export function GuidedTour({
