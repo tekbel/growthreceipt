@@ -19,6 +19,19 @@ const tourCopy: Record<WorkflowStepId, string> = {
   next: "Find next move asks the agent for one next experiment, based only on verified purchases. It runs a live OpenAI call, so it takes a few seconds.",
 };
 
+// What a step is waiting for until the real state changes. Steps without an entry need no action.
+// The next move needs a verified purchase first, so its line follows the purchase step.
+function waitingCopy(id: WorkflowStepId, purchased: boolean) {
+  if (id === "purchase")
+    return "Waiting for your purchase. This step turns to done once PayPal confirms it.";
+  if (id === "results") return "Your purchase shows up here once PayPal confirms it.";
+  if (id === "next")
+    return purchased
+      ? "Waiting for you to run Find next move."
+      : "Unlocks after your first verified purchase.";
+  return null;
+}
+
 // The tour opens on its own only once per browser, so a reload or a demo reset never reopens it.
 export function takeFirstTour() {
   try {
@@ -44,6 +57,8 @@ export function GuidedTour({
   const step = steps[index];
   const titleId = useId();
   const last = index === steps.length - 1;
+  const purchased = steps.some((item) => item.id === "purchase" && item.complete);
+  const waiting = step.complete ? null : waitingCopy(step.id, purchased);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -100,6 +115,12 @@ export function GuidedTour({
           ) : null}
         </h2>
         <p>{tourCopy[step.id]}</p>
+        {waiting ? (
+          <p className="tour-waiting">
+            <span aria-hidden="true" />
+            {waiting}
+          </p>
+        ) : null}
       </div>
       <footer>
         <button

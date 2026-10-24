@@ -12,7 +12,8 @@ function watchForBrowserErrors(page: Page, errors: string[], label: string) {
 	);
 }
 
-async function enterJudgeDemo(page: Page) {
+// A judge's first visit opens the guided tour. Tests that are not about the tour close it.
+async function enterJudgeDemo(page: Page, { keepTour = false } = {}) {
 	await page.goto("/");
 	await expect(page).toHaveTitle(/GrowthReceipt/);
 	await expect(
@@ -28,6 +29,12 @@ async function enterJudgeDemo(page: Page) {
 		page.getByText("PayPal sandbox. No real money moves."),
 	).toBeVisible();
 	await expect(page.locator("nextjs-portal")).toHaveCount(0);
+	const tour = page.getByRole("complementary", { name: /^Describe your product/ });
+	await expect(tour).toBeVisible();
+	if (!keepTour) {
+		await page.getByRole("button", { name: "Close tour" }).click();
+		await expect(tour).toHaveCount(0);
+	}
 }
 
 async function openWorkspacePage(page: Page, name: string, path: string) {
@@ -100,6 +107,59 @@ test("hosted judge demo exposes the complete seeded story", async ({
 	expect(errors).toEqual([]);
 });
 
+test("guided tour walks a first time judge through the loop", async ({
+	page,
+}) => {
+	const errors: string[] = [];
+	watchForBrowserErrors(page, errors, "workspace");
+
+	await enterJudgeDemo(page, { keepTour: true });
+	const tour = page.locator(".tour-card");
+	const steps = [
+		{ title: "Describe your product", path: "products", target: "product" },
+		{ title: "Review the campaign", path: "content", target: "content" },
+		{ title: "Test the purchase", path: "checkout", target: "purchase" },
+		{ title: "Read verified results", path: "results", target: null },
+		{ title: "Choose the next test", path: "experiment", target: "next" },
+	];
+	for (const [index, step] of steps.entries()) {
+		if (index > 0) await tour.getByRole("button", { name: "Next" }).click();
+		await expect(page).toHaveURL(new RegExp(`/${step.path}$`));
+		await expect(tour.getByRole("heading", { name: step.title })).toBeVisible();
+		await expect(tour.getByText(`Step ${index + 1} of 5`)).toBeVisible();
+		// Results has no receipts before a purchase, so nothing is ringed there.
+		if (step.target)
+			await expect(page.locator(`[data-tour="${step.target}"]`)).toHaveAttribute(
+				"data-tour-active",
+				"",
+			);
+		else await expect(page.locator("[data-tour-active]")).toHaveCount(0);
+	}
+	await expect(tour.getByText("Unlocks after your first verified purchase.")).toBeVisible();
+
+	await tour.getByRole("button", { name: "Back" }).click();
+	await expect(page).toHaveURL(/\/results$/);
+	await expect(tour.getByText("Your purchase shows up here once PayPal confirms it.")).toBeVisible();
+	await tour.getByRole("button", { name: "Next" }).click();
+	await tour.getByRole("button", { name: "Finish" }).click();
+	await expect(tour).toHaveCount(0);
+	await expect(page.locator("[data-tour-active]")).toHaveCount(0);
+
+	// It opens on its own only once. The judge bar and the help panel bring it back.
+	await page.reload();
+	await expect(page.getByText("PayPal sandbox. No real money moves.")).toBeVisible({
+		timeout: 30_000,
+	});
+	await expect(tour).toHaveCount(0);
+	await page.getByRole("button", { name: "Take the tour" }).click();
+	await expect(page).toHaveURL(/\/products$/);
+	await expect(tour).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(tour).toHaveCount(0);
+
+	expect(errors).toEqual([]);
+});
+
 test("judge demo remains navigable on a phone", async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	const errors: string[] = [];
@@ -132,8 +192,13 @@ test("@paypal purchase closes the verified revenue loop", async ({
 	const errors: string[] = [];
 	watchForBrowserErrors(page, errors, "workspace");
 
-	await enterJudgeDemo(page);
-	await openWorkspacePage(page, "Customer checkout", "checkout");
+	// The tour stays open on the purchase step and must turn to done on its own.
+	await enterJudgeDemo(page, { keepTour: true });
+	const tour = page.locator(".tour-card");
+	await tour.getByRole("button", { name: "Next" }).click();
+	await tour.getByRole("button", { name: "Next" }).click();
+	await expect(page).toHaveURL(/\/checkout$/);
+	await expect(tour.getByText(/^Waiting for your purchase/)).toBeVisible();
 
 	const checkoutOpened = page.waitForEvent("popup");
 	await page.getByRole("button", { name: "Open as customer" }).click();
@@ -173,6 +238,12 @@ test("@paypal purchase closes the verified revenue loop", async ({
 	await expect(success).toBeVisible({ timeout: 60_000 });
 	const captureId = (await success.locator("dd").last().innerText()).trim();
 	expect(captureId.length).toBeGreaterThan(8);
+
+	// The workspace refreshes revenue on focus and every 15 seconds.
+	await page.bringToFront();
+	await expect(tour.getByText("Done", { exact: true })).toBeVisible({ timeout: 45_000 });
+	await expect(tour.getByText(/^Waiting for your purchase/)).toHaveCount(0);
+	await tour.getByRole("button", { name: "Close tour" }).click();
 
 	await checkout.getByRole("link", { name: "See it on Today" }).click();
 	await expect(checkout).toHaveURL(/\/today$/);
