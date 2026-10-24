@@ -1821,6 +1821,40 @@ function Topbar({
   );
 }
 
+// Same answers as docs/hackathon/judge-faq.md, kept short for the panel.
+const helpQuestions = [
+  {
+    question: "How is a sale linked to a post?",
+    answer:
+      "Every approved post has its own buy link. The PayPal order carries that post's ID, so when PayPal captures the payment the sale is credited to the post. PayPal's signed webhook is stored as a second proof.",
+  },
+  {
+    question: "What if the agent is wrong?",
+    answer:
+      "Nothing goes out on its own. You approve every post and decide on every next move. With only one or two purchases, the agent says the signal is early instead of naming a winner.",
+  },
+  {
+    question: "Why PayPal?",
+    answer:
+      "The loop learns from proof of payment, not clicks. PayPal gives a captured order and a signed webhook for every purchase and refund. This demo uses the PayPal sandbox, so no real money moves.",
+  },
+  {
+    question: "What data does the agent see?",
+    answer:
+      "The campaign, the purchases PayPal confirmed for it summed by post and offer, and your offers. It never sees buyer names, emails or payment details.",
+  },
+  {
+    question: "What does an agent run cost?",
+    answer:
+      "Each run records its model, time and OpenAI token counts, shown under the run. Daily limits per workspace keep spend bounded.",
+  },
+  {
+    question: "What does a refund do?",
+    answer:
+      "A full refund stops the purchase counting as revenue and leaves it out of the agent's evidence. A partial refund counts what the buyer kept.",
+  },
+];
+
 function HelpPanel({
   steps,
   navigate,
@@ -1873,6 +1907,15 @@ function HelpPanel({
             </li>
           ))}
         </ol>
+        <section className="help-faq" aria-labelledby="help-faq-title">
+          <h3 id="help-faq-title">Common questions</h3>
+          {helpQuestions.map(({ question, answer }) => (
+            <details key={question}>
+              <summary>{question}</summary>
+              <p>{answer}</p>
+            </details>
+          ))}
+        </section>
         <footer className="help-footer">
           <strong>Check your connections</strong>
           <p>Review PayPal, publishing, and measurement services in one place.</p>

@@ -108,6 +108,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [ARCHITECTURE.md](./ARCHITECTURE.md) defines the recommended technical design and key decisions.
 - [PROMPTS.md](./PROMPTS.md) contains sequential implementation prompts for a coding agent. Run them in order.
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
+- [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers the questions judges ask most: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
