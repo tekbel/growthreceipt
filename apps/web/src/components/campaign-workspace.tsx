@@ -888,7 +888,11 @@ export function CampaignWorkspace({
     hasRecommendation: Boolean(recommendation),
   });
 
+  // Each step's page depends on the loaded campaign, so the tour waits for the workspace.
+  const tourReady = loadState === "ready";
+
   function openTour(index = 0) {
+    if (!tourReady) return;
     setHelpOpen(false);
     setTourStep(index);
     navigate(tourSteps[index].view);
@@ -1348,7 +1352,7 @@ export function CampaignWorkspace({
         {identity.mode === "judge" && onResetDemo ? (
           <JudgeBar
             onReset={onResetDemo}
-            onTour={() => openTour()}
+            onTour={tourReady ? () => openTour() : undefined}
             notify={notify}
             preparedAt={campaign?.created_at}
           />
@@ -1581,7 +1585,7 @@ function JudgeBar({
   preparedAt,
 }: {
   onReset: () => Promise<void>;
-  onTour: () => void;
+  onTour?: () => void;
   notify: (message: string) => void;
   preparedAt?: string;
 }) {
@@ -1633,9 +1637,11 @@ function JudgeBar({
         </div>
       ) : (
         <div className="judge-bar-actions">
-          <button className="text-button" type="button" onClick={onTour}>
-            Take the tour
-          </button>
+          {onTour ? (
+            <button className="text-button" type="button" onClick={onTour}>
+              Take the tour
+            </button>
+          ) : null}
           <button className="text-button" type="button" onClick={() => setConfirming(true)}>
             Reset demo
           </button>
