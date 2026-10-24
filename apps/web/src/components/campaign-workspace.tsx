@@ -46,6 +46,7 @@ import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/
 import { SiPaypal, SiPosthog } from "react-icons/si";
 import { AgentRuns } from "@/components/agent-runs";
 import { EvidenceGrid } from "@/components/evidence-grid";
+import { GuidedTour, takeFirstTour } from "@/components/guided-tour";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
 import {
@@ -92,6 +93,7 @@ import {
   workspaceHour,
 } from "@/lib/time";
 import { isView, type View, views } from "@/lib/views";
+import { type WorkflowStep, workflowSteps } from "@/lib/workflow";
 
 // AG Studio is large, so it loads only when the dashboard opens, and only in the browser.
 const RevenueStudio = dynamic(() => import("@/components/revenue-studio/revenue-studio"), {
@@ -327,6 +329,7 @@ export function CampaignWorkspace({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [tourStep, setTourStep] = useState<number | null>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -521,6 +524,15 @@ export function CampaignWorkspace({
     }, 10_000);
     return () => window.clearInterval(timer);
   }, [awaitingRefund, loadRevenue]);
+
+  // A judge's first visit opens the tour.
+  const touredOnEntry = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the judge workspace is ready
+  useEffect(() => {
+    if (loadState !== "ready" || touredOnEntry.current) return;
+    touredOnEntry.current = true;
+    if (identity.mode === "judge" && campaign && takeFirstTour()) openTour();
+  }, [loadState]);
 
   // After a reload, pick up agent runs that are still working on the server.
   const resumed = useRef(false);
@@ -867,6 +879,19 @@ export function CampaignWorkspace({
   function showEvidence(postIds: string[]) {
     setDashboardFocus(postIds);
     navigate("dashboard");
+  }
+
+  const tourSteps = workflowSteps({
+    hasCampaign: Boolean(campaign),
+    approved: campaign?.status === "approved",
+    hasRevenue: Boolean(revenue?.completed_orders),
+    hasRecommendation: Boolean(recommendation),
+  });
+
+  function openTour(index = 0) {
+    setHelpOpen(false);
+    setTourStep(index);
+    navigate(tourSteps[index].view);
   }
 
   function navigate(nextView: View) {
@@ -1321,7 +1346,12 @@ export function CampaignWorkspace({
           onSignOut={onSignOut}
         />
         {identity.mode === "judge" && onResetDemo ? (
-          <JudgeBar onReset={onResetDemo} notify={notify} preparedAt={campaign?.created_at} />
+          <JudgeBar
+            onReset={onResetDemo}
+            onTour={() => openTour()}
+            notify={notify}
+            preparedAt={campaign?.created_at}
+          />
         ) : null}
         {draftRun?.background ? (
           <section className="agent-bar" aria-label="Agent working">
@@ -1356,14 +1386,21 @@ export function CampaignWorkspace({
       ) : null}
       {helpOpen ? (
         <HelpPanel
-          campaign={campaign}
-          revenue={revenue}
-          recommendation={recommendation}
+          steps={tourSteps}
           navigate={(nextView) => {
             setHelpOpen(false);
             navigate(nextView);
           }}
+          onTour={() => openTour()}
           onClose={() => setHelpOpen(false)}
+        />
+      ) : null}
+      {tourStep !== null ? (
+        <GuidedTour
+          steps={tourSteps}
+          index={tourStep}
+          onStep={openTour}
+          onClose={() => setTourStep(null)}
         />
       ) : null}
     </div>
@@ -1539,10 +1576,12 @@ function PreparedAgo({ at }: { at: string }) {
 
 function JudgeBar({
   onReset,
+  onTour,
   notify,
   preparedAt,
 }: {
   onReset: () => Promise<void>;
+  onTour: () => void;
   notify: (message: string) => void;
   preparedAt?: string;
 }) {
@@ -1593,9 +1632,14 @@ function JudgeBar({
           </button>
         </div>
       ) : (
-        <button className="text-button" type="button" onClick={() => setConfirming(true)}>
-          Reset demo
-        </button>
+        <div className="judge-bar-actions">
+          <button className="text-button" type="button" onClick={onTour}>
+            Take the tour
+          </button>
+          <button className="text-button" type="button" onClick={() => setConfirming(true)}>
+            Reset demo
+          </button>
+        </div>
       )}
     </section>
   );
@@ -1744,16 +1788,14 @@ function Topbar({
 }
 
 function HelpPanel({
-  campaign,
-  revenue,
-  recommendation,
+  steps,
   navigate,
+  onTour,
   onClose,
 }: {
-  campaign: Campaign | null;
-  revenue: RevenueSummary | null;
-  recommendation: Recommendation | null;
+  steps: WorkflowStep[];
   navigate: (view: View) => void;
+  onTour: () => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -1764,52 +1806,6 @@ function HelpPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const approved = campaign?.status === "approved";
-  const hasRevenue = Boolean(revenue?.completed_orders);
-  const steps: Array<{
-    title: string;
-    copy: string;
-    action: string;
-    view: View;
-    complete: boolean;
-  }> = [
-    {
-      title: "Describe your product",
-      copy: "Set the audience, revenue goal, channels, and voice.",
-      action: campaign ? "Review product" : "Add product",
-      view: campaign ? "products" : "new-campaign",
-      complete: Boolean(campaign),
-    },
-    {
-      title: "Review the campaign",
-      copy: "Edit the drafted posts and approve the work you want to use.",
-      action: "Open content",
-      view: "content",
-      complete: approved,
-    },
-    {
-      title: "Test the purchase",
-      copy: "Buy from your own post in PayPal's sandbox. No real money moves.",
-      action: "Open checkout",
-      view: "checkout",
-      complete: hasRevenue,
-    },
-    {
-      title: "Read verified results",
-      copy: "Trace each purchase back to the post that earned it.",
-      action: "View results",
-      view: "results",
-      complete: hasRevenue,
-    },
-    {
-      title: "Choose the next test",
-      copy: "Let the agent turn verified revenue into one next experiment.",
-      action: "Open experiment",
-      view: "experiment",
-      complete: Boolean(recommendation),
-    },
-  ];
-
   return (
     <div className="help-backdrop">
       <button className="help-scrim" type="button" onClick={onClose} aria-label="Close help" />
@@ -1819,6 +1815,9 @@ function HelpPanel({
             <span className="eyebrow">Help</span>
             <h2 id="help-title">Learn the workflow</h2>
             <p>Five steps from a product brief to a next move backed by real revenue.</p>
+            <button className="text-button" type="button" onClick={onTour}>
+              Take the guided tour
+            </button>
           </div>
           <button type="button" onClick={onClose} aria-label="Close help">
             <X aria-hidden="true" />
@@ -1826,7 +1825,7 @@ function HelpPanel({
         </header>
         <ol className="help-steps">
           {steps.map((step, index) => (
-            <li className={step.complete ? "complete" : ""} key={step.title}>
+            <li className={step.complete ? "complete" : ""} key={step.id}>
               <span className="help-step-mark" aria-hidden="true">
                 {step.complete ? <Check /> : index + 1}
               </span>
@@ -2478,7 +2477,7 @@ function ProductsPage({
           </button>
         }
       />
-      <section className="product-hero">
+      <section className="product-hero" data-tour="product">
         <ProductMark
           className="product-avatar"
           name={campaign.product_name}
@@ -3125,7 +3124,7 @@ function ContentPage({
             <h2>Post preview</h2>
             <span>Preview only · Not published</span>
           </div>
-          <article className="social-preview">
+          <article className="social-preview" data-tour="content">
             <header>
               <span>
                 <ChannelIcon channel={selected.channel} /> {selected.channel} post
@@ -3493,7 +3492,7 @@ function ResultsPage({
         <PayingPostsMetric campaign={campaign} receipts={receipts} />
       </section>
       {allReceipts?.length ? (
-        <section className="results-receipts" aria-labelledby="receipts-title">
+        <section className="results-receipts" aria-labelledby="receipts-title" data-tour="results">
           <div className="column-heading">
             <h2 id="receipts-title">
               From post to payment to next move
@@ -4053,7 +4052,7 @@ function ExperimentPage({
           </InfoTip>
         }
       />
-      <section className="experiment-stage">
+      <section className="experiment-stage" data-tour="next">
         {recommendation ? (
           <div>
             <ConfidenceTag confidence={recommendation.confidence} />
@@ -4446,7 +4445,7 @@ function CheckoutPage({
         title="Buy as your customer"
         description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page and never sees GrowthReceipt. Each purchase is attributed to the post that referred it. This demo uses PayPal sandbox, so no real money moves."
       />
-      <section className="checkout-preview-card">
+      <section className="checkout-preview-card" data-tour="purchase">
         <div>
           <span className="eyebrow">{offer.name}</span>
           <h2>Find what breaks a launch before your visitors do.</h2>

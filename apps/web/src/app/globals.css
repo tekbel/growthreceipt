@@ -1133,3 +1133,23 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .receipt-widget-proof { display: inline-flex; gap: 6px; align-items: center; justify-self: start; padding: 3px 8px; border-radius: 999px; background: var(--surface-subtle); color: var(--muted); }
 .receipt-widget-proof.ok { background: var(--success-soft); color: var(--success); }
 @media (max-width: 640px) { .receipt-widget li { grid-template-columns: 1fr; gap: 6px; } }
+
+/* Guided tour. A docked card that leaves the page usable, and a ring on the element it points at. */
+.tour-card { position: fixed; right: 24px; bottom: 24px; z-index: 75; display: grid; gap: 10px; width: min(360px, calc(100vw - 32px)); padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface); box-shadow: var(--shadow); animation: toast-in var(--duration-base) var(--ease) both; }
+.tour-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tour-card header button { display: grid; place-items: center; width: 36px; height: 36px; margin: -8px -10px -8px 0; border: 0; border-radius: var(--corner-sm); background: transparent; color: var(--muted); }
+.tour-card header button:hover { background: var(--surface-hover); color: var(--ink); }
+.tour-card header svg { width: 16px; height: 16px; }
+.tour-card h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: var(--type-md); }
+.tour-card h2 .status-tag svg { width: 12px; height: 12px; margin-right: 3px; }
+.tour-card p { margin: 6px 0 0; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.55; }
+.tour-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.tour-card .text-button { min-height: 44px; }
+.tour-card .text-button:disabled { color: var(--muted); text-decoration: none; opacity: .5; }
+[data-tour-active] { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: var(--corner-sm); scroll-margin: 96px; transition: outline-color var(--duration-base) var(--ease); }
+body:has(.tour-card) .page-shell { padding-bottom: 240px; }
+body:has(.tour-card) .toast { top: 84px; bottom: auto; }
+@media (max-width: 640px) {
+  .tour-card { right: 0; bottom: 0; left: 0; width: auto; padding-bottom: max(14px, env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: var(--corner-md) var(--corner-md) 0 0; }
+  body:has(.tour-card) .toast { right: 16px; left: 16px; }
+}
