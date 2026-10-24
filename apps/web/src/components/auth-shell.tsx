@@ -256,21 +256,11 @@ export function AuthShell() {
               </li>
             </ul>
           </div>
-          <aside className="auth-example" aria-label="About the example product">
-            <span className="auth-example-mark" aria-hidden="true">
-              {/* biome-ignore lint/performance/noImgElement: a small static icon. */}
-              <img src="/products/launchcheck.svg" alt="" width={36} height={36} decoding="async" />
-            </span>
-            <p>
-              The demo markets{" "}
-              <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
-                LaunchCheck
-              </a>
-              , an example SaaS product that scans a launch page for speed, SEO and structure
-              issues. Every campaign, post and purchase you see is for it.
-            </p>
-          </aside>
           <SampleFlow />
+          <p className="auth-next">
+            <span>Planned</span>
+            PayPal subscriptions, disputes and more publishing channels.
+          </p>
         </section>
         <section className="auth-card" aria-labelledby="sign-in-title">
           <div>
@@ -299,10 +289,6 @@ export function AuthShell() {
             <li>PayPal sandbox</li>
             <li>No real money</li>
           </ul>
-          <div className="auth-next">
-            <span>Planned</span>
-            <p>We plan to add PayPal subscriptions, disputes and more publishing channels.</p>
-          </div>
           {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
           <div className="auth-divider">
             <span>or keep your workspace</span>
@@ -445,6 +431,17 @@ function SampleFlow() {
         <span>How it works</span>
         <span>Sample from the judge demo</span>
       </figcaption>
+      <p className="flow-example">
+        {/* biome-ignore lint/performance/noImgElement: a small static icon. */}
+        <img src="/products/launchcheck.svg" alt="" width={20} height={20} decoding="async" />
+        <span>
+          The demo markets{" "}
+          <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
+            LaunchCheck
+          </a>
+          , an example product that scans a launch page for speed, SEO and structure issues.
+        </span>
+      </p>
       <ol className="flow-steps">
         {flowSteps.map(({ label, detail, actor }, index) => (
           <li

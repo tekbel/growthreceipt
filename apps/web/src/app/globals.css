@@ -91,22 +91,26 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-wordmark > span, .auth-loading-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: var(--corner-sm); }
 .auth-wordmark svg, .auth-loading-mark svg { width: 17px; height: 17px; stroke-width: 1.8; }
 .auth-promise { max-width: 650px; margin: auto 0 0; padding: 48px 0 36px; }
-.auth-promise h1 { max-width: 600px; margin: 12px 0 0; font-size: var(--type-hero); font-weight: 500; line-height: 1.03; letter-spacing: -.045em; }
+.auth-promise h1 { max-width: 640px; margin: 12px 0 0; font-size: var(--type-hero); font-weight: 400; line-height: 1.05; letter-spacing: -.025em; text-wrap: balance; }
 .auth-promise p { max-width: 520px; margin: 18px 0 0; color: var(--ink-soft); font-size: var(--type-lg); line-height: 1.65; }
 /* Sample flow on the sign in page: the product loop as a vertical stepper. */
-.flow { width: min(470px, 100%); margin: 0 0 auto; }
-.flow-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 18px; color: var(--muted); font-size: var(--type-xs); }
+.flow { width: min(470px, 100%); margin: 0; }
+.flow-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: var(--type-xs); }
 .flow-head span:first-child { color: var(--ink-soft); font-weight: 600; }
+/* Names the example product, so judges know what LaunchCheck is before they meet it. */
+.flow-example { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 20px; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
+.flow-example img { flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 5px; }
+.flow-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
 .flow-steps { display: grid; margin: 0; padding: 0; list-style: none; }
 .flow-step, .flow-result { animation: flow-in 420ms var(--ease) both; animation-delay: calc(var(--i, 0) * 140ms + 250ms); }
 .flow-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding-bottom: 18px; }
-.flow-step:not(:last-child)::before { position: absolute; top: 30px; bottom: 2px; left: 13.5px; width: 1px; background: var(--accent); opacity: .45; content: ""; }
-.flow-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--accent); border-radius: 50%; color: var(--accent); font-size: var(--type-xs); font-weight: 600; }
+.flow-step:not(:last-child)::before { position: absolute; top: 30px; bottom: 2px; left: 13.5px; width: 1px; background: var(--line-strong); content: ""; }
+.flow-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--line-strong); border-radius: 50%; color: var(--ink-soft); font-size: var(--type-xs); font-weight: 600; }
 .flow-mark svg { width: 14px; height: 14px; stroke-width: 2.4; }
 .flow-step.current .flow-mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .flow-copy { display: grid; gap: 2px; min-width: 0; padding-top: 3px; }
-.flow-copy strong { color: var(--accent); font-size: var(--type-md); font-weight: 500; }
-.flow-step.current .flow-copy strong { color: var(--ink); }
+.flow-copy strong { color: var(--ink); font-size: var(--type-base); font-weight: 600; }
+.flow-step.current .flow-copy strong { color: var(--accent-strong); }
 .flow-copy span { color: var(--muted); font-size: var(--type-sm); }
 .flow-actor { margin-top: 4px; padding: 2px 9px; border-radius: 999px; background: var(--surface-subtle); color: var(--muted); font-size: var(--type-xs); }
 .flow-result { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 14px 16px; border-radius: var(--corner-md); background: var(--success-soft); color: var(--success); font-size: var(--type-sm); font-weight: 600; }
@@ -114,7 +118,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .flow-result strong { margin-left: auto; color: var(--ink); font-size: var(--type-lg); font-variant-numeric: tabular-nums; }
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-card { width: min(430px, calc(100% - 48px)); align-self: center; justify-self: center; padding: 36px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: var(--shadow); }
-.auth-card h2 { margin: 8px 0 0; font-size: var(--type-title); font-weight: 500; letter-spacing: -.03em; }
+.auth-card h2 { margin: 8px 0 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; }
 .auth-card > div:first-child > p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
 .auth-demo-button, .auth-provider-button, .auth-email > .button { width: 100%; min-height: 48px; }
 .auth-demo-button { justify-content: space-between; margin-top: 28px; padding-right: 16px; padding-left: 18px; }
@@ -547,10 +551,10 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .auth-stage { display: flex; flex-direction: column; padding: 30px 24px 48px; }
   .auth-intro { display: contents; }
   .auth-wordmark { order: 1; }
-  .auth-promise { order: 2; margin: 44px 0 28px; padding: 0; }
+  .auth-promise { order: 2; margin: 36px 0 28px; padding: 0; }
   .auth-card { order: 3; width: 100%; max-width: 520px; margin: 0; }
-  .auth-example { order: 4; width: 100%; max-width: 520px; margin: 36px 0 0; }
-  .flow { order: 5; width: 100%; max-width: 520px; margin: 28px 0 10px; }
+  .flow { order: 4; width: 100%; max-width: 520px; margin: 36px 0 0; }
+  .auth-next { order: 5; width: 100%; max-width: 520px; margin: 20px 0 0; }
   .sidebar { transform: translateX(-100%); transition: transform 180ms ease; }
   .sidebar.open { transform: translateX(0); }
   .mobile-close { display: grid; }
@@ -1037,7 +1041,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @media (max-width: 640px) { .agent-runs dl { grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 0; } .agent-runs dd { margin-bottom: 8px; } }
 
 /* First impression. The demo is the one obvious action. */
-.auth-promise h1 { max-width: 640px; }
 .auth-proof { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 26px 0 0; padding: 0; list-style: none; }
 .auth-proof li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); }
 .auth-proof svg { width: 16px; height: 16px; color: var(--ink); }
@@ -1049,14 +1052,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-demo-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 12px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--type-xs); }
 .auth-demo-facts li { display: inline-flex; align-items: center; gap: 6px; }
 .auth-demo-facts li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
-/* Keep the whole sample flow, revenue included, above the fold on laptop screens. */
-@media (min-width: 901px) and (max-height: 980px) {
-  .auth-promise { padding: 28px 0 26px; }
-  .auth-promise h1 { font-size: clamp(2.5rem, 1.6rem + 2.6vw, 3.6rem); }
-  .auth-proof { margin-top: 20px; }
-  .flow-head { margin-bottom: 12px; }
-  .flow-step { padding-bottom: 11px; }
-}
 
 /* Images appear without popping. The letter shows first and the icon fades in over it. */
 .product-mark, .checkout-product-mark { position: relative; }
@@ -1070,27 +1065,21 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .paypal-button-slot.ready { opacity: 1; }
 .paypal-button-skeleton { position: absolute; inset: 0 0 auto; height: 48px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-hover) 50%, var(--surface-subtle) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s linear infinite; }
 /* Keep planned work visible without letting it compete with the working demo. */
-.auth-next { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
+.auth-next { width: min(470px, 100%); display: flex; align-items: baseline; gap: 10px; margin: 20px 0 auto; color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
 .auth-next span { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--surface-hover); font-size: var(--type-2xs); font-weight: 600; }
-.auth-next p { margin: 0; }
 
-/* Names the example product, so judges know what LaunchCheck is before they meet it. */
-.auth-example { width: min(470px, 100%); display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 12px; margin: 0 0 22px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface-subtle); }
-.auth-example-mark { width: 36px; height: 36px; overflow: hidden; border-radius: var(--corner-sm); background: #dce8ff; }
-.auth-example-mark img { width: 100%; height: 100%; display: block; }
-.auth-example p { margin: 0; color: var(--ink-soft); font-size: var(--type-xs); line-height: 1.55; }
-.auth-example strong { color: var(--ink); }
-.auth-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
-/* Keep the demo card in view near the top while the intro scrolls. */
-@media (min-width: 901px) {
-  .auth-card { align-self: start; position: sticky; top: clamp(32px, 12vh, 140px); margin-top: clamp(32px, 12vh, 140px); }
+/* Keep the demo card in view while the intro scrolls, its top in line with the wordmark. */
+@media (min-width: 861px) {
+  .auth-card { align-self: start; position: sticky; top: clamp(28px, 5vw, 72px); margin-top: clamp(28px, 5vw, 72px); }
 }
-@media (min-width: 901px) and (max-height: 980px) {
-  .auth-promise { padding: 20px 0 18px; }
+/* Keep the whole sample flow, revenue included, above the fold on laptop screens. */
+@media (min-width: 861px) and (max-height: 980px) {
+  .auth-promise { padding: 24px 0 22px; }
   .auth-promise h1 { font-size: clamp(2.4rem, 1.5rem + 2.3vw, 3.3rem); }
   .auth-promise p { margin-top: 12px; font-size: var(--type-md); }
-  .auth-example { margin-bottom: 14px; padding: 10px 12px; }
-  .flow-step { padding-bottom: 6px; }
+  .auth-proof { margin-top: 18px; }
+  .flow-example { margin-bottom: 14px; }
+  .flow-step { padding-bottom: 8px; }
 }
 .revise-action { display: grid; gap: 8px; justify-items: start; margin: 4px 0 16px; }
 .revise-action > span { color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
