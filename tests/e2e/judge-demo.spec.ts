@@ -166,6 +166,28 @@ test("guided tour walks a first time judge through the loop", async ({
 	expect(errors).toEqual([]);
 });
 
+test("home page explains the full revenue loop", async ({ page }) => {
+	await page.goto("/");
+	const trigger = page.getByRole("button", { name: "See the full revenue loop" });
+	await trigger.click();
+	const loop = page.getByRole("dialog", {
+		name: "From approved post to verified revenue",
+	});
+	await expect(loop).toBeVisible();
+	await loop.getByRole("button", { name: "Pause" }).click();
+
+	await loop.getByRole("button", { name: /^You decide/ }).click();
+	await expect(loop.getByText("9 of 10")).toBeVisible();
+	await expect(loop.getByRole("heading", { name: "You decide" })).toBeVisible();
+	await loop.getByRole("button", { name: "Next step" }).click();
+	await expect(loop.getByText("10 of 10")).toBeVisible();
+	await expect(loop.getByRole("button", { name: "Next step" })).toBeDisabled();
+
+	await page.keyboard.press("Escape");
+	await expect(loop).toBeHidden();
+	await expect(trigger).toBeFocused();
+});
+
 test("judge demo remains navigable on a phone", async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	const errors: string[] = [];

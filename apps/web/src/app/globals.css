@@ -116,6 +116,66 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .flow-result { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 14px 16px; border-radius: var(--corner-md); background: var(--success-soft); color: var(--success); font-size: var(--type-sm); font-weight: 600; }
 .flow-result svg { width: 18px; height: 18px; }
 .flow-result strong { margin-left: auto; color: var(--ink); font-size: var(--type-lg); font-variant-numeric: tabular-nums; }
+.loop-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 6px; font-size: var(--type-sm); }
+.loop-trigger svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
+.loop-trigger:hover svg { transform: translateX(2px); }
+.loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.loop-dialog[open] { animation: rise var(--duration-base) var(--ease); }
+.loop-dialog::backdrop { background: color-mix(in srgb, var(--ink) 38%, transparent); }
+.loop-panel { display: grid; gap: 20px; padding: clamp(20px, 3vw, 32px); }
+.loop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.loop-head h2 { margin: 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; text-wrap: balance; }
+.loop-head p { margin: 6px 0 0; color: var(--ink-soft); font-size: var(--type-sm); }
+.loop-icon { width: 40px; padding: 0; flex-shrink: 0; }
+.loop-icon svg { width: 18px; height: 18px; }
+.loop-stages { --mark: 44px; --row-gap: 28px; position: relative; display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.loop-stages::before { content: ""; position: absolute; top: calc(var(--mark) / 2); bottom: calc(var(--mark) / 2); left: calc(var(--mark) / 2 - 1px); width: 2px; background: var(--line); }
+.loop-stage { position: relative; }
+.loop-stage button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--corner-sm); }
+.loop-mark { display: grid; place-items: center; width: var(--mark); height: var(--mark); flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--muted); transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease); }
+.loop-mark svg { width: 18px; height: 18px; }
+.loop-stage[data-approval] .loop-mark { border-radius: var(--corner-md); border-width: 2px; }
+.loop-stage[data-state="done"] .loop-mark { border-color: var(--accent-soft); background: var(--accent-soft); color: var(--accent-strong); }
+.loop-stage[data-state="active"] .loop-mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.loop-stages[data-playing] .loop-stage[data-state="active"] .loop-mark { animation: pulse 1.6s var(--ease) infinite; }
+.loop-label, .loop-actor { display: block; }
+.loop-copy { display: grid; gap: 2px; padding: 2px 6px; border-radius: var(--corner-sm); background: var(--surface); }
+.loop-label { color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; }
+.loop-actor { color: var(--muted); font-size: var(--type-xs); }
+.loop-stage[data-state="active"] .loop-label { color: var(--ink); }
+.loop-stage[data-approval] .loop-actor { color: var(--ink-soft); font-weight: 600; }
+.loop-return { display: flex; align-items: center; gap: 6px; margin: -8px 0 0; color: var(--muted); font-size: var(--type-xs); }
+.loop-return svg { width: 14px; height: 14px; }
+.loop-detail { display: flex; gap: 14px; min-height: 128px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface-subtle); animation: rise var(--duration-base) var(--ease); }
+.loop-detail[data-approval] { border-color: var(--line-strong); }
+.loop-detail-icon { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); }
+.loop-detail-icon svg { width: 18px; height: 18px; }
+.loop-detail h3 { margin: 2px 0 4px; font-size: var(--type-md); font-weight: 600; }
+.loop-detail p { margin: 0; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.55; }
+.loop-detail .loop-detail-actor { color: var(--muted); font-size: var(--type-xs); font-weight: 600; }
+.loop-controls { display: flex; align-items: center; gap: 8px; }
+.loop-controls .button:first-child { min-width: 112px; }
+.loop-count { margin-left: auto; color: var(--muted); font-size: var(--type-sm); font-variant-numeric: tabular-nums; }
+.loop-text summary { width: fit-content; color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; cursor: pointer; }
+.loop-text ol { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 20px; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.5; }
+.loop-text strong { color: var(--ink); }
+@media (min-width: 720px) {
+  /* Steps 1 to 5 run left to right, 6 to 10 come back right to left, so the path closes. */
+  .loop-stages { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--row-gap) 8px; }
+  .loop-stages::before { left: 10%; right: 10%; width: auto; bottom: calc(50% - var(--row-gap) / 2 - var(--mark) / 2); border: 2px solid var(--line); border-radius: 28px; background: none; }
+  .loop-stage:nth-child(n + 6) { grid-row: 2; }
+  .loop-stage:nth-child(6) { grid-column: 5; }
+  .loop-stage:nth-child(7) { grid-column: 4; }
+  .loop-stage:nth-child(8) { grid-column: 3; }
+  .loop-stage:nth-child(9) { grid-column: 2; }
+  .loop-stage:nth-child(10) { grid-column: 1; }
+  .loop-stage button { flex-direction: column; align-items: center; gap: 8px; height: 100%; text-align: center; }
+  .loop-return { justify-content: center; }
+}
+@media (max-width: 719px) {
+  .loop-dialog { width: 100%; max-width: none; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; }
+  .loop-detail { min-height: 0; }
+}
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-card { width: min(430px, calc(100% - 48px)); align-self: center; justify-self: center; padding: 36px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: var(--shadow); }
 .auth-card h2 { margin: 8px 0 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, BadgeCheck, Bot, Check, Mail, ReceiptText } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   type CSSProperties,
   type FormEvent,
@@ -20,6 +21,9 @@ import {
 import { apiFetch, DEMO_RESET_KEY, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
+
+// Loaded only when a visitor opens it, so the home page stays as light as before.
+const RevenueLoop = dynamic(() => import("@/components/revenue-loop"), { ssr: false });
 
 type AuthState = "loading" | "signed-out" | "bootstrapping" | "ready" | "error";
 
@@ -425,6 +429,7 @@ const flowSteps = [
 
 function SampleFlow() {
   const last = flowSteps.length - 1;
+  const [loopOpen, setLoopOpen] = useState(false);
   return (
     <figure className="flow" aria-labelledby="flow-caption">
       <figcaption id="flow-caption" className="flow-head">
@@ -467,6 +472,16 @@ function SampleFlow() {
           <CountUp to={9} delayMs={(flowSteps.length + 1) * 160} /> USD
         </strong>
       </div>
+      <button
+        className="text-button loop-trigger"
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setLoopOpen(true)}
+      >
+        See the full revenue loop
+        <ArrowRight aria-hidden="true" />
+      </button>
+      {loopOpen ? <RevenueLoop onClose={() => setLoopOpen(false)} /> : null}
     </figure>
   );
 }
