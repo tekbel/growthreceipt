@@ -119,7 +119,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .loop-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 6px; font-size: var(--type-sm); }
 .loop-trigger svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
 .loop-trigger:hover svg { transform: translateX(2px); }
-.loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .loop-dialog[open] { animation: rise var(--duration-base) var(--ease); }
 .loop-dialog::backdrop { background: color-mix(in srgb, var(--ink) 38%, transparent); }
 .loop-panel { display: grid; gap: 20px; padding: clamp(20px, 3vw, 32px); }
@@ -127,7 +127,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .loop-head h2 { margin: 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; text-wrap: balance; }
 .loop-head p { margin: 6px 0 0; color: var(--ink-soft); font-size: var(--type-sm); }
 .loop-icon { width: 40px; padding: 0; flex-shrink: 0; }
-.loop-icon svg { width: 18px; height: 18px; }
+.button.loop-icon svg { width: 18px; height: 18px; flex: none; }
 .loop-stages { --mark: 44px; --row-gap: 28px; position: relative; display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .loop-stages::before { content: ""; position: absolute; top: calc(var(--mark) / 2); bottom: calc(var(--mark) / 2); left: calc(var(--mark) / 2 - 1px); width: 2px; background: var(--line); }
 .loop-stage { position: relative; }
