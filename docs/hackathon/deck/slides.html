@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GrowthReceipt deck</title>
+<style>
+@font-face { font-family: Figtree; src: url(figtree.woff2) format("woff2"); font-weight: 300 900; }
+:root {
+  --ink: #22282f; --ink-soft: #515e71; --muted: #66768a; --line: #e3e7ec; --line-strong: #c9d0da;
+  --stage: #f5f8fa; --surface: #ffffff; --accent: #3a5bc7; --accent-strong: #2c49a8; --accent-soft: #ebf0fc;
+  --success: #1f7a4d; --success-soft: #e6f4ec;
+}
+@page { size: 1920px 1080px; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--stage); }
+body { font-family: Figtree, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+.slide { position: relative; width: 1920px; height: 1080px; overflow: hidden; padding: 112px 128px 120px; background: var(--surface); break-after: page; display: grid; }
+.brand { position: absolute; top: 56px; left: 128px; display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 600; }
+.brand svg { width: 32px; height: 32px; }
+.foot { position: absolute; left: 128px; right: 128px; bottom: 52px; display: flex; justify-content: space-between; color: var(--muted); font-size: 20px; }
+.eyebrow { margin: 0 0 24px; color: var(--accent-strong); font-size: 22px; font-weight: 600; letter-spacing: .02em; }
+h1 { margin: 0; font-size: 88px; font-weight: 400; line-height: 1.04; letter-spacing: -.025em; text-wrap: balance; }
+.lede { margin: 32px 0 0; max-width: 30ch; color: var(--ink-soft); font-size: 32px; line-height: 1.4; }
+.points { display: grid; gap: 28px; margin: 48px 0 0; padding: 0; list-style: none; }
+.points li { display: grid; grid-template-columns: 40px 1fr; gap: 18px; color: var(--ink-soft); font-size: 27px; line-height: 1.4; }
+.points li::before { content: ""; width: 28px; height: 28px; margin-top: 5px; border-radius: 50%; background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c49a8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 16px no-repeat; }
+.points strong { color: var(--ink); font-weight: 600; }
+.split { display: grid; grid-template-columns: 560px 1fr; gap: 80px; align-items: center; }
+.shot { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--stage); }
+.shot img { display: block; width: 100%; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.stack { display: grid; gap: 24px; }
+
+/* 1. Problem */
+.problem { grid-template-columns: 1fr 640px; gap: 96px; align-items: center; }
+.chain { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.chain li { display: flex; align-items: center; gap: 22px; padding: 22px 28px; border: 1px solid var(--line); border-radius: 12px; font-size: 30px; font-weight: 600; background: var(--surface); }
+.chain li span { margin-left: auto; color: var(--muted); font-size: 22px; font-weight: 500; }
+.chain .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--line-strong); }
+.chain .link, .chain .gap { padding: 0; border: 0; border-radius: 0; background: none; }
+.chain .link { height: 34px; margin-left: 34px; border-left: 2px solid var(--line-strong); }
+.chain .gap { height: 96px; margin-left: 34px; border-left: 2px dashed var(--line-strong); display: flex; align-items: center; padding-left: 24px; color: var(--ink-soft); font-size: 24px; font-weight: 600; }
+.chain .paid { border-color: var(--success); background: var(--success-soft); color: var(--success); }
+.chain .paid .dot { background: var(--success); }
+
+/* 2. Loop */
+.loop { align-content: center; gap: 56px; }
+.loop .lede { max-width: none; }
+
+/* 5. Next */
+.next { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; }
+.try { padding: 56px; border: 1px solid var(--line); border-radius: 18px; background: var(--stage); }
+.try p { margin: 0; color: var(--ink-soft); font-size: 26px; line-height: 1.45; }
+.try .url { margin: 14px 0 28px; color: var(--accent-strong); font-size: 46px; font-weight: 600; letter-spacing: -.01em; }
+.try .built { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line); font-size: 22px; color: var(--muted); }
+.planned { display: grid; gap: 18px; margin: 48px 0 0; padding: 0; list-style: none; }
+.planned li { padding: 22px 28px; border: 1px solid var(--line); border-radius: 12px; font-size: 28px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<template id="chrome">
+  <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="#3a5bc7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/></svg>GrowthReceipt</div>
+  <div class="foot"><span class="page"></span><span>growthreceipt.addisstack.com</span></div>
+</template>
+
+<section class="slide problem">
+  <div>
+    <p class="eyebrow">The problem</p>
+    <h1>Likes do not tell you which post sold.</h1>
+    <p class="lede">Indie founders and small teams selling digital products post every day. Likes and clicks stop before the purchase, so the next post is a guess.</p>
+  </div>
+  <ol class="chain" aria-label="What founders can see today">
+    <li><i class="dot"></i>Post<span>Published</span></li>
+    <li class="link" aria-hidden="true"></li>
+    <li><i class="dot"></i>Likes and clicks<span>Counted</span></li>
+    <li class="gap">No link to the sale</li>
+    <li class="paid"><i class="dot"></i>Purchase<span>Unattributed</span></li>
+  </ol>
+</section>
+
+<section class="slide loop">
+  <div>
+    <p class="eyebrow">The loop</p>
+    <h1>Every purchase teaches the next post.</h1>
+    <p class="lede">The agent drafts, you approve, a customer pays with PayPal, and the verified purchase shapes the next experiment you approve.</p>
+  </div>
+  <figure class="shot"><img src="shots/loop.png" alt="The ten stage revenue loop from the GrowthReceipt home page"></figure>
+</section>
+
+<section class="slide split">
+  <div>
+    <p class="eyebrow">The proof</p>
+    <h1>PayPal proves which post sold.</h1>
+    <ul class="points">
+      <li><span><strong>Server side orders.</strong> GrowthReceipt creates and captures every PayPal order. The price never comes from the browser.</span></li>
+      <li><span><strong>Verified webhooks.</strong> PayPal's signed webhook is checked before a payment counts as evidence.</span></li>
+      <li><span><strong>One buy link per post.</strong> The sale is credited to the post that earned it.</span></li>
+    </ul>
+  </div>
+  <figure class="shot"><img src="shots/crop-proof.png" alt="Technical proof in GrowthReceipt: order, capture and credit to the Day 3 post"></figure>
+</section>
+
+<section class="slide split">
+  <div>
+    <p class="eyebrow">The impact</p>
+    <h1>Decide from purchases, not likes.</h1>
+    <ul class="points">
+      <li><span><strong>Honest evidence.</strong> Code labels the signal as early, a clear leader or a tie. One sale is never called a winner.</span></li>
+      <li><span><strong>Checked with PayPal.</strong> The agent looks up the orders it cites before it proposes one experiment.</span></li>
+      <li><span><strong>You stay in control.</strong> Nothing changes until you approve it.</span></li>
+    </ul>
+  </div>
+  <div class="stack">
+    <figure class="shot"><img src="shots/crop-chain.png" alt="From post to payment to next move, waiting for the founder's decision"></figure>
+    <figure class="shot"><img src="shots/crop-table.png" alt="Posts ranked by verified revenue with the evidence labeled early signal"></figure>
+  </div>
+</section>
+
+<section class="slide next">
+  <div>
+    <p class="eyebrow">What comes next</p>
+    <h1>More of the loop, on more channels.</h1>
+    <ul class="planned">
+      <li>PayPal subscriptions</li>
+      <li>PayPal disputes</li>
+      <li>More publishing channels</li>
+    </ul>
+  </div>
+  <div class="try">
+    <p>Try it now</p>
+    <p class="url">growthreceipt.addisstack.com</p>
+    <p>Open the judge demo in one click. It runs in the PayPal sandbox, so no real money moves.</p>
+    <p class="built">Built with PayPal Orders, Web SDK v6 and verified webhooks, and OpenAI agents with human approval.</p>
+  </div>
+</section>
+
+<script>
+const slides = document.querySelectorAll(".slide");
+slides.forEach((slide, index) => {
+  slide.prepend(document.getElementById("chrome").content.cloneNode(true));
+  slide.querySelector(".page").textContent = `${index + 1} of ${slides.length}`;
+});
+</script>
+</body>
+</html>

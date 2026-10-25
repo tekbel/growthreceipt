@@ -1,0 +1,5 @@
+previews/
+shots/*
+!shots/loop.png
+!shots/proof.png
+!shots/crop-*.png
