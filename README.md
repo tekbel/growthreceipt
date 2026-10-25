@@ -1,22 +1,45 @@
-# Agentic Marketing System
+# GrowthReceipt
 
-An approval-first marketing operating system for apps, SaaS products, and digital products.
+Know which posts generate revenue. GrowthReceipt is a marketing agent for indie founders and small teams selling digital products. Each approved post gets its own PayPal buy link, PayPal verifies every purchase, and the agent proposes the next experiment from those verified purchases. Nothing changes until the founder approves it.
 
-The product turns a product brief into a campaign, creates platform-specific content, routes it through human approval, schedules approved posts, measures results, and records evidence-backed lessons for the next campaign.
+Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addisstack.com**.
 
-## Product promise
+## Judge path in 60 seconds
 
-> Give the system a product and a measurable objective. It proposes the next best campaign, prepares the assets, waits for approval, publishes, measures the outcome, and recommends the next action.
+1. Open https://growthreceipt.addisstack.com and choose **Try the judge demo**. No sign up. A guided tour walks the loop.
+2. In **Customer checkout**, choose **Open as customer** and pay with the sandbox buyer shown on the page. It is the PayPal sandbox, so no real money moves.
+3. Back in the workspace, **Results** shows the verified revenue credited to the post. Open **Technical proof** for the order, the capture and the verified webhook.
+4. Choose **Find next move**. The agent reads the verified purchase and proposes one experiment that waits for your approval.
 
-The repository contains the first application foundation: a responsive campaign-review workspace, a FastAPI service with liveness and readiness probes, a live hosted OpenAI agent adapter, a worker shell, shared contracts, and the first Supabase migration.
+The home page also has **See the full revenue loop**, a walk through every stage in about 20 seconds.
 
-The active competition build is **GrowthReceipt: marketing backed by payments**. It is being prepared for the 2026 PayPal AI Hackathon. See [the hackathon strategy](./docs/hackathon/paypal-ai-2026.md).
+![The GrowthReceipt revenue loop](./docs/hackathon/deck/shots/loop.png)
+
+| PayPal proves which post sold | Posts ranked by verified revenue |
+| --- | --- |
+| ![Technical proof: order, capture and credit to the post](./docs/hackathon/deck/shots/crop-proof.png) | ![Results table with the evidence labeled early signal](./docs/hackathon/deck/shots/crop-table.png) |
 
 ![GrowthReceipt architecture](./docs/architecture/overview.png)
 
-The loop and who pays whom are explained in [docs/hackathon/architecture.md](./docs/hackathon/architecture.md).
+* How the loop works and who pays whom: [docs/hackathon/architecture.md](./docs/hackathon/architecture.md)
+* Common judge questions: [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md)
+* Who it is for and planned pricing: [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md)
+* Five slide summary: [docs/hackathon/deck/growthreceipt-deck.pdf](./docs/hackathon/deck/growthreceipt-deck.pdf)
 
-GrowthReceipt is for indie makers and small software teams who market their own product on LinkedIn or X and sell through PayPal. The audience, what it is not for yet, and the planned pricing are in [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md).
+Built with PayPal Orders, Web SDK v6 and verified webhooks, OpenAI agents with human approval, Next.js, FastAPI and Supabase.
+
+## Tests
+
+```bash
+pytest -q apps/api                                           # API tests
+E2E_BASE_URL=https://growthreceipt.addisstack.com npx playwright test   # hosted browser tests
+```
+
+The hosted suite also runs daily from `.github/workflows/smoke.yml`. Add `E2E_PAYPAL=1 --grep @paypal` for a real PayPal sandbox purchase and refund.
+
+## Background
+
+The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original V1 plan is kept below for reference.
 
 ## Current implementation
 
