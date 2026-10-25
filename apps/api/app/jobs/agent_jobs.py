@@ -223,61 +223,64 @@ async def heartbeat(jobs: AgentJobStore, job_id: UUID) -> AsyncIterator[None]:
         task.cancel()
 
 
-class TrackedJob:
-    """Set result before the block ends. It becomes the job's result."""
-
-    def __init__(self, job_id: UUID) -> None:
-        self.id = job_id
-        self.result: BaseModel | None = None
+# Runs detached from their request. Holding the tasks here keeps them from being collected.
+_running: dict[UUID, asyncio.Task[Any]] = {}
 
 
-@asynccontextmanager
-async def track(
+def spawn[R](jobs: AgentJobStore, job_id: UUID, work: Coroutine[Any, Any, R]) -> asyncio.Task[R]:
+    """Runs work after its request ends. The work records its own result or error."""
+
+    async def run() -> R:
+        try:
+            async with heartbeat(jobs, job_id):
+                return await work
+        except asyncio.CancelledError:
+            await jobs.fail(job_id, INTERRUPTED, status="interrupted")
+            raise
+
+    def settled(task: asyncio.Task[R]) -> None:
+        _running.pop(job_id, None)
+        # Read the error so a run nobody waits for does not log it as never retrieved.
+        if not task.cancelled():
+            task.exception()
+
+    task = asyncio.create_task(run())
+    _running[job_id] = task
+    task.add_done_callback(settled)
+    return task
+
+
+async def detached[M: BaseModel](
     jobs: AgentJobStore,
+    work: Coroutine[Any, Any, M],
     *,
     workspace_id: UUID,
     kind: JobKind,
     campaign_id: UUID | None = None,
     failure: str,
-) -> AsyncIterator[TrackedJob]:
-    """Records a plain request as a job. The request still answers as usual, and a page that
-    reloaded meanwhile finds the result through the job."""
-    job = TrackedJob(
-        await jobs.start(workspace_id=workspace_id, kind=kind, campaign_id=campaign_id)
-    )
-    try:
-        async with heartbeat(jobs, job.id):
-            yield job
-    except HTTPException as error:
-        await jobs.fail(job.id, str(error.detail))
-        raise
-    except asyncio.CancelledError:
-        await jobs.fail(job.id, INTERRUPTED, status="interrupted")
-        raise
-    except BaseException:
-        await jobs.fail(job.id, failure)
-        raise
-    await jobs.finish(job.id, job.result.model_dump(mode="json") if job.result else {})
+) -> M:
+    """Runs an agent call as a job in its own task and answers the request with its result.
 
+    A host that cancels the request when the client disconnects stops only the wait. The run
+    keeps going and records its result, so a reloaded page still finds it. The work must not use
+    the request's database session, which closes with the request.
+    """
+    job_id = await jobs.start(workspace_id=workspace_id, kind=kind, campaign_id=campaign_id)
 
-# Runs detached from their request. Holding the tasks here keeps them from being collected.
-_running: dict[UUID, asyncio.Task[None]] = {}
-
-
-def spawn(jobs: AgentJobStore, job_id: UUID, work: Coroutine[Any, Any, object]) -> None:
-    """Runs work after its request ends. The work records its own result or error."""
-
-    async def run() -> None:
+    async def record() -> M:
         try:
-            async with heartbeat(jobs, job_id):
-                await work
-        except asyncio.CancelledError:
-            await jobs.fail(job_id, INTERRUPTED, status="interrupted")
+            result = await work
+        except HTTPException as error:
+            await jobs.fail(job_id, str(error.detail))
             raise
-        finally:
-            _running.pop(job_id, None)
+        except Exception:
+            logger.exception("Agent job %s failed", kind)
+            await jobs.fail(job_id, failure)
+            raise
+        await jobs.finish(job_id, result.model_dump(mode="json"))
+        return result
 
-    _running[job_id] = asyncio.create_task(run())
+    return await asyncio.shield(spawn(jobs, job_id, record()))
 
 
 async def stop_running() -> None:

@@ -272,8 +272,8 @@ async def test_follow_up_needs_an_approved_move(
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Approve a next move first"
-    [job] = [job for _, job in agent_jobs.jobs.values() if job.kind == "follow_up_post"]
-    assert job.status == "failed" and job.error == "Approve a next move first"
+    # A request turned away before the agent runs leaves no job behind.
+    assert not [job for _, job in agent_jobs.jobs.values() if job.kind == "follow_up_post"]
 
 
 @pytest.mark.asyncio
@@ -297,8 +297,8 @@ async def test_agent_revises_a_post_from_the_review_note(
     assert response.status_code == 200
     # A page that reloaded while the agent revised finds the answer through the job.
     revisions = [job for _, job in agent_jobs.jobs.values() if job.kind == "revise_post"]
-    assert [job.status for job in revisions] == ["failed", "succeeded"]
-    assert revisions[1].result == response.json()
+    assert [job.status for job in revisions] == ["succeeded"]
+    assert revisions[0].result == response.json()
     [revised] = [
         item for item in response.json()["campaign"]["posts"] if item["id"] == str(post.id)
     ]

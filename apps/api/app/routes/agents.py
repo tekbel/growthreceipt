@@ -13,7 +13,11 @@ from pydantic import BaseModel, Field
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import AgentGateway
-from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.dependencies import (
+    CampaignStoreScope,
+    get_campaign_store,
+    get_campaign_store_scope,
+)
 from app.campaigns.generation import draft_campaign
 from app.campaigns.models import (
     Campaign,
@@ -21,16 +25,17 @@ from app.campaigns.models import (
     CampaignDraft,
     CampaignPost,
     EventActor,
+    Post,
 )
 from app.campaigns.page_reader import PageReadError, ProductPage, read_product_page
 from app.campaigns.store import CampaignStore
 from app.config import get_settings
-from app.jobs.agent_jobs import track
+from app.jobs.agent_jobs import detached
 from app.jobs.dependencies import AgentJobs
 from app.offers import DEFAULT_OFFER_ID, OFFERS, offer_for
 from app.paypal.dependencies import get_optional_paypal_gateway
 from app.paypal.gateway import PayPalAPIError, PayPalGateway
-from app.paypal.store import PaymentStore, Receipt
+from app.paypal.store import PaymentStore, Receipt, RevenueSummary
 from app.paypal.store_dependencies import get_payment_store
 from app.quota import CampaignDraftRun, NextActionRun, Quota, claim_run
 from app.workspaces import WorkspaceId
@@ -336,37 +341,38 @@ async def create_next_action(
     _run: NextActionRun,
     paypal: Annotated[PayPalGateway | None, Depends(get_optional_paypal_gateway)],
     jobs: AgentJobs,
+    stores: Annotated[CampaignStoreScope, Depends(get_campaign_store_scope)],
 ) -> NextActionResponse:
-    """A plain request finishes even when the page reloads. The job lets the page follow it."""
+    """The agent runs detached, so a disconnect or a reload does not stop it."""
     campaign = await campaigns.get(
         workspace_id=workspace_id,
         campaign_id=request.campaign_id,
     )
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    async with track(
-        jobs,
-        workspace_id=workspace_id,
-        kind="next_action",
-        campaign_id=campaign.id,
-        failure="A next move could not be prepared right now.",
-    ) as job:
-        job.result = response = await _next_action(campaign, gateway, store, campaigns, paypal)
-    return response
-
-
-async def _next_action(
-    campaign: Campaign,
-    gateway: AgentGateway,
-    store: PaymentStore,
-    campaigns: CampaignStore,
-    paypal: PayPalGateway | None,
-) -> NextActionResponse:
     summary = await store.revenue_summary(campaign_id=campaign.id)
     # A fully refunded purchase is not evidence. A partial refund counts what the buyer kept.
     receipts = [
         receipt for receipt in await store.receipts(campaign_id=campaign.id) if receipt.counts
     ]
+    return await detached(
+        jobs,
+        _next_action(campaign, summary, receipts, gateway, stores, paypal),
+        workspace_id=workspace_id,
+        kind="next_action",
+        campaign_id=campaign.id,
+        failure="A next move could not be prepared right now.",
+    )
+
+
+async def _next_action(
+    campaign: Campaign,
+    summary: RevenueSummary,
+    receipts: list[Receipt],
+    gateway: AgentGateway,
+    stores: CampaignStoreScope,
+    paypal: PayPalGateway | None,
+) -> NextActionResponse:
     paid_posts = []
     for post in campaign.posts:
         paid = [receipt for receipt in receipts if receipt.content_id == post.id]
@@ -464,21 +470,22 @@ async def _next_action(
             )
         }
     )
-    await campaigns.record_event(
-        campaign_id=campaign.id,
-        actor="agent",
-        action="next_action_recommended",
-        detail={
-            "session_id": run.session_id,
-            "turn_id": run.turn_id,
-            **run.usage,
-            "model": get_settings().openai_model,
-            "duration_ms": duration_ms,
-            "evidence": evidence.model_dump(mode="json"),
-            "next_action": next_action.model_dump(),
-            "paypal_checks": [check.model_dump() for check in checks],
-        },
-    )
+    async with stores() as campaigns:
+        await campaigns.record_event(
+            campaign_id=campaign.id,
+            actor="agent",
+            action="next_action_recommended",
+            detail={
+                "session_id": run.session_id,
+                "turn_id": run.turn_id,
+                **run.usage,
+                "model": get_settings().openai_model,
+                "duration_ms": duration_ms,
+                "evidence": evidence.model_dump(mode="json"),
+                "next_action": next_action.model_dump(),
+                "paypal_checks": [check.model_dump() for check in checks],
+            },
+        )
     return NextActionResponse(
         session_id=run.session_id,
         turn_id=run.turn_id,
@@ -596,6 +603,7 @@ async def draft_follow_up_post(
     workspace_id: WorkspaceId,
     quota: Quota,
     jobs: AgentJobs,
+    stores: Annotated[CampaignStoreScope, Depends(get_campaign_store_scope)],
 ) -> FollowUpResponse:
     """Drafts the post an approved next move asks for. It waits in review like any other post.
 
@@ -605,87 +613,98 @@ async def draft_follow_up_post(
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    async with track(
+    events = await campaigns.events(workspace_id=workspace_id, campaign_id=campaign.id)
+    moves = [event for event in events if event.action in MOVE_ACTIONS]
+    if moves and moves[0].action == "follow_up_drafted":
+        drafted = next((post for post in campaign.posts if post.id == moves[0].post_id), None)
+        if drafted is None:
+            raise HTTPException(status_code=409, detail="A post was already drafted for this move")
+        source_id = moves[0].detail.get("source_post_id")
+        return FollowUpResponse(
+            post_id=drafted.id,
+            source_post_id=UUID(source_id) if source_id else None,
+            campaign=campaign,
+            already_drafted=True,
+        )
+    if not moves or moves[0].action != "next_action_approved":
+        raise HTTPException(status_code=409, detail="Approve a next move first")
+    approved = moves[0].detail
+    recommended = next(
+        (event for event in moves if event.action == "next_action_recommended"), None
+    )
+    paid_posts = (recommended.detail.get("evidence", {}) if recommended else {}).get(
+        "paid_posts", []
+    )
+    paid_ids = [str(paid["content_id"]) for paid in paid_posts]
+    source = next(
+        (post for paid_id in paid_ids for post in campaign.posts if str(post.id) == paid_id),
+        None,
+    )
+    day = max((post.day for post in campaign.posts), default=0) + 1
+    if day > MAX_POSTS:
+        raise HTTPException(status_code=409, detail="This campaign already has 14 posts")
+    prompt = json.dumps(
+        {
+            "product_name": campaign.product_name,
+            "product_description": campaign.product_description,
+            "audience": campaign.audience,
+            "brand_voice": campaign.brand_voice,
+            "campaign_channels": campaign.channels,
+            "approved_plan": approved.get("recommendation"),
+            "source_post": source.model_dump(
+                mode="json", include={"day", "channel", "theme", "content", "call_to_action"}
+            )
+            if source
+            else None,
+            "source_post_revenue": paid_posts[0]["revenue"] if source and paid_posts else None,
+            "offer": {
+                "name": campaign.offer.name,
+                "description": campaign.offer.description,
+                "price": f"{campaign.offer.amount:.2f}",
+                "currency": campaign.offer.currency,
+            },
+            "day": day,
+        },
+        indent=2,
+    )
+    await claim_run(quota, workspace_id, "campaign_draft")
+    return await detached(
         jobs,
+        _follow_up_post(gateway, stores, workspace_id, campaign, prompt, day, source, approved),
         workspace_id=workspace_id,
         kind="follow_up_post",
         campaign_id=campaign.id,
         failure="The post could not be drafted right now.",
-    ) as job:
-        events = await campaigns.events(workspace_id=workspace_id, campaign_id=campaign.id)
-        moves = [event for event in events if event.action in MOVE_ACTIONS]
-        if moves and moves[0].action == "follow_up_drafted":
-            drafted = next((post for post in campaign.posts if post.id == moves[0].post_id), None)
-            if drafted is None:
-                raise HTTPException(
-                    status_code=409, detail="A post was already drafted for this move"
-                )
-            source_id = moves[0].detail.get("source_post_id")
-            job.result = response = FollowUpResponse(
-                post_id=drafted.id,
-                source_post_id=UUID(source_id) if source_id else None,
-                campaign=campaign,
-                already_drafted=True,
-            )
-            return response
-        if not moves or moves[0].action != "next_action_approved":
-            raise HTTPException(status_code=409, detail="Approve a next move first")
-        approved = moves[0].detail
-        recommended = next(
-            (event for event in moves if event.action == "next_action_recommended"), None
+    )
+
+
+async def _follow_up_post(
+    gateway: AgentGateway,
+    stores: CampaignStoreScope,
+    workspace_id: UUID,
+    campaign: Campaign,
+    prompt: str,
+    day: int,
+    source: Post | None,
+    approved: dict[str, Any],
+) -> FollowUpResponse:
+    try:
+        run = await gateway.run_structured(
+            workflow="follow-up-post",
+            instructions=FOLLOW_UP_INSTRUCTIONS,
+            input_text=prompt,
+            output_type=CampaignPost,
         )
-        paid_posts = (recommended.detail.get("evidence", {}) if recommended else {}).get(
-            "paid_posts", []
+    except (APIError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=502, detail="The post could not be drafted right now"
+        ) from error
+    post = run.output.model_copy(update={"day": day})
+    if post.channel not in campaign.channels:
+        post = post.model_copy(
+            update={"channel": source.channel if source else campaign.channels[0]}
         )
-        paid_ids = [str(paid["content_id"]) for paid in paid_posts]
-        source = next(
-            (post for paid_id in paid_ids for post in campaign.posts if str(post.id) == paid_id),
-            None,
-        )
-        day = max((post.day for post in campaign.posts), default=0) + 1
-        if day > MAX_POSTS:
-            raise HTTPException(status_code=409, detail="This campaign already has 14 posts")
-        prompt = json.dumps(
-            {
-                "product_name": campaign.product_name,
-                "product_description": campaign.product_description,
-                "audience": campaign.audience,
-                "brand_voice": campaign.brand_voice,
-                "campaign_channels": campaign.channels,
-                "approved_plan": approved.get("recommendation"),
-                "source_post": source.model_dump(
-                    mode="json", include={"day", "channel", "theme", "content", "call_to_action"}
-                )
-                if source
-                else None,
-                "source_post_revenue": paid_posts[0]["revenue"] if source and paid_posts else None,
-                "offer": {
-                    "name": campaign.offer.name,
-                    "description": campaign.offer.description,
-                    "price": f"{campaign.offer.amount:.2f}",
-                    "currency": campaign.offer.currency,
-                },
-                "day": day,
-            },
-            indent=2,
-        )
-        await claim_run(quota, workspace_id, "campaign_draft")
-        try:
-            run = await gateway.run_structured(
-                workflow="follow-up-post",
-                instructions=FOLLOW_UP_INSTRUCTIONS,
-                input_text=prompt,
-                output_type=CampaignPost,
-            )
-        except (APIError, RuntimeError) as error:
-            raise HTTPException(
-                status_code=502, detail="The post could not be drafted right now"
-            ) from error
-        post = run.output.model_copy(update={"day": day})
-        if post.channel not in campaign.channels:
-            post = post.model_copy(
-                update={"channel": source.channel if source else campaign.channels[0]}
-            )
+    async with stores() as campaigns:
         updated = await campaigns.add_post(
             workspace_id=workspace_id,
             campaign_id=campaign.id,
@@ -700,15 +719,14 @@ async def draft_follow_up_post(
                 "approved_plan": approved.get("recommendation"),
             },
         )
-        if updated is None:
-            raise HTTPException(status_code=404, detail="Campaign not found")
-        added = next(item for item in reversed(updated.posts) if item.day == day)
-        job.result = response = FollowUpResponse(
-            post_id=added.id,
-            source_post_id=source.id if source else None,
-            campaign=updated,
-        )
-        return response
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    added = next(item for item in reversed(updated.posts) if item.day == day)
+    return FollowUpResponse(
+        post_id=added.id,
+        source_post_id=source.id if source else None,
+        campaign=updated,
+    )
 
 
 REVISION_INSTRUCTIONS = """You are GrowthReceipt's campaign writer.
@@ -738,51 +756,65 @@ async def revise_post(
     workspace_id: WorkspaceId,
     _run: CampaignDraftRun,
     jobs: AgentJobs,
+    stores: Annotated[CampaignStoreScope, Depends(get_campaign_store_scope)],
 ) -> RevisionResponse:
     """Applies the founder's change request to one post. The result goes back to review."""
     campaign = await campaigns.get(workspace_id=workspace_id, campaign_id=request.campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    async with track(
+    post = next((item for item in campaign.posts if item.id == request.post_id), None)
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    note = (post.review_note or "").strip()
+    if post.status != "changes_requested" or not note:
+        raise HTTPException(status_code=409, detail="Request changes with a note first")
+    prompt = json.dumps(
+        {
+            "product_name": campaign.product_name,
+            "audience": campaign.audience,
+            "brand_voice": campaign.brand_voice,
+            "review_note": note,
+            "post": post.model_dump(
+                mode="json", include={"day", "channel", "theme", "content", "call_to_action"}
+            ),
+        },
+        indent=2,
+    )
+    return await detached(
         jobs,
+        _revise_post(gateway, stores, workspace_id, campaign.id, post, note, prompt),
         workspace_id=workspace_id,
         kind="revise_post",
         campaign_id=campaign.id,
         failure="The post could not be revised right now.",
-    ) as job:
-        post = next((item for item in campaign.posts if item.id == request.post_id), None)
-        if post is None:
-            raise HTTPException(status_code=404, detail="Post not found")
-        note = (post.review_note or "").strip()
-        if post.status != "changes_requested" or not note:
-            raise HTTPException(status_code=409, detail="Request changes with a note first")
-        prompt = json.dumps(
-            {
-                "product_name": campaign.product_name,
-                "audience": campaign.audience,
-                "brand_voice": campaign.brand_voice,
-                "review_note": note,
-                "post": post.model_dump(
-                    mode="json", include={"day", "channel", "theme", "content", "call_to_action"}
-                ),
-            },
-            indent=2,
+    )
+
+
+async def _revise_post(
+    gateway: AgentGateway,
+    stores: CampaignStoreScope,
+    workspace_id: UUID,
+    campaign_id: UUID,
+    post: Post,
+    note: str,
+    prompt: str,
+) -> RevisionResponse:
+    try:
+        run = await gateway.run_structured(
+            workflow="revise-post",
+            instructions=REVISION_INSTRUCTIONS,
+            input_text=prompt,
+            output_type=CampaignPost,
         )
-        try:
-            run = await gateway.run_structured(
-                workflow="revise-post",
-                instructions=REVISION_INSTRUCTIONS,
-                input_text=prompt,
-                output_type=CampaignPost,
-            )
-        except (APIError, RuntimeError) as error:
-            raise HTTPException(
-                status_code=502, detail="The post could not be revised right now"
-            ) from error
-        revised = run.output.model_copy(update={"day": post.day, "channel": post.channel})
+    except (APIError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=502, detail="The post could not be revised right now"
+        ) from error
+    revised = run.output.model_copy(update={"day": post.day, "channel": post.channel})
+    async with stores() as campaigns:
         updated = await campaigns.revise_post(
             workspace_id=workspace_id,
-            campaign_id=campaign.id,
+            campaign_id=campaign_id,
             post_id=post.id,
             revised=revised,
             detail={
@@ -795,10 +827,9 @@ async def revise_post(
                 "after": revised.content,
             },
         )
-        if updated is None:
-            raise HTTPException(status_code=404, detail="Post not found")
-        job.result = response = RevisionResponse(post_id=post.id, campaign=updated)
-        return response
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return RevisionResponse(post_id=post.id, campaign=updated)
 
 
 BRIEF_INSTRUCTIONS = """You are GrowthReceipt's campaign planner.
@@ -847,41 +878,46 @@ async def suggest_brief_from_url(
     jobs: AgentJobs,
 ) -> BriefFromUrlResponse:
     """Reads a public product page and suggests a brief. The founder edits it before drafting."""
-    async with track(
+    try:
+        page = await read_page(request.url)
+    except PageReadError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if len(page.title + page.description + page.text) < 40:
+        raise HTTPException(status_code=422, detail="That page has too little text to read.")
+    # Claimed after the page is read, so a bad link does not use up a run.
+    await claim_run(quota, workspace_id, "campaign_draft")
+    prompt = json.dumps(
+        {
+            "url": page.url,
+            "title": page.title,
+            "description": page.description,
+            "page_text": page.text,
+        },
+        indent=2,
+    )
+    return await detached(
         jobs,
+        _brief_from_url(gateway, page, prompt),
         workspace_id=workspace_id,
         kind="brief_from_url",
         failure="The brief could not be suggested right now.",
-    ) as job:
-        try:
-            page = await read_page(request.url)
-        except PageReadError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-        if len(page.title + page.description + page.text) < 40:
-            raise HTTPException(status_code=422, detail="That page has too little text to read.")
-        # Claimed after the page is read, so a bad link does not use up a run.
-        await claim_run(quota, workspace_id, "campaign_draft")
-        prompt = json.dumps(
-            {
-                "url": page.url,
-                "title": page.title,
-                "description": page.description,
-                "page_text": page.text,
-            },
-            indent=2,
+    )
+
+
+async def _brief_from_url(
+    gateway: AgentGateway, page: ProductPage, prompt: str
+) -> BriefFromUrlResponse:
+    try:
+        run = await gateway.run_structured(
+            workflow="brief-from-url",
+            instructions=BRIEF_INSTRUCTIONS,
+            input_text=prompt,
+            output_type=BriefSuggestion,
         )
-        try:
-            run = await gateway.run_structured(
-                workflow="brief-from-url",
-                instructions=BRIEF_INSTRUCTIONS,
-                input_text=prompt,
-                output_type=BriefSuggestion,
-            )
-        except (APIError, RuntimeError) as error:
-            raise HTTPException(
-                status_code=502, detail="The brief could not be suggested right now"
-            ) from error
-        job.result = response = BriefFromUrlResponse(
-            **run.output.model_dump(), product_icon_url=page.image_url, source_url=page.url
-        )
-        return response
+    except (APIError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=502, detail="The brief could not be suggested right now"
+        ) from error
+    return BriefFromUrlResponse(
+        **run.output.model_dump(), product_icon_url=page.image_url, source_url=page.url
+    )

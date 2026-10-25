@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -7,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.agents.dependencies import get_agent_gateway
 from app.agents.gateway import FakeAgentGateway
-from app.campaigns.dependencies import get_campaign_store
+from app.campaigns.dependencies import get_campaign_store, get_campaign_store_scope
 from app.campaigns.models import CampaignDraft, CampaignPost
 from app.campaigns.store import FakeCampaignStore
 from app.main import app
@@ -16,6 +18,17 @@ from app.paypal.gateway import FakePayPalGateway, PayPalOrderDetails
 from app.paypal.store import FakePaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
 from app.routes.agents import NextAction, PayPalCheck, paypal_order_tool
+
+
+def use_campaign_store(store: FakeCampaignStore) -> None:
+    """Agent runs save through a scope of their own, so both point at the same store."""
+
+    @asynccontextmanager
+    async def scope() -> AsyncIterator[FakeCampaignStore]:
+        yield store
+
+    app.dependency_overrides[get_campaign_store] = lambda: store
+    app.dependency_overrides[get_campaign_store_scope] = lambda: scope
 
 
 @pytest.mark.asyncio
@@ -47,7 +60,7 @@ async def test_campaign_to_verified_revenue_to_next_action_loop() -> None:
         needs_more_data=True,
         human_approval_required=True,
     )
-    app.dependency_overrides[get_campaign_store] = lambda: campaign_store
+    use_campaign_store(campaign_store)
     app.dependency_overrides[get_payment_store] = lambda: payment_store
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
     app.dependency_overrides[get_agent_gateway] = lambda: FakeAgentGateway(
@@ -192,7 +205,7 @@ async def test_next_action_agent_checks_cited_orders_with_paypal() -> None:
         needs_more_data=True,
         human_approval_required=True,
     )
-    app.dependency_overrides[get_campaign_store] = lambda: campaign_store
+    use_campaign_store(campaign_store)
     payment_store = FakePaymentStore()
     app.dependency_overrides[get_payment_store] = lambda: payment_store
     app.dependency_overrides[get_paypal_gateway] = lambda: paypal

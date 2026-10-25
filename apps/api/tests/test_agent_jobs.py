@@ -3,10 +3,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
+from pydantic import BaseModel
 
 from app.jobs.agent_jobs import (
     INTERRUPTED,
     FakeAgentJobStore,
+    detached,
     follow,
     spawn,
     stop_running,
@@ -62,3 +65,56 @@ async def test_shutdown_marks_running_work_interrupted() -> None:
 
     job = await jobs.get(workspace_id=workspace, job_id=job_id)
     assert job is not None and job.status == "interrupted" and job.error == INTERRUPTED
+
+
+class Saved(BaseModel):
+    id: str
+
+
+@pytest.mark.asyncio
+async def test_a_detached_run_outlives_its_cancelled_request() -> None:
+    jobs = FakeAgentJobStore()
+    workspace = uuid4()
+    release = asyncio.Event()
+
+    async def work() -> Saved:
+        await release.wait()
+        return Saved(id="saved")
+
+    request = asyncio.create_task(
+        detached(jobs, work(), workspace_id=workspace, kind="next_action", failure="Failed.")
+    )
+    await asyncio.sleep(0)
+    # A host that cancels on disconnect cancels the request, not the run.
+    request.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await request
+    release.set()
+
+    [(_, job)] = jobs.jobs.values()
+    events = [event async for event in follow(jobs, workspace_id=workspace, job_id=job.id)]
+    assert events == [("result", {"id": "saved"})]
+
+
+@pytest.mark.asyncio
+async def test_a_detached_run_records_why_it_failed() -> None:
+    jobs = FakeAgentJobStore()
+    workspace = uuid4()
+
+    async def refused() -> Saved:
+        raise HTTPException(status_code=502, detail="The agent is unavailable.")
+
+    async def broken() -> Saved:
+        raise RuntimeError("boom")
+
+    with pytest.raises(HTTPException):
+        await detached(jobs, refused(), workspace_id=workspace, kind="revise_post", failure="x")
+    with pytest.raises(RuntimeError):
+        await detached(
+            jobs, broken(), workspace_id=workspace, kind="revise_post", failure="Not revised."
+        )
+
+    assert [(job.status, job.error) for _, job in jobs.jobs.values()] == [
+        ("failed", "The agent is unavailable."),
+        ("failed", "Not revised."),
+    ]
