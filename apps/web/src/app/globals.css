@@ -129,7 +129,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .home-shot .dark-only, :root[data-theme="dark"] .home-shot .light-only { display: none; }
 :root[data-theme="dark"] .home-shot .dark-only { display: block; }
 .home-band { border-block: 1px solid var(--line); background: var(--stage); }
-.flow { margin: 0; padding: 96px 0; }
+.flow { margin: 0 auto; padding: 96px 0; }
 .flow-head { display: grid; gap: 8px; margin-bottom: 40px; }
 .flow-head span:last-child { color: var(--ink); font-size: var(--type-display); font-weight: 400; letter-spacing: -.02em; }
 .flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; align-items: start; }

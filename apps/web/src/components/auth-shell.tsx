@@ -346,7 +346,7 @@ export function AuthShell() {
                   src={`/home/results-${theme}.webp`}
                   alt="The Results page of the judge demo after a PayPal sandbox purchase, with 9.00 USD of verified revenue credited to one post"
                   width={1600}
-                  height={911}
+                  height={1081}
                   decoding="async"
                   fetchPriority={theme === "light" ? "high" : "low"}
                 />
