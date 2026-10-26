@@ -86,39 +86,108 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 
 /* Authentication. One quiet entry point for permanent users and isolated judge demos. */
 .auth-stage { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, .9fr); background: var(--stage); }
-.auth-intro { min-height: 100vh; display: flex; flex-direction: column; padding: clamp(28px, 5vw, 72px); border-right: 1px solid var(--line); background: var(--surface); }
 .auth-wordmark { display: inline-flex; align-items: center; gap: 10px; font-size: var(--type-xl); font-weight: 600; letter-spacing: -.02em; }
 .auth-wordmark > span, .auth-loading-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: var(--corner-sm); }
 .auth-wordmark svg, .auth-loading-mark svg { width: 17px; height: 17px; stroke-width: 1.8; }
-.auth-promise { max-width: 650px; margin: auto 0 0; padding: 48px 0 36px; }
-.auth-promise h1 { max-width: 640px; margin: 12px 0 0; font-size: var(--type-hero); font-weight: 400; line-height: 1.05; letter-spacing: -.025em; text-wrap: balance; }
-.auth-promise p { max-width: 520px; margin: 18px 0 0; color: var(--ink-soft); font-size: var(--type-lg); line-height: 1.65; }
-/* Sample flow on the sign in page: the product loop as a vertical stepper. */
-.flow { width: min(470px, 100%); margin: 0; }
-.flow-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: var(--type-xs); }
-.flow-head span:first-child { color: var(--ink-soft); font-weight: 600; }
 /* Names the example product, so judges know what LaunchCheck is before they meet it. */
-.flow-example { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 20px; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
-.flow-example img { flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 5px; }
-.flow-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
-.flow-steps { display: grid; margin: 0; padding: 0; list-style: none; }
-.flow-step, .flow-result { animation: flow-in 420ms var(--ease) both; animation-delay: calc(var(--i, 0) * 140ms + 250ms); }
-.flow-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding-bottom: 18px; }
-.flow-step:not(:last-child)::before { position: absolute; top: 30px; bottom: 2px; left: 13.5px; width: 1px; background: var(--line-strong); content: ""; }
-.flow-mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--line-strong); border-radius: 50%; color: var(--ink-soft); font-size: var(--type-xs); font-weight: 600; }
-.flow-mark svg { width: 14px; height: 14px; stroke-width: 2.4; }
+/* Signed out home: split hero with the real product, how it works, then sign in. */
+.home { min-height: 100vh; background: var(--surface); color: var(--ink); }
+.home-wrap { width: min(1200px, 100% - 48px); margin: 0 auto; }
+.home-header { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: saturate(1.6) blur(18px); }
+.home-header .home-wrap { display: flex; align-items: center; gap: 16px; height: 64px; }
+.home-header .auth-wordmark { font-size: var(--type-lg); }
+.home-header .auth-wordmark > span { width: 28px; height: 28px; }
+.home-header nav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.home-header .button svg { width: 15px; height: 15px; }
+.button.ghost { border-color: transparent; background: transparent; }
+.button.ghost:hover:not(:disabled) { border-color: transparent; background: var(--surface-hover); }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: center; padding: 72px 0 96px; }
+.home-copy .eyebrow, .home-kicker { color: var(--accent-strong); font-size: var(--type-base); font-weight: 600; }
+.home-copy h1 { margin: 16px 0 0; font-size: clamp(2.5rem, 1.6rem + 3.2vw, 4.25rem); font-weight: 400; line-height: 1.03; letter-spacing: -.03em; text-wrap: balance; }
+.home-copy > p { max-width: 560px; margin: 22px 0 30px; color: var(--ink-soft); font-size: var(--type-lg); line-height: 1.65; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.home-actions .button { min-height: 52px; padding: 0 22px; font-size: var(--type-md); }
+.home-demo { box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 8px 24px -12px var(--accent); transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease), box-shadow var(--duration-base) var(--ease); }
+.home-demo:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 12px 28px -12px var(--accent); }
+.home-demo:active:not(:disabled) { transform: translateY(0); }
+.home-demo svg { transition: transform var(--duration-fast) var(--ease); }
+.home-demo:hover:not(:disabled) svg { transform: translateX(3px); }
+.home-demo:disabled { box-shadow: none; }
+.auth-demo-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 18px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--type-sm); }
+.auth-demo-facts li { display: inline-flex; align-items: center; gap: 7px; }
+.auth-demo-facts li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.home .auth-captcha { max-width: 420px; }
+.home .inline-error { margin: 14px 0 0; font-size: var(--type-sm); }
+.auth-proof { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 28px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.auth-proof li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); }
+.auth-proof svg { width: 16px; height: 16px; color: var(--ink); }
+.home-shot { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--stage); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); transform: perspective(1600px) rotateY(-6deg); transform-origin: left center; }
+:root[data-theme="dark"] .home-shot { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
+.home-shot-bar { display: flex; gap: 6px; padding: 4px 6px 10px; }
+.home-shot-bar span { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
+.home-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.home-shot .dark-only, :root[data-theme="dark"] .home-shot .light-only { display: none; }
+:root[data-theme="dark"] .home-shot .dark-only { display: block; }
+.home-band { border-block: 1px solid var(--line); background: var(--stage); }
+.flow { margin: 0; padding: 96px 0; }
+.flow-head { display: grid; gap: 8px; margin-bottom: 40px; }
+.flow-head span:last-child { color: var(--ink); font-size: var(--type-display); font-weight: 400; letter-spacing: -.02em; }
+.flow-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; align-items: start; }
+.flow-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.flow-step { display: grid; align-content: start; gap: 4px; padding: 18px 20px 20px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface); }
+.flow-step.current { border-color: var(--accent); background: var(--accent-soft); }
+.flow-step-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.flow-actor { color: var(--muted); font-size: var(--type-xs); font-weight: 600; }
+.flow-mark { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--success); font-size: var(--type-xs); font-weight: 600; }
+.flow-mark svg { width: 13px; height: 13px; stroke-width: 2.6; }
 .flow-step.current .flow-mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
-.flow-copy { display: grid; gap: 2px; min-width: 0; padding-top: 3px; }
-.flow-copy strong { color: var(--ink); font-size: var(--type-base); font-weight: 600; }
-.flow-step.current .flow-copy strong { color: var(--accent-strong); }
-.flow-copy span { color: var(--muted); font-size: var(--type-sm); }
-.flow-actor { margin-top: 4px; padding: 2px 9px; border-radius: 999px; background: var(--surface-subtle); color: var(--muted); font-size: var(--type-xs); }
-.flow-result { display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 14px 16px; border-radius: var(--corner-md); background: var(--success-soft); color: var(--success); font-size: var(--type-sm); font-weight: 600; }
+.flow-step strong { font-size: var(--type-md); font-weight: 600; }
+.flow-step.current strong { color: var(--accent-strong); }
+.flow-step > span:last-child { color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
+.flow-side { display: grid; gap: 20px; }
+/* Names the example product, so judges know what LaunchCheck is before they meet it. */
+.flow-example { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--ink-soft); font-size: var(--type-base); line-height: 1.55; }
+.flow-example img { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; }
+.flow-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
+.flow-step, .flow-result { animation: flow-in 420ms var(--ease) both; animation-delay: calc(var(--i, 0) * 140ms + 250ms); }
+.flow-result { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-radius: var(--corner-md); background: var(--success-soft); color: var(--success); font-size: var(--type-base); font-weight: 600; }
 .flow-result svg { width: 18px; height: 18px; }
-.flow-result strong { margin-left: auto; color: var(--ink); font-size: var(--type-lg); font-variant-numeric: tabular-nums; }
-.loop-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 6px; font-size: var(--type-sm); }
-.loop-trigger svg { width: 16px; height: 16px; transition: transform var(--duration-fast) var(--ease); }
-.loop-trigger:hover svg { transform: translateX(2px); }
+.flow-result strong { margin-left: auto; color: var(--ink); font-size: var(--type-2xl); font-variant-numeric: tabular-nums; }
+.flow-side > .button { justify-self: start; min-height: 48px; }
+.home-cta { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 64px; align-items: center; padding: 96px 0; }
+.home-cta h2 { margin: 12px 0; font-size: var(--type-display); font-weight: 400; letter-spacing: -.02em; }
+.home-cta-copy > p { max-width: 520px; margin: 0 0 28px; color: var(--ink-soft); font-size: var(--type-md); line-height: 1.65; }
+.home-signin { padding: 28px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: var(--shadow); scroll-margin-top: 96px; }
+.home-signin:focus { outline: 0; }
+.home-signin .auth-divider { margin: 0 0 18px; }
+.home-signin .auth-provider-button { margin-bottom: 4px; }
+.home-footer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 24px; padding: 28px 0 40px; border-top: 1px solid var(--line); }
+/* Keep planned work visible without letting it compete with the working demo. */
+.auth-next { display: flex; align-items: baseline; gap: 10px; margin: 0; color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
+.auth-next span { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--surface-hover); font-size: var(--type-2xs); font-weight: 600; }
+.home-footer .auth-legal { margin: 0 0 0 auto; }
+@media (max-width: 1080px) {
+  .home-hero { grid-template-columns: 1fr; gap: 48px; padding: 56px 0 72px; }
+  .home-copy > p { max-width: 640px; }
+  .home-shot { transform: none; }
+  .flow-grid { grid-template-columns: 1fr; }
+  .flow-side { max-width: 560px; }
+}
+@media (max-width: 760px) {
+  .home-wrap { width: calc(100% - 32px); }
+  .home-header .home-loop-link { display: none; }
+  .home-header .home-demo { display: none; }
+  .home-hero { gap: 36px; padding: 40px 0 56px; }
+  .home-copy > p { font-size: var(--type-md); }
+  .home-actions .button { width: 100%; }
+  .flow { padding: 64px 0; }
+  .flow-steps { grid-template-columns: 1fr; gap: 10px; }
+  .home-cta { grid-template-columns: 1fr; gap: 32px; padding: 64px 0; }
+  .home-signin { padding: 22px; }
+  .home-footer .auth-legal { margin-left: 0; }
+}
+@media (min-width: 761px) and (max-width: 1080px) { .flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .home-shot { transform: none; } }
 .loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .loop-dialog[open] { animation: rise var(--duration-base) var(--ease); }
 .loop-dialog::backdrop { background: color-mix(in srgb, var(--ink) 38%, transparent); }
@@ -177,15 +246,10 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .loop-detail { min-height: 0; }
 }
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
-.auth-card { width: min(430px, calc(100% - 48px)); align-self: center; justify-self: center; padding: 36px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: var(--shadow); }
-.auth-card h2 { margin: 8px 0 0; font-size: var(--type-title); font-weight: 400; letter-spacing: -.02em; }
-.auth-card > div:first-child > p { margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
-.auth-demo-button, .auth-provider-button, .auth-email > .button { width: 100%; min-height: 48px; }
-.auth-demo-button { justify-content: space-between; margin-top: 28px; padding-right: 16px; padding-left: 18px; }
-.auth-demo-button svg { width: 17px; }
 .auth-captcha { min-height: 65px; margin-top: 16px; }
 .auth-divider { display: flex; align-items: center; gap: 13px; margin: 24px 0; color: var(--muted); font-size: var(--type-xs); }
 .auth-divider::before, .auth-divider::after { height: 1px; flex: 1; background: var(--line); content: ""; }
+.auth-provider-button, .auth-email > .button { width: 100%; min-height: 48px; }
 .auth-provider-button { justify-content: center; }
 .auth-email { display: grid; gap: 10px; margin-top: 18px; }
 .auth-email label { color: var(--ink-soft); font-size: var(--type-xs); font-weight: 600; }
@@ -612,14 +676,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 }
 
 @media (max-width: 860px) {
-  /* One column with the sign in card right after the promise, so the demo button stays near the top. */
   .auth-stage { display: flex; flex-direction: column; padding: 30px 24px 48px; }
-  .auth-intro { display: contents; }
-  .auth-wordmark { order: 1; }
-  .auth-promise { order: 2; margin: 36px 0 28px; padding: 0; }
-  .auth-card { order: 3; width: 100%; max-width: 520px; margin: 0; }
-  .flow { order: 4; width: 100%; max-width: 520px; margin: 36px 0 0; }
-  .auth-next { order: 5; width: 100%; max-width: 520px; margin: 20px 0 0; }
   .sidebar { transform: translateX(-100%); transition: transform 180ms ease; }
   .sidebar.open { transform: translateX(0); }
   .mobile-close { display: grid; }
@@ -646,9 +703,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 
 @media (max-width: 580px) {
   .auth-stage { padding: 24px 16px 40px; }
-  .auth-promise { margin: 36px 0 24px; }
-  .auth-promise p { font-size: var(--type-md); }
-  .auth-card { padding: 26px 22px; }
   .topbar { height: 57px; padding: 0 16px; }
   .breadcrumbs { font-size: var(--type-xs); }
   .topbar-actions { gap: 0; }
@@ -1105,18 +1159,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .agent-runs .agent-run-control { color: var(--success); font-weight: 600; }
 @media (max-width: 640px) { .agent-runs dl { grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 0; } .agent-runs dd { margin-bottom: 8px; } }
 
-/* First impression. The demo is the one obvious action. */
-.auth-proof { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 26px 0 0; padding: 0; list-style: none; }
-.auth-proof li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); }
-.auth-proof svg { width: 16px; height: 16px; color: var(--ink); }
-.auth-demo-button { min-height: 54px; font-size: var(--type-base); box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 8px 24px -12px var(--accent); transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease), box-shadow var(--duration-base) var(--ease); }
-.auth-demo-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 12px 28px -12px var(--accent); }
-.auth-demo-button:active:not(:disabled) { transform: translateY(0); }
-.auth-demo-button svg { transition: transform var(--duration-fast) var(--ease); }
-.auth-demo-button:hover:not(:disabled) svg { transform: translateX(3px); }
-.auth-demo-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 12px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--type-xs); }
-.auth-demo-facts li { display: inline-flex; align-items: center; gap: 6px; }
-.auth-demo-facts li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
 
 /* Images appear without popping. The letter shows first and the icon fades in over it. */
 .product-mark, .checkout-product-mark { position: relative; }
@@ -1129,19 +1171,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .paypal-button-slot { opacity: 0; transition: opacity var(--duration-base) var(--ease); }
 .paypal-button-slot.ready { opacity: 1; }
 .paypal-button-skeleton { position: absolute; inset: 0 0 auto; height: 48px; border-radius: 6px; background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-hover) 50%, var(--surface-subtle) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s linear infinite; }
-/* Keep planned work visible without letting it compete with the working demo. */
-.auth-next { width: min(470px, 100%); display: flex; align-items: baseline; gap: 10px; margin: 20px 0 auto; color: var(--muted); font-size: var(--type-xs); line-height: 1.5; }
-.auth-next span { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--surface-hover); font-size: var(--type-2xs); font-weight: 600; }
 
-/* Keep the demo card in view while the intro scrolls, its top in line with the wordmark. */
-@media (min-width: 861px) {
-  .auth-card { align-self: start; position: sticky; top: clamp(28px, 5vw, 72px); margin-top: clamp(28px, 5vw, 72px); }
-}
 /* Keep the whole sample flow, revenue included, above the fold on laptop screens. */
 @media (min-width: 861px) and (max-height: 980px) {
-  .auth-promise { padding: 24px 0 22px; }
-  .auth-promise h1 { font-size: clamp(2.4rem, 1.5rem + 2.3vw, 3.3rem); }
-  .auth-promise p { margin-top: 12px; font-size: var(--type-md); }
   .auth-proof { margin-top: 18px; }
   .flow-example { margin-bottom: 14px; }
   .flow-step { padding-bottom: 8px; }

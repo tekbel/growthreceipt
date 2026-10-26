@@ -14,7 +14,7 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 await page.goto(BASE);
-await page.getByRole("button", { name: "Try the judge demo" }).click();
+await page.getByRole("button", { name: "Try the judge demo" }).first().click();
 await page.getByRole("button", { name: "Close tour" }).click({ timeout: 30_000 });
 await page.getByRole("button", { name: "Results", exact: true }).first().click();
 

@@ -19,7 +19,10 @@ async function enterJudgeDemo(page: Page, { keepTour = false } = {}) {
 	await expect(
 		page.getByRole("heading", { name: "Know which posts generate revenue." }),
 	).toBeVisible();
-	await page.getByRole("button", { name: "Try the judge demo" }).click();
+	await page
+		.getByRole("button", { name: "Try the judge demo" })
+		.first()
+		.click();
 	await expect(
 		page.getByRole("button", { name: "Today", exact: true }),
 	).toBeVisible({
@@ -168,7 +171,9 @@ test("guided tour walks a first time judge through the loop", async ({
 
 test("home page explains the full revenue loop", async ({ page }) => {
 	await page.goto("/");
-	const trigger = page.getByRole("button", { name: "See the full revenue loop" });
+	const trigger = page
+		.getByRole("button", { name: "See the full revenue loop" })
+		.first();
 	await trigger.click();
 	const loop = page.getByRole("dialog", {
 		name: "From approved post to verified revenue",

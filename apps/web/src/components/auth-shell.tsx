@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import {
   type CSSProperties,
   type FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -26,6 +27,7 @@ import { setWorkspaceTimeZone } from "@/lib/time";
 const RevenueLoop = dynamic(() => import("@/components/revenue-loop"), { ssr: false });
 
 type AuthState = "loading" | "signed-out" | "bootstrapping" | "ready" | "error";
+type JudgeButton = "header" | "hero" | "end";
 
 export function AuthShell() {
   const [state, setState] = useState<AuthState>(supabaseConfigured ? "loading" : "ready");
@@ -48,6 +50,9 @@ export function AuthShell() {
   const [submitting, setSubmitting] = useState(false);
   // Which button started the wait, so only that one shows the busy label.
   const [pending, setPending] = useState<"judge" | "google" | "email" | null>(null);
+  // Three buttons open the demo, so a failure shows next to the one that was used.
+  const [judgeFrom, setJudgeFrom] = useState<JudgeButton>("hero");
+  const [loopOpen, setLoopOpen] = useState(false);
   const captcha = useTurnstile();
   const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
@@ -119,11 +124,12 @@ export function AuthShell() {
     };
   }, [bootstrap]);
 
-  async function enterJudgeDemo() {
+  async function enterJudgeDemo(from: JudgeButton) {
     const supabase = getSupabase();
     if (!supabase) return;
     setSubmitting(true);
     setPending("judge");
+    setJudgeFrom(from);
     setError(null);
     const { error: signInError } = await supabase.auth.signInAnonymously({
       options: { captchaToken: captcha.token ?? undefined },
@@ -179,6 +185,15 @@ export function AuthShell() {
     setSubmitting(false);
   }
 
+  // The header Sign in goes to the sign in panel at the end of the page and puts focus there.
+  function showSignIn() {
+    const panel = document.getElementById("sign-in");
+    if (!panel) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    panel.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" });
+    (document.getElementById("sign-in-email") ?? panel).focus({ preventScroll: true });
+  }
+
   async function signOut() {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -230,154 +245,223 @@ export function AuthShell() {
     );
   }
   if (state === "signed-out") {
+    const demoButton = (from: JudgeButton, className: string) => (
+      <button
+        className={`button accent home-demo ${className}`}
+        type="button"
+        disabled={submitting || captchaPending}
+        onClick={() => void enterJudgeDemo(from)}
+      >
+        {submitting && pending === "judge" && judgeFrom === from ? (
+          <BusyLabel text="Opening your demo" />
+        ) : (
+          "Try the judge demo"
+        )}
+        <ArrowRight aria-hidden="true" />
+      </button>
+    );
+    const loopButton = (className: string) => (
+      <button
+        className={`button ${className}`}
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setLoopOpen(true)}
+      >
+        See the full revenue loop
+      </button>
+    );
+    const judgeError = (where: "top" | "end") =>
+      error && pending === "judge" && (judgeFrom === "end") === (where === "end") ? (
+        <p className="inline-error" role="alert">
+          {error}
+        </p>
+      ) : null;
+    const demoFacts = (
+      <ul className="auth-demo-facts">
+        <li>No account</li>
+        <li>PayPal sandbox</li>
+        <li>No real money</li>
+      </ul>
+    );
     return (
-      <main className="auth-stage">
-        <section className="auth-intro">
-          <div className="auth-wordmark">
-            <span>
-              <ReceiptText aria-hidden="true" />
-            </span>
-            GrowthReceipt
+      <div className="home">
+        <header className="home-header">
+          <div className="home-wrap">
+            <div className="auth-wordmark">
+              <span>
+                <ReceiptText aria-hidden="true" />
+              </span>
+              GrowthReceipt
+            </div>
+            <nav aria-label="Get started">
+              {loopButton("ghost home-loop-link")}
+              <button className="button secondary" type="button" onClick={showSignIn}>
+                Sign in
+              </button>
+              {demoButton("header", "")}
+            </nav>
           </div>
-          <div className="auth-promise">
-            <span className="eyebrow">
-              For indie founders and small teams selling digital products
-            </span>
-            <h1>Know which posts generate revenue.</h1>
-            <p>
-              See how each post contributes to sales through purchases verified by PayPal. The AI
-              agent identifies your best performing content and recommends what to post next to
-              increase sales, with every recommendation subject to your approval.
-            </p>
-            <ul className="auth-proof" aria-label="Built with">
-              <li>
-                <SiPaypal aria-hidden="true" />
-                PayPal Orders, Web SDK v6 and verified webhooks
-              </li>
-              <li>
-                <Bot aria-hidden="true" />
-                OpenAI agents with human approval
-              </li>
-            </ul>
-          </div>
-          <SampleFlow />
+        </header>
+        <main>
+          <section className="home-wrap home-hero">
+            <div className="home-copy">
+              <span className="eyebrow">
+                For indie founders and small teams selling digital products
+              </span>
+              <h1>Know which posts generate revenue.</h1>
+              <p>
+                See how each post contributes to sales through purchases verified by PayPal. The AI
+                agent identifies your best performing content and recommends what to post next to
+                increase sales, with every recommendation subject to your approval.
+              </p>
+              <div className="home-actions">
+                {demoButton("hero", "")}
+                {loopButton("outline")}
+              </div>
+              {demoFacts}
+              {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
+              {judgeError("top")}
+              <ul className="auth-proof" aria-label="Built with">
+                <li>
+                  <SiPaypal aria-hidden="true" />
+                  PayPal Orders, Web SDK v6 and verified webhooks
+                </li>
+                <li>
+                  <Bot aria-hidden="true" />
+                  OpenAI agents with human approval
+                </li>
+              </ul>
+            </div>
+            <figure className="home-shot">
+              <div className="home-shot-bar" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              {(["light", "dark"] as const).map((theme) => (
+                // biome-ignore lint/performance/noImgElement: static screenshots swapped by theme in CSS.
+                <img
+                  key={theme}
+                  className={`${theme}-only`}
+                  src={`/home/results-${theme}.webp`}
+                  alt="The Results page of the judge demo after a PayPal sandbox purchase, with 9.00 USD of verified revenue credited to one post"
+                  width={1600}
+                  height={911}
+                  decoding="async"
+                  fetchPriority={theme === "light" ? "high" : "low"}
+                />
+              ))}
+            </figure>
+          </section>
+          <section className="home-band">
+            <SampleFlow loopButton={loopButton("outline")} />
+          </section>
+          <section className="home-wrap home-cta" aria-labelledby="sign-in-title">
+            <div className="home-cta-copy">
+              <span className="home-kicker">PayPal AI Hackathon 2026</span>
+              <h2 id="sign-in-title">The loop in 90 seconds</h2>
+              <p>
+                Approve a post, buy it through PayPal sandbox, and watch the payment change the
+                agent's next recommendation.
+              </p>
+              <div className="home-actions">{demoButton("end", "")}</div>
+              {demoFacts}
+              {judgeError("end")}
+            </div>
+            <div className="home-signin" id="sign-in" tabIndex={-1}>
+              <div className="auth-divider">
+                <span>or keep your workspace</span>
+              </div>
+              {googleAuthEnabled ? (
+                <button
+                  className="button secondary auth-provider-button"
+                  type="button"
+                  disabled={submitting || captchaPending}
+                  onClick={() => void signInWithGoogle()}
+                >
+                  {submitting && pending === "google" ? (
+                    <BusyLabel text="Opening Google" />
+                  ) : (
+                    "Continue with Google"
+                  )}
+                </button>
+              ) : null}
+              {emailSent ? (
+                <div className="auth-sent" role="status">
+                  <span className="auth-sent-mark">
+                    <Mail aria-hidden="true" />
+                  </span>
+                  <strong>Check your email</strong>
+                  <p>
+                    We sent a sign in link to <b>{email.trim()}</b>. It works once and expires in
+                    one hour.
+                  </p>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={submitting || captchaPending || resendIn > 0}
+                    onClick={() => void requestLink()}
+                  >
+                    {resendIn > 0 ? `Resend link in ${resendIn}s` : "Resend link"}
+                  </button>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => {
+                      setEmailSent(false);
+                      setResendIn(0);
+                    }}
+                  >
+                    Use a different email
+                  </button>
+                </div>
+              ) : (
+                <form className="auth-email" onSubmit={sendMagicLink}>
+                  <label htmlFor="sign-in-email">Email address</label>
+                  <div>
+                    <Mail aria-hidden="true" />
+                    <input
+                      id="sign-in-email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      required
+                    />
+                  </div>
+                  <button
+                    className="button secondary"
+                    type="submit"
+                    disabled={submitting || captchaPending}
+                  >
+                    {submitting && pending === "email" ? (
+                      <BusyLabel text="Sending your link" />
+                    ) : (
+                      "Email me a sign in link"
+                    )}
+                  </button>
+                </form>
+              )}
+              {error && pending !== "judge" ? (
+                <p className="inline-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+          </section>
+        </main>
+        <footer className="home-wrap home-footer">
           <p className="auth-next">
             <span>Planned</span>
             PayPal subscriptions, disputes and more publishing channels.
           </p>
-        </section>
-        <section className="auth-card" aria-labelledby="sign-in-title">
-          <div>
-            <span className="eyebrow">PayPal AI Hackathon 2026</span>
-            <h2 id="sign-in-title">The loop in 90 seconds</h2>
-            <p>
-              Approve a post, buy it through PayPal sandbox, and watch the payment change the
-              agent's next recommendation.
-            </p>
-          </div>
-          <button
-            className="button accent auth-demo-button"
-            type="button"
-            disabled={submitting || captchaPending}
-            onClick={() => void enterJudgeDemo()}
-          >
-            {submitting && pending === "judge" ? (
-              <BusyLabel text="Opening your demo" />
-            ) : (
-              "Try the judge demo"
-            )}
-            <ArrowRight aria-hidden="true" />
-          </button>
-          <ul className="auth-demo-facts">
-            <li>No account</li>
-            <li>PayPal sandbox</li>
-            <li>No real money</li>
-          </ul>
-          {turnstileSiteKey ? <div className="auth-captcha" ref={captcha.ref} /> : null}
-          <div className="auth-divider">
-            <span>or keep your workspace</span>
-          </div>
-          {googleAuthEnabled ? (
-            <button
-              className="button secondary auth-provider-button"
-              type="button"
-              disabled={submitting || captchaPending}
-              onClick={() => void signInWithGoogle()}
-            >
-              {submitting && pending === "google" ? (
-                <BusyLabel text="Opening Google" />
-              ) : (
-                "Continue with Google"
-              )}
-            </button>
-          ) : null}
-          {emailSent ? (
-            <div className="auth-sent" role="status">
-              <span className="auth-sent-mark">
-                <Mail aria-hidden="true" />
-              </span>
-              <strong>Check your email</strong>
-              <p>
-                We sent a sign in link to <b>{email.trim()}</b>. It works once and expires in one
-                hour.
-              </p>
-              <button
-                className="button secondary"
-                type="button"
-                disabled={submitting || captchaPending || resendIn > 0}
-                onClick={() => void requestLink()}
-              >
-                {resendIn > 0 ? `Resend link in ${resendIn}s` : "Resend link"}
-              </button>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => {
-                  setEmailSent(false);
-                  setResendIn(0);
-                }}
-              >
-                Use a different email
-              </button>
-            </div>
-          ) : (
-            <form className="auth-email" onSubmit={sendMagicLink}>
-              <label htmlFor="sign-in-email">Email address</label>
-              <div>
-                <Mail aria-hidden="true" />
-                <input
-                  id="sign-in-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-              </div>
-              <button
-                className="button secondary"
-                type="submit"
-                disabled={submitting || captchaPending}
-              >
-                {submitting && pending === "email" ? (
-                  <BusyLabel text="Sending your link" />
-                ) : (
-                  "Email me a sign in link"
-                )}
-              </button>
-            </form>
-          )}
-          {error ? (
-            <p className="inline-error" role="alert">
-              {error}
-            </p>
-          ) : null}
           <a className="auth-legal" href="/privacy">
             Privacy policy
           </a>
-        </section>
-      </main>
+        </footer>
+        {loopOpen ? <RevenueLoop onClose={() => setLoopOpen(false)} /> : null}
+      </div>
     );
   }
   return (
@@ -427,61 +511,55 @@ const flowSteps = [
   { label: "Next move", detail: "Learned from the purchase", actor: "Agent" },
 ];
 
-function SampleFlow() {
+function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
   const last = flowSteps.length - 1;
-  const [loopOpen, setLoopOpen] = useState(false);
   return (
-    <figure className="flow" aria-labelledby="flow-caption">
+    <figure className="home-wrap flow" aria-labelledby="flow-caption">
       <figcaption id="flow-caption" className="flow-head">
-        <span>How it works</span>
+        <span className="home-kicker">How it works</span>
         <span>Sample from the judge demo</span>
       </figcaption>
-      <p className="flow-example">
-        {/* biome-ignore lint/performance/noImgElement: a small static icon. */}
-        <img src="/products/launchcheck.svg" alt="" width={20} height={20} decoding="async" />
-        <span>
-          The demo markets{" "}
-          <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
-            LaunchCheck
-          </a>
-          , an example product that scans a launch page for speed, SEO and structure issues.
-        </span>
-      </p>
-      <ol className="flow-steps">
-        {flowSteps.map(({ label, detail, actor }, index) => (
-          <li
-            key={label}
-            className={index === last ? "flow-step current" : "flow-step"}
-            style={{ "--i": index } as CSSProperties}
-          >
-            <span className="flow-mark">
-              {index === last ? index + 1 : <Check aria-hidden="true" />}
-            </span>
-            <span className="flow-copy">
+      <div className="flow-grid">
+        <ol className="flow-steps">
+          {flowSteps.map(({ label, detail, actor }, index) => (
+            <li
+              key={label}
+              className={index === last ? "flow-step current" : "flow-step"}
+              style={{ "--i": index } as CSSProperties}
+            >
+              <span className="flow-step-top">
+                <span className="flow-actor">{actor}</span>
+                <span className="flow-mark">
+                  {index === last ? index + 1 : <Check aria-hidden="true" />}
+                </span>
+              </span>
               <strong>{label}</strong>
               <span>{detail}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="flow-side">
+          <p className="flow-example">
+            {/* biome-ignore lint/performance/noImgElement: a small static icon. */}
+            <img src="/products/launchcheck.svg" alt="" width={22} height={22} decoding="async" />
+            <span>
+              The demo markets{" "}
+              <a href="https://launchcheck.addisstack.com" target="_blank" rel="noopener">
+                LaunchCheck
+              </a>
+              , an example product that scans a launch page for speed, SEO and structure issues.
             </span>
-            <span className="flow-actor">{actor}</span>
-          </li>
-        ))}
-      </ol>
-      <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
-        <BadgeCheck aria-hidden="true" />
-        <span>Attributed revenue</span>
-        <strong>
-          <CountUp to={9} delayMs={(flowSteps.length + 1) * 160} /> USD
-        </strong>
+          </p>
+          <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
+            <BadgeCheck aria-hidden="true" />
+            <span>Attributed revenue</span>
+            <strong>
+              <CountUp to={9} delayMs={(flowSteps.length + 1) * 160} /> USD
+            </strong>
+          </div>
+          {loopButton}
+        </div>
       </div>
-      <button
-        className="text-button loop-trigger"
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setLoopOpen(true)}
-      >
-        See the full revenue loop
-        <ArrowRight aria-hidden="true" />
-      </button>
-      {loopOpen ? <RevenueLoop onClose={() => setLoopOpen(false)} /> : null}
     </figure>
   );
 }

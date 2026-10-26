@@ -13,14 +13,14 @@ const page = await browser.newPage({
 });
 
 await page.goto(BASE);
-await page.getByRole("button", { name: "See the full revenue loop" }).click();
+await page.getByRole("button", { name: "See the full revenue loop" }).first().click();
 const loop = page.getByRole("dialog");
 await loop.getByRole("button", { name: /^Next post/ }).click();
 await page.waitForTimeout(500);
 await loop.locator(".loop-stages").screenshot({ path: `${out}loop.png` });
 await page.keyboard.press("Escape");
 
-await page.getByRole("button", { name: "Try the judge demo" }).click();
+await page.getByRole("button", { name: "Try the judge demo" }).first().click();
 await page.getByRole("button", { name: "Close tour" }).click({ timeout: 30_000 });
 for (const [name, file] of [
 	["Results", "results"],
