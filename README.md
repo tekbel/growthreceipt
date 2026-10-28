@@ -39,7 +39,7 @@ The hosted suite also runs daily from `.github/workflows/smoke.yml`. Add `E2E_PA
 
 ## Background
 
-The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original V1 plan is kept below for reference.
+The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original plan lives in [SPEC.md](./SPEC.md) and [ARCHITECTURE.md](./ARCHITECTURE.md). Parts of it, such as Buffer scheduling, Telegram and Stripe, were never built.
 
 ## Current implementation
 
@@ -125,80 +125,35 @@ Setup (full runbook with every form value in [docs/integrations/linkedin.md](./d
 
 Without these variables the Integrations page keeps the share link behaviour. LinkedIn access tokens last 60 days and self serve apps get no refresh token, so the founder reconnects when the Integrations page says the connection expired. The API checks for due posts every five minutes, and a claim column stops two replicas from posting the same item.
 
+## Security notes
+
+- PayPal webhooks are accepted only after PayPal verifies the signature. Each event ID is stored once, so a repeated notification never counts revenue twice.
+- Revenue counts only completed captures. A pending capture is not revenue, and a fully refunded purchase leaves the evidence.
+- The buy link decides the attribution and the price on the server. It resolves the post, campaign and offer, and refuses posts that are not approved.
+- Every query is scoped to the signed in workspace, and the Supabase tables have row level security on.
+- The agent's PayPal tool only accepts order IDs from the campaign's own paid receipts. Human approval of a next move is enforced by the API, not only the interface.
+- The page reader fetches only https pages on public addresses, checks each redirect, and caps size and time.
+- LinkedIn tokens are encrypted at rest, and the sign in state is signed so a forged callback cannot attach a profile to another workspace.
+- Secrets live in environment variables and never in the repository. The sandbox buyer login is shared only in sandbox mode. The full git history was scanned with `gitleaks`.
+- Agent runs have daily limits per workspace and in total.
+
+## Known limitations
+
+- PayPal sandbox only. Buyers pay one GrowthReceipt sandbox merchant. Founders connecting their own PayPal account is planned.
+- Only purchases made through a post's buy link are attributed. A sale that skips the link is not credited to any post.
+- One time purchases only. Subscriptions are planned.
+- The agent picks offers from a fixed catalog, not from the founder's own products.
+- Automatic posting covers LinkedIn personal profiles. X and Facebook open the official share composer, Instagram gets a copy button, and views and clicks are not imported.
+- Small samples stay small. Fewer than 3 purchases on the leading post is labeled an early signal, and the agent is told not to call a winner.
+- LinkedIn self serve tokens last 60 days with no refresh, so founders reconnect.
+- Sign up captcha is off during judging so judges are not blocked.
+
 ## Documents
 
-- [SPEC.md](./SPEC.md) defines the product, V1 scope, user stories, data model, API surface, agent contracts, security, analytics, and acceptance criteria.
-- [ARCHITECTURE.md](./ARCHITECTURE.md) defines the recommended technical design and key decisions.
-- [PROMPTS.md](./PROMPTS.md) contains sequential implementation prompts for a coding agent. Run them in order.
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
 - [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers the questions judges ask most: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
-
-## Recommended build order
-
-1. Foundation, authentication, tenancy, and local development
-2. Product Brain onboarding
-3. Campaign strategy generation
-4. Content generation and review
-5. Approval workflow and audit log
-6. Buffer scheduling
-7. Metrics ingestion and weekly learning report
-8. Telegram bot and Mini App shell
-9. Billing and public SaaS controls
-10. Production hardening
-
-## V1 completion test
-
-A user can:
-
-1. Create a workspace and product.
-2. Generate a structured Product Brain from a URL and manual inputs.
-3. Set a measurable marketing objective.
-4. Generate a seven-day campaign and channel-specific drafts.
-5. Edit, approve, reject, and regenerate individual drafts.
-6. Schedule approved supported-channel posts through Buffer.
-7. See publication status and imported post metrics.
-8. Receive a weekly report containing evidence, confidence, and recommended next actions.
-9. Review and approve the same campaign from Telegram.
-
-No agent may publish, spend money, change billing, or connect an external account without an explicit user action.
-
-## Opinionated V1 stack
-
-- Web: Next.js, TypeScript, Tailwind CSS, shadcn/ui
-- API: FastAPI, Python, Pydantic
-- Agent runtime: OpenAI Agents API with hosted execution and structured Pydantic outputs
-- Data, auth, storage: Supabase Postgres, Auth, Storage, Row Level Security
-- Jobs: Trigger.dev or a Postgres-backed worker behind a small interface
-- Social publishing: Buffer API for currently supported channels
-- Product analytics: PostHog
-- Billing: Stripe on the web
-- Telegram: Bot API plus a Mini App using the shared web frontend and backend
-- Hosting: Vercel for web, Railway or Fly.io for API and worker
-
-## Explicit non-goals for V1
-
-- Fully autonomous publishing
-- Autonomous ad spend
-- A custom social scheduling engine
-- Direct integrations with every social network
-- Competitor scraping at scale
-- Video or image generation pipelines
-- Multi-agent swarms
-- White-label agency features
-- Marketing attribution beyond first-party events and imported post metrics
-
-## External assumptions to verify before implementation
-
-Provider APIs, pricing, scopes, rate limits, and platform policies can change. Recheck official documentation when implementing each integration. As verified on 2026-10-07:
-
-- Buffer exposes GraphQL post creation and scheduling. Its documented API channel list does not include TikTok.
-- Telegram Mini Apps require server-side validation of `initData`. Digital goods and services sold inside Telegram must use Telegram Stars.
-- The OpenAI Agents SDK supports structured outputs, tools, guardrails, human approval, sessions, MCP, and tracing.
-
-## First command for a coding agent
-
-Open `PROMPTS.md` and execute Prompt 00. Do not run all prompts in one unreviewed pass.
+- [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md) and [PROMPTS.md](./PROMPTS.md) are the original pre hackathon plan and build prompts, kept as background. They describe more than GrowthReceipt ships.

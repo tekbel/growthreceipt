@@ -28,3 +28,5 @@ web-proto-type-skill/
 scripts/sandbox_purchases.mjs
 plan.json
 
+# Written by the local SessionEnd hook
+reference_last_session.md
