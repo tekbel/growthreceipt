@@ -3,19 +3,19 @@
 :root {
   color-scheme: light;
   --font-sans: "Figtree Variable", "Figtree", system-ui, sans-serif;
-  --canvas: #ffffff;
-  --stage: #f5f8fa;
+  --canvas: #f3f5f7;
+  --stage: #e9edf1;
   --surface: #ffffff;
-  --surface-subtle: #f6f7f9;
-  --surface-hover: #eceff3;
-  --ink: #22282f;
-  --ink-soft: #515e71;
-  --muted: #66768a;
-  --line: #e3e7ec;
-  --line-strong: #c9d0da;
-  --accent: #3a5bc7;
-  --accent-strong: #2c49a8;
-  --accent-soft: #ebf0fc;
+  --surface-subtle: #eef1f4;
+  --surface-hover: #e9edf1;
+  --ink: #111a26;
+  --ink-soft: #4a5666;
+  --muted: #5c6877;
+  --line: #dfe4ea;
+  --line-strong: #d3d9e0;
+  --accent: #4458b8;
+  --accent-strong: #36479a;
+  --accent-soft: #e5e9fb;
   --success: #287a59;
   --success-soft: #e8f3ed;
   --warning: #8b6818;
@@ -61,26 +61,26 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 /* layout.tsx sets data-theme on <html> before first paint, from storage or the OS. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0d1824;
-  --stage: #0a141e;
-  --surface: #13202d;
-  --surface-subtle: #182736;
-  --surface-hover: #1e2f41;
-  --ink: #eef2f6;
-  --ink-soft: #c3cdd8;
-  --muted: #93a2b3;
-  --line: #24364a;
-  --line-strong: #33495f;
-  --accent: #8ea6ec;
-  --accent-strong: #aabcf2;
-  --accent-soft: #1d2b4d;
+  --canvas: #0b111a;
+  --stage: #080d14;
+  --surface: #111a26;
+  --surface-subtle: #152030;
+  --surface-hover: #192536;
+  --ink: #f3f5f7;
+  --ink-soft: #c9d2dc;
+  --muted: #a0adbc;
+  --line: #1f2b3b;
+  --line-strong: #273447;
+  --accent: #9fb2ff;
+  --accent-strong: #bac5ff;
+  --accent-soft: #202a43;
   --success: #83c9a9;
   --success-soft: #243a30;
   --warning: #dfc06c;
   --warning-soft: #3e3724;
   --danger: #ee9b9f;
   --danger-soft: #432b2d;
-  --on-accent: #0b1830;
+  --on-accent: #101727;
   --shadow: 0 16px 44px rgb(0 0 0 / 20%);
 }
 
