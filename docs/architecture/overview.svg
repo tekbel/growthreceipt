@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="Figtree, system-ui, sans-serif">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&amp;display=swap');
-    .box { fill: #13202d; stroke: #33495f; stroke-width: 1.5; }
-    .actor { fill: #182736; stroke: #8ea6ec; stroke-width: 1.5; }
+    .box { fill: #111a26; stroke: #273447; stroke-width: 1.5; }
+    .actor { fill: #152030; stroke: #9fb2ff; stroke-width: 1.5; }
     .title { fill: #eef2f6; font-size: 24px; font-weight: 600; }
     .sub { fill: #93a2b3; font-size: 17px; }
     .line { stroke: #5d7390; stroke-width: 2; fill: none; marker-end: url(#arrow); }
     .dash { stroke-dasharray: 7 7; }
     .tag { fill: #c3cdd8; font-size: 15px; }
-    .num { fill: #8ea6ec; }
-    .numt { fill: #0b1830; font-size: 15px; font-weight: 600; text-anchor: middle; }
+    .num { fill: #9fb2ff; }
+    .numt { fill: #101727; font-size: 15px; font-weight: 600; text-anchor: middle; }
     .step { fill: #eef2f6; font-size: 19px; font-weight: 600; }
     .stepd { fill: #93a2b3; font-size: 16px; }
   </style>
@@ -67,7 +67,7 @@
   <text class="title" x="494" y="510">Web app</text>
   <text class="sub" x="494" y="542">Next.js on Railway</text>
 
-  <rect class="box" x="760" y="460" width="260" height="120" rx="18" fill="#182736"/>
+  <rect class="box" x="760" y="460" width="260" height="120" rx="18" fill="#152030"/>
   <text class="title" x="786" y="510">GrowthReceipt API</text>
   <text class="sub" x="786" y="542">FastAPI on Railway</text>
 
@@ -85,7 +85,7 @@
   <text class="sub" x="786" y="882">Postgres and Auth</text>
 
   <!-- Step panel -->
-  <rect x="1360" y="190" width="500" height="830" rx="22" fill="#13202d" stroke="#24364a" stroke-width="1.5"/>
+  <rect x="1360" y="190" width="500" height="830" rx="22" fill="#111a26" stroke="#1f2b3b" stroke-width="1.5"/>
   <text x="1396" y="240" fill="#93a2b3" font-size="16" font-weight="600" letter-spacing="1.5">THE LOOP</text>
 
   <g transform="translate(1396 280)">
