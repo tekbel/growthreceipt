@@ -46,75 +46,129 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
+  autonumber
   actor Buyer
-  participant Buy as Buy page
-  participant API
-  participant PayPal
-  participant DB as Postgres
+  box Browser
+    participant Buy as Buy page
+  end
+  box GrowthReceipt
+    participant API
+    participant DB as Postgres
+  end
+  box PayPal sandbox
+    participant PayPal
+  end
   Buyer->>Buy: Opens the buy link of an approved post
   Buy->>API: GET /v1/public/offers/{content_id}
-  API-->>Buy: Pack and price from the catalog
+  alt Post is not approved
+    API-->>Buy: 404, no checkout for unreviewed content
+  else Approved
+    API-->>Buy: Pack and price from the catalog
+  end
   Buyer->>Buy: Clicks the PayPal button
   Buy->>API: Create order
+  Note over Buy,API: The browser never sends a price
   API->>PayPal: Create order at the catalog price
+  Note over API,PayPal: custom_id is the post's attribution ID<br/>reference_id is the offer
   API->>DB: Order linked to campaign and post
   Buyer->>PayPal: Approves the payment
   Buy->>API: Capture
-  API->>PayPal: Capture with a request ID
-  API->>DB: Capture stored, counted only when COMPLETED
+  API->>PayPal: Capture with a PayPal-Request-Id
+  alt Capture status is COMPLETED
+    rect rgba(68, 88, 184, 0.12)
+      API->>DB: Verified revenue credited to the post
+    end
+  else PENDING or DECLINED
+    API-->>Buy: 409, not counted as revenue
+  end
   PayPal->>API: POST /v1/paypal/webhooks
   API->>PayPal: Verify the signature
-  API->>DB: Webhook stored as proof
+  alt Signature invalid
+    API-->>PayPal: 400, event refused
+  else Event ID already stored
+    API->>DB: Ignored, revenue counted once
+  else New verified event
+    API->>DB: Stored as a second proof of the capture
+  end
 ```
 
 ### Next move checked with PayPal
 
 ```mermaid
 sequenceDiagram
+  autonumber
   actor Founder
-  participant API
-  participant Agent as OpenAI agent
-  participant PayPal
-  participant DB as Postgres
+  box GrowthReceipt
+    participant API
+    participant DB as Postgres
+  end
+  box OpenAI
+    participant Agent as Revenue learning agent
+  end
+  box PayPal sandbox
+    participant PayPal
+  end
   Founder->>API: POST /v1/agents/next-action
-  API->>DB: Paid orders of this campaign
+  API->>DB: Paid orders of this campaign, full refunds left out
   API->>API: Code ranks posts and labels the evidence
+  Note over API: none, early, leader, tie or mixed<br/>decided in code, not by the model
   API->>Agent: Evidence and the orders to check
-  loop Each cited order, this campaign only
+  loop Each cited order, at most 5, this campaign only
     Agent->>API: get_paypal_order
     API->>PayPal: Get order
     API-->>Agent: confirmed, mismatch, not_found or unavailable
   end
   Agent-->>API: One next move, typed output
-  API->>DB: Recommendation and checks saved
-  API-->>Founder: Next move with Checked with PayPal
-  Founder->>API: Approve or reject
+  alt Output skips human approval
+    API-->>Founder: 502, run refused
+  else Approval required
+    API->>DB: Recommendation and checks saved
+    API-->>Founder: Next move with Checked with PayPal
+  end
+  rect rgba(68, 88, 184, 0.12)
+    Founder->>API: Approve, edit or reject
+    Note over Founder,API: Nothing changes until the founder decides
+  end
 ```
 
 ### Campaign draft that survives a reload
 
 ```mermaid
 sequenceDiagram
+  autonumber
   actor Founder
-  participant Web
-  participant API
-  participant Job as Detached run
-  participant DB as agent_jobs
+  box Browser
+    participant Web
+  end
+  box GrowthReceipt
+    participant API
+    participant Job as Detached run
+    participant DB as agent_jobs
+  end
   Founder->>Web: Submits the brief
   Web->>API: POST /v1/campaigns/stream
   API->>DB: Job row, status running
   API->>Job: Starts the draft outside the request
-  loop Every 15 seconds
-    Job->>DB: Heartbeat
+  Note over API,Job: A dropped request cannot cancel the run
+  par Heartbeat
+    loop Every 15 seconds
+      Job->>DB: Heartbeat
+    end
+  and Progress
+    Job->>DB: Each progress step
+    API-->>Web: Steps as server sent events
   end
-  Job->>DB: Each progress step
-  API-->>Web: Steps as server sent events
-  Founder->>Web: Reloads or leaves the page
-  Web->>API: GET /v1/agent-jobs
-  Web->>API: GET /v1/agent-jobs/{id}/stream
-  API-->>Web: Every step so far, then new ones
+  opt Founder reloads or leaves the page
+    Web->>API: GET /v1/agent-jobs
+    Web->>API: GET /v1/agent-jobs/{id}/stream
+    API-->>Web: Every step so far, then new ones
+  end
   Job->>DB: Campaign saved, status succeeded
   API-->>Web: Campaign
+  rect rgba(68, 88, 184, 0.12)
+    Founder->>Web: Reviews and approves each post
+    Note over Founder,Web: No post gets a buy link before approval
+  end
   Note over DB: A running job with no update for 90 seconds reads as interrupted
 ```
 
