@@ -27,19 +27,49 @@ Each diagram is drawn from the code. A change to one of these flows updates its 
 ### System
 
 ```mermaid
-flowchart LR
-  founder([Founder]) --> web[Next.js web app]
-  buyer([Buyer]) --> buy[Public buy page]
-  web --> api[FastAPI API]
-  buy --> api
-  buy --> sdk[PayPal JS SDK v6]
-  api --> db[(Postgres on Supabase)]
-  api --> openai[OpenAI Agents API]
-  api --> orders[PayPal Orders v2]
-  paypalhook[PayPal webhooks] --> api
-  web --> studio[AG Studio dashboard]
-  studio --> api
-  api --> linkedin[LinkedIn API]
+flowchart TB
+  founder([Founder])
+  buyer([Buyer])
+
+  subgraph browser [Browser]
+    direction LR
+    web[Next.js workspace<br/>AG Studio dashboard and AG Grid evidence]
+    buy[Public buy page<br/>PayPal JS SDK v6]
+  end
+
+  subgraph gr [GrowthReceipt on Railway]
+    direction LR
+    api[FastAPI API<br/>attribution, evidence ranking, approvals]
+    db[(Postgres on Supabase<br/>campaigns, receipts, webhook proofs, agent runs)]
+  end
+
+  subgraph paypal [PayPal sandbox]
+    direction LR
+    orders[Orders API v2<br/>create, capture, look up]
+    hooks[Webhooks<br/>signed events]
+  end
+
+  subgraph ai [OpenAI]
+    agents[Agents API<br/>campaign, next move, follow up, revise]
+  end
+
+  linkedin[LinkedIn API<br/>publish approved posts]
+
+  founder -->|Approves posts and next moves| web
+  buyer -->|Opens the buy link of an approved post| buy
+  web -->|Signed in requests| api
+  buy -->|Create and capture, never a price| api
+  api -->|Order with custom_id = post| orders
+  hooks -->|Signature verified, stored once| api
+  api -->|Evidence decided in code| agents
+  agents -->|get_paypal_order tool| api
+  api --> db
+  api -->|Only approved posts| linkedin
+
+  classDef human fill:#4458b8,stroke:#36479a,color:#ffffff
+  classDef gate fill:#e8ebf8,stroke:#4458b8,color:#1b2240
+  class founder,buyer human
+  class web,api gate
 ```
 
 ### Purchase and proof
