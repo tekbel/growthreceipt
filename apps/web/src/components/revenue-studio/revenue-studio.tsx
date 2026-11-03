@@ -27,6 +27,9 @@ import { revenueStudioTheme } from "./theme";
 
 type Report = AgReportState<RevenueRegistry>;
 
+// Baked in at build time. Without it Studio runs as a trial with a watermark.
+const studioLicenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY || undefined;
+
 // A module level function keeps one reference, so Studio does not reset on render.
 const widgets = (defaults: AgWidgetsConfig) =>
   createWidgets<RevenueRegistry>({
@@ -351,7 +354,7 @@ export default function RevenueStudio({
         </div>
       </div>
       <div className="revenue-studio-canvas">
-        <AgStudioProvider modules={modules}>
+        <AgStudioProvider modules={modules} licenseKey={studioLicenseKey}>
           <AgStudio<RevenueRegistry>
             style={{ height: "100%", width: "100%" }}
             theme={revenueStudioTheme}
