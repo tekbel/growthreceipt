@@ -193,6 +193,70 @@ test("home page explains the full revenue loop", async ({ page }) => {
 	await expect(trigger).toBeFocused();
 });
 
+// Phones show GrowthReceipt's icon for the app, and the product's icon on its checkout page.
+test("app and checkout pages carry their own home screen icons", async ({
+	page,
+	request,
+}) => {
+	async function appleIcon(target: Page) {
+		const link = target.locator('link[rel="apple-touch-icon"]');
+		await expect(link).not.toHaveCount(0);
+		const href = await link.first().getAttribute("href");
+		expect(href).toBeTruthy();
+		const url = new URL(href ?? "", target.url()).href;
+		const response = await request.get(url);
+		expect(response.ok()).toBe(true);
+		expect(response.headers()["content-type"]).toContain("image/png");
+		return href ?? "";
+	}
+
+	await enterJudgeDemo(page);
+	const appIcon = await appleIcon(page);
+	await openWorkspacePage(page, "Customer checkout", "checkout");
+	const checkoutOpened = page.waitForEvent("popup");
+	await page.getByRole("button", { name: "Open as customer" }).click();
+	const checkout = await checkoutOpened;
+	await checkout.locator("#checkout-title").waitFor({ timeout: 30_000 });
+	const productIcon = await appleIcon(checkout);
+	expect(productIcon).toContain("/buy/");
+	expect(productIcon).not.toBe(appIcon);
+});
+
+// c38c3b5: Ask AI closes with Done, and opening it without a change saves nothing.
+// No prompt is sent, so no agent call is made.
+test("Ask AI closes with Done and leaves the dashboard unedited", async ({
+	page,
+}) => {
+	const errors: string[] = [];
+	watchForBrowserErrors(page, errors, "revenue dashboard");
+
+	await enterJudgeDemo(page);
+	await openWorkspacePage(page, "Revenue dashboard", "dashboard");
+	const dashboard = page.getByRole("region", { name: "Revenue dashboard" });
+	const askAi = dashboard.getByRole("button", { name: "Ask AI" });
+	await expect(askAi).toBeVisible({ timeout: 30_000 });
+	await expect(
+		dashboard.getByRole("button", { name: "Reset to default" }),
+	).toHaveCount(0);
+
+	await askAi.click();
+	const done = dashboard.getByRole("button", { name: "Done", exact: true });
+	await expect(done).toBeVisible();
+	await expect(
+		dashboard.getByRole("button", { name: "Save layout" }),
+	).toHaveCount(0);
+	await done.click();
+
+	await expect(askAi).toBeVisible();
+	await expect(
+		dashboard.getByRole("button", { name: "Reset to default" }),
+	).toHaveCount(0);
+
+	// Until the AG Studio trial key is set (docs/hackathon/category-plan.md), AG logs its
+	// license banner as console errors. Every other error still fails the test.
+	expect(errors.filter((line) => !/console: \*/.test(line))).toEqual([]);
+});
+
 test("judge demo remains navigable on a phone", async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	const errors: string[] = [];
