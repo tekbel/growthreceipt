@@ -342,6 +342,18 @@ def test_equal_revenue_is_a_tie_in_a_stable_order() -> None:
     assert classify_evidence(ranked) == "tie"
 
 
+def test_more_revenue_from_fewer_purchases_is_mixed() -> None:
+    # One $19 pack against two $9 packs. The bigger sale must not be called the winner.
+    ranked = rank_paid_posts([paid(5, 2, "18.00"), paid(3, 1, "19.00")])
+    assert ranked[0].day == 3
+    assert classify_evidence(ranked) == "mixed"
+
+
+def test_a_leader_with_the_most_purchases_is_not_mixed() -> None:
+    ranked = rank_paid_posts([paid(5, 3, "27.00"), paid(3, 3, "12.00"), paid(1, 1, "19.00")])
+    assert classify_evidence(ranked) == "leader"
+
+
 @pytest.mark.asyncio
 async def test_a_refunded_purchase_is_not_next_move_evidence(transport: ASGITransport) -> None:
     store = FakePaymentStore()

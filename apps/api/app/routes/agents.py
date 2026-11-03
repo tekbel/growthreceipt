@@ -88,7 +88,7 @@ class OfferEvidence(BaseModel):
     revenue: str
 
 
-EvidenceSignal = Literal["none", "early", "leader", "tie"]
+EvidenceSignal = Literal["none", "early", "leader", "tie", "mixed"]
 
 # A post needs this many purchases before it counts as a leader rather than an early signal.
 LEADER_MIN_ORDERS = 3
@@ -157,6 +157,9 @@ def classify_evidence(ranked: list[PaidPostEvidence]) -> EvidenceSignal:
     leader = ranked[0]
     if len(ranked) > 1 and Decimal(ranked[1].revenue) == Decimal(leader.revenue):
         return "tie"
+    # Offers have different prices, so the post that earned the most may not have the most buyers.
+    if any(paid.completed_orders > leader.completed_orders for paid in ranked[1:]):
+        return "mixed"
     if leader.completed_orders < LEADER_MIN_ORDERS:
         return "early"
     return "leader"
@@ -309,6 +312,9 @@ follow up that repeats its angle, and set needs_more_data to true.
 leader: one post earned the most from at least 3 purchases. Build the experiment on that post.
 tie: two or more posts earned the same amount. Do not pick a winner. Recommend a controlled
 comparison of the tied posts and set needs_more_data to true.
+mixed: the first post earned the most, but another post has more purchases. Do not pick a winner.
+Name both posts, say one earned more and the other sold more often, recommend a controlled
+comparison of the two with the same offer, and set needs_more_data to true.
 When orders_to_check is not empty, call get_paypal_order for each of those orders before you
 answer. Base the recommendation only on purchases PayPal confirmed, and say in evidence_summary
 how many of the checked orders PayPal confirmed. If an order is not confirmed, say so plainly.

@@ -144,7 +144,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - One time purchases only. Subscriptions are planned.
 - The agent picks offers from a fixed catalog, not from the founder's own products.
 - Automatic posting covers LinkedIn personal profiles. X and Facebook open the official share composer, Instagram gets a copy button, and views and clicks are not imported.
-- Small samples stay small. Fewer than 3 purchases on the leading post is labeled an early signal, and the agent is told not to call a winner.
+- Small samples stay small. Fewer than 3 purchases on the leading post is labeled an early signal, and the agent is told not to call a winner. When one post earns the most but another has more purchases, the evidence is labeled mixed and the agent compares the two.
 - LinkedIn self serve tokens last 60 days with no refresh, so founders reconnect.
 - Sign up captcha is off during judging so judges are not blocked.
 

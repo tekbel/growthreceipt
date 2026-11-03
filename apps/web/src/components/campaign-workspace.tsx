@@ -170,7 +170,7 @@ type MoveEvidence = {
   refunded_orders?: number;
 };
 
-type EvidenceSignal = "none" | "early" | "leader" | "tie";
+type EvidenceSignal = "none" | "early" | "leader" | "tie" | "mixed";
 
 type PayPalCheck = {
   order_id: string;
@@ -3852,6 +3852,20 @@ function SignalBasis({
       </p>
     );
   }
+  if (evidence.signal === "mixed") {
+    const busiest = paid.reduce((most, post) =>
+      post.completed_orders > most.completed_orders ? post : most,
+    );
+    const count = (post: typeof lead) =>
+      `${post.completed_orders} purchase${post.completed_orders === 1 ? "" : "s"}`;
+    return (
+      <p className="move-basis">
+        Compares <PostRef post={refFor(lead, posts)} onOpen={openPost} />, {money(lead.revenue)}{" "}
+        from {count(lead)}, with <PostRef post={refFor(busiest, posts)} onOpen={openPost} />,{" "}
+        {money(busiest.revenue)} from {count(busiest)}.
+      </p>
+    );
+  }
   return (
     <p className="move-basis">
       Built on <PostRef post={refFor(lead, posts)} onOpen={openPost} />, {lead.completed_orders}{" "}
@@ -3885,6 +3899,8 @@ const signalCopy: Record<EvidenceSignal, string> = {
     "Early signal. The leading post has fewer than 3 purchases, so the agent repeats its angle with care. Keep testing before treating it as a winner.",
   leader: "Clear leader. One post earned the most from at least 3 purchases.",
   tie: "Tied. Posts earned the same amount, so the agent compares them instead of picking one.",
+  mixed:
+    "Mixed. One post earned the most, but another sold more often, so the agent compares them instead of picking one.",
 };
 
 const confidenceCopy: Record<Recommendation["confidence"], string> = {

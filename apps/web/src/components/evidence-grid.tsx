@@ -63,14 +63,22 @@ type EvidenceRow = {
   nextAction: string;
 };
 
-// Mirrors classify_evidence in the API: a leader needs 3 purchases and more revenue than any other post.
+// Mirrors classify_evidence in the API: a leader needs 3 purchases, more revenue than any other
+// post and at least as many purchases. More revenue from fewer purchases is mixed.
 const LEADER_MIN_ORDERS = 3;
 
-function signalFor(row: EvidenceRow, top: number, topCount: number): string {
+type Tops = { revenue: number; revenueCount: number; leaderPurchases: number; purchases: number };
+
+function signalFor(row: EvidenceRow, tops: Tops): string {
   if (!row.purchases) return "";
-  if (row.revenue < top) return "Smaller signal";
-  if (topCount > 1) return "Tied for most";
-  return row.purchases >= LEADER_MIN_ORDERS ? "Strongest signal" : "Early signal";
+  const mixed = tops.revenueCount === 1 && tops.purchases > tops.leaderPurchases;
+  if (row.revenue === tops.revenue) {
+    if (tops.revenueCount > 1) return "Tied for most";
+    if (mixed) return "Most revenue";
+    return row.purchases >= LEADER_MIN_ORDERS ? "Strongest signal" : "Early signal";
+  }
+  if (mixed && row.purchases === tops.purchases) return "Most purchases";
+  return "Smaller signal";
 }
 
 const approvalLabels: Record<Campaign["posts"][number]["status"], string> = {
@@ -141,9 +149,16 @@ export function EvidenceGrid({
         nextAction: nextActions[post.id] ?? "",
       };
     });
-    const top = Math.max(0, ...built.filter((row) => row.purchases).map((row) => row.revenue));
-    const topCount = built.filter((row) => row.purchases && row.revenue === top).length;
-    return built.map((row) => ({ ...row, signal: signalFor(row, top, topCount) }));
+    const paidRows = built.filter((row) => row.purchases);
+    const revenue = Math.max(0, ...paidRows.map((row) => row.revenue));
+    const leaders = paidRows.filter((row) => row.revenue === revenue);
+    const tops: Tops = {
+      revenue,
+      revenueCount: leaders.length,
+      leaderPurchases: Math.max(0, ...leaders.map((row) => row.purchases)),
+      purchases: Math.max(0, ...paidRows.map((row) => row.purchases)),
+    };
+    return built.map((row) => ({ ...row, signal: signalFor(row, tops) }));
   }, [campaign, receipts, nextActions]);
 
   const money = useMemo(
