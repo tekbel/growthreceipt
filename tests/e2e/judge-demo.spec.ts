@@ -252,9 +252,8 @@ test("Ask AI closes with Done and leaves the dashboard unedited", async ({
 		dashboard.getByRole("button", { name: "Reset to default" }),
 	).toHaveCount(0);
 
-	// Until the AG Studio trial key is set (docs/hackathon/category-plan.md), AG logs its
-	// license banner as console errors. Every other error still fails the test.
-	expect(errors.filter((line) => !/console: \*/.test(line))).toEqual([]);
+	// The AG Studio key is live, so a license banner in the console fails this test too.
+	expect(errors).toEqual([]);
 });
 
 test("judge demo remains navigable on a phone", async ({ page }) => {
