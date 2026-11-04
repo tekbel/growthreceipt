@@ -322,10 +322,12 @@ export default function RevenueStudio({
             </button>
           </p>
         ) : (
-          <span>
-            {load.checkouts.length} checkout{load.checkouts.length === 1 ? "" : "s"} from PayPal
-            sandbox
-          </span>
+          // A judge who just bought once sees one row where many sample rows were, so say why.
+          <p className="revenue-studio-real" role="status">
+            Showing your {load.checkouts.length} real checkout
+            {load.checkouts.length === 1 ? "" : "s"} from PayPal sandbox. The sample orders are
+            hidden now that real data exists.
+          </p>
         )}
         <div>
           {edited && mode === "view" ? (
