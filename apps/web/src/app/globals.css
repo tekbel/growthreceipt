@@ -99,10 +99,15 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .home-header .auth-wordmark > span { width: 28px; height: 28px; }
 .home-header nav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .home-header .button svg { width: 15px; height: 15px; }
+/* Shown only after the hero buttons scroll away. Hidden means invisible, unfocusable and silent. */
+.home-header-demo { display: inline-flex; transition: opacity var(--duration-base) var(--ease), transform var(--duration-base) var(--ease), visibility 0s linear 0s; }
+.home-header-demo[data-shown="false"] { visibility: hidden; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity var(--duration-base) var(--ease), transform var(--duration-base) var(--ease), visibility 0s linear var(--duration-base); }
 .button.ghost { border-color: transparent; background: transparent; }
 .button.ghost:hover:not(:disabled) { border-color: transparent; background: var(--surface-hover); }
 .home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: center; padding: 72px 0 96px; }
 .home-copy .eyebrow, .home-kicker { color: var(--accent-strong); font-size: var(--type-base); font-weight: 600; }
+/* One line on wide screens, slightly smaller so it ends before the shot. */
+@media (min-width: 1240px) { .home-copy .eyebrow { font-size: var(--type-sm); white-space: nowrap; } }
 .home-copy h1 { margin: 16px 0 0; font-size: clamp(2.5rem, 1.6rem + 3.2vw, 4.25rem); font-weight: 400; line-height: 1.03; letter-spacing: -.03em; text-wrap: balance; }
 .home-copy > p { max-width: 560px; margin: 22px 0 30px; color: var(--ink-soft); font-size: var(--type-lg); line-height: 1.65; }
 .home-actions { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -125,7 +130,23 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 :root[data-theme="dark"] .home-shot { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
 .home-shot-bar { display: flex; gap: 6px; padding: 4px 6px 10px; }
 .home-shot-bar span { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
-.home-shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.home-shot-media { position: relative; }
+/* Shows rows 165 to 960 of the 1600 by 1081 shot. Percent margins follow the width. */
+.home-shot-crop { overflow: hidden; aspect-ratio: 1600 / 795; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.home-shot img { display: block; width: 100%; height: auto; margin-top: -10.3125%; }
+.home-callouts { margin: 0; padding: 0; list-style: none; }
+/* Each callout rings its target in the shot and labels it. Percentages follow the crop box. */
+.home-callout { position: absolute; border: 2px solid var(--accent); border-radius: 8px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+.home-callout > span { position: absolute; left: -2px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 10px 24px -12px rgb(34 40 47 / 45%); color: var(--ink); font-size: var(--type-xs); font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.home-callout svg { flex: 0 0 auto; width: 15px; height: 15px; color: var(--success); }
+/* The verified revenue figure, labelled above. */
+.home-callout-paypal { left: 2%; top: 23.5%; width: 23%; height: 18.5%; }
+/* Wide enough to cover the subtitle line in the shot. */
+.home-callout-paypal > span { bottom: calc(100% + 4px); min-width: 167%; }
+/* The Day 3 X post in the strip, labelled below. */
+.home-callout-post { left: 2%; top: 71.3%; width: 13.5%; height: 8.4%; }
+.home-callout-post > span { top: calc(100% + 6px); }
+@media (min-width: 761px) { :root[data-theme="dark"] .home-callout > span { box-shadow: 0 10px 24px -12px rgb(0 0 0 / 70%); } }
 .home-shot .dark-only, :root[data-theme="dark"] .home-shot .light-only { display: none; }
 :root[data-theme="dark"] .home-shot .dark-only { display: block; }
 .home-band { border-block: 1px solid var(--line); background: var(--stage); }
@@ -175,8 +196,11 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 }
 @media (max-width: 760px) {
   .home-wrap { width: calc(100% - 32px); }
-  .home-header .home-loop-link { display: none; }
-  .home-header .home-demo { display: none; }
+  .home-header .home-header-demo { display: none; }
+  /* Too small to point at anything, so the callouts sit under the shot as plain notes. */
+  .home-callouts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .home-callout { position: static; width: max-content; height: max-content; border: 0; box-shadow: none; }
+  .home-callout > span { position: static; min-width: 0; box-shadow: none; }
   .home-hero { gap: 36px; padding: 40px 0 56px; }
   .home-copy > p { font-size: var(--type-md); }
   .home-actions .button { width: 100%; }
@@ -187,7 +211,10 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .home-footer .auth-legal { margin-left: 0; }
 }
 @media (min-width: 761px) and (max-width: 1080px) { .flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (prefers-reduced-motion: reduce) { .home-shot { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .home-shot { transform: none; }
+  .home-header-demo, .home-header-demo[data-shown="false"] { transform: none; transition: none; }
+}
 .loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .loop-dialog[open] { animation: rise var(--duration-base) var(--ease); }
 .loop-dialog::backdrop { background: color-mix(in srgb, var(--ink) 38%, transparent); }

@@ -53,6 +53,19 @@ export function AuthShell() {
   // Three buttons open the demo, so a failure shows next to the one that was used.
   const [judgeFrom, setJudgeFrom] = useState<JudgeButton>("hero");
   const [loopOpen, setLoopOpen] = useState(false);
+  // The header demo button appears only once the hero's own buttons have scrolled away.
+  const [heroActions, setHeroActions] = useState<HTMLDivElement | null>(null);
+  const [heroActionsGone, setHeroActionsGone] = useState(false);
+  useEffect(() => {
+    if (!heroActions) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeroActionsGone(!entry.isIntersecting),
+      // The sticky header covers the top 64px, so a button under it counts as gone.
+      { rootMargin: "-64px 0px 0px 0px" },
+    );
+    observer.observe(heroActions);
+    return () => observer.disconnect();
+  }, [heroActions]);
   const captcha = useTurnstile();
   const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
@@ -294,11 +307,18 @@ export function AuthShell() {
               GrowthReceipt
             </div>
             <nav aria-label="Get started">
-              {loopButton("ghost home-loop-link")}
+              {/* Before Sign in, so Sign in keeps its place at the edge while this fades in. */}
+              <span
+                className="home-header-demo"
+                data-shown={heroActionsGone}
+                inert={!heroActionsGone}
+                aria-hidden={!heroActionsGone}
+              >
+                {demoButton("header", "")}
+              </span>
               <button className="button secondary" type="button" onClick={showSignIn}>
                 Sign in
               </button>
-              {demoButton("header", "")}
             </nav>
           </div>
         </header>
@@ -306,15 +326,16 @@ export function AuthShell() {
           <section className="home-wrap home-hero">
             <div className="home-copy">
               <span className="eyebrow">
-                For indie founders and small teams selling digital products
+                For indie founders and small teams selling SaaS, templates, courses and other
+                digital products
               </span>
               <h1>Know which posts generate revenue.</h1>
               <p>
-                Each approved post gets its own PayPal buy link, so every verified purchase is
-                credited to the post that earned it. An AI agent reads those purchases and plans
-                your next post around what customers bought. Nothing runs until you approve it.
+                Each approved post gets its own PayPal buy link. Verified purchases show which post
+                earned the money, and an AI agent plans your next post from them. Nothing runs until
+                you approve it.
               </p>
-              <div className="home-actions">
+              <div className="home-actions" ref={setHeroActions}>
                 {demoButton("hero", "")}
                 {loopButton("outline")}
               </div>
@@ -338,19 +359,38 @@ export function AuthShell() {
                 <span />
                 <span />
               </div>
-              {(["light", "dark"] as const).map((theme) => (
-                // biome-ignore lint/performance/noImgElement: static screenshots swapped by theme in CSS.
-                <img
-                  key={theme}
-                  className={`${theme}-only`}
-                  src={`/home/results-${theme}.webp`}
-                  alt="The Results page of the judge demo after a PayPal sandbox purchase, with $9.00 of verified revenue credited to one post"
-                  width={1600}
-                  height={1081}
-                  decoding="async"
-                  fetchPriority={theme === "light" ? "high" : "low"}
-                />
-              ))}
+              <div className="home-shot-media">
+                {/* The crop skips the app top bar and the offer table, so the numbers read larger. */}
+                <div className="home-shot-crop">
+                  {(["light", "dark"] as const).map((theme) => (
+                    // biome-ignore lint/performance/noImgElement: static screenshots swapped by theme in CSS.
+                    <img
+                      key={theme}
+                      className={`${theme}-only`}
+                      src={`/home/results-${theme}.webp`}
+                      alt="Results in the judge demo after a PayPal sandbox purchase. $9.00 of verified revenue is credited to the Day 3 X post."
+                      width={1600}
+                      height={1081}
+                      decoding="async"
+                      fetchPriority={theme === "light" ? "high" : "low"}
+                    />
+                  ))}
+                </div>
+                <ul className="home-callouts">
+                  <li className="home-callout home-callout-paypal">
+                    <span>
+                      <BadgeCheck aria-hidden="true" />
+                      Verified by PayPal webhook
+                    </span>
+                  </li>
+                  <li className="home-callout home-callout-post">
+                    <span>
+                      <Check aria-hidden="true" />
+                      Credited to the Day 3 post
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </figure>
           </section>
           <section className="home-band">
