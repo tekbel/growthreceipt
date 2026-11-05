@@ -1,5 +1,7 @@
 # Product Specification
 
+> Original plan from before the hackathon, kept as background. GrowthReceipt does not ship most of it (no Telegram, Buffer, PostHog, Stripe or worker processes). What ships is described in [README.md](../../README.md) and [docs/hackathon/architecture.md](../hackathon/architecture.md).
+
 ## 1. Summary
 
 The Agentic Marketing System is a multi-tenant SaaS that helps founders market apps, SaaS products, and digital products. It maintains durable product context, plans campaigns against measurable goals, creates channel-ready drafts, requires approval before external actions, schedules content, measures outcomes, and turns results into reusable marketing learnings.

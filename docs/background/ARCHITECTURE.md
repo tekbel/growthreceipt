@@ -1,5 +1,7 @@
 # Architecture
 
+> Original plan from before the hackathon, kept as background. GrowthReceipt does not ship most of it (no Telegram, Buffer, PostHog, Stripe or worker processes). What ships is described in [README.md](../../README.md) and [docs/hackathon/architecture.md](../hackathon/architecture.md).
+
 ## 1. Recommended shape
 
 Use a modular monolith with a separate web application, API process, and worker. Keep one database and one domain model. Avoid independently deployed agent services until load or team boundaries justify them.

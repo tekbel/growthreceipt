@@ -39,7 +39,7 @@ The hosted suite also runs daily from `.github/workflows/smoke.yml`. Add `E2E_PA
 
 ## Background
 
-The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original plan lives in [SPEC.md](./SPEC.md) and [ARCHITECTURE.md](./ARCHITECTURE.md). Parts of it, such as Buffer scheduling, Telegram and Stripe, were never built.
+The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original plan lives in [SPEC.md](./docs/background/SPEC.md) and [ARCHITECTURE.md](./docs/background/ARCHITECTURE.md). Parts of it, such as Buffer scheduling, Telegram and Stripe, were never built.
 
 ## Current implementation
 
@@ -156,4 +156,4 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
-- [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md) and [PROMPTS.md](./PROMPTS.md) are the original pre hackathon plan and build prompts, kept as background. They describe more than GrowthReceipt ships.
+- [SPEC.md](./docs/background/SPEC.md), [ARCHITECTURE.md](./docs/background/ARCHITECTURE.md) and [PROMPTS.md](./docs/background/PROMPTS.md) are the original pre hackathon plan and build prompts, kept as background. They describe more than GrowthReceipt ships.

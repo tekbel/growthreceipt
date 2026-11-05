@@ -1,6 +1,6 @@
 # Judge FAQ
 
-Short answers to the questions judges ask most. The same answers are in the in app Help panel.
+Short answers to questions you may have. The same answers are in the app's Help panel.
 
 ## How is a purchase linked to a post?
 

@@ -1,5 +1,7 @@
 # Sequential Implementation Prompts
 
+> Original plan from before the hackathon, kept as background. GrowthReceipt does not ship most of it (no Telegram, Buffer, PostHog, Stripe or worker processes). What ships is described in [README.md](../../README.md) and [docs/hackathon/architecture.md](../hackathon/architecture.md).
+
 These prompts are designed for a coding agent working in the project repository. Run them in order. Start each prompt in a clean task with the prior code available. Review and commit manually after each accepted phase.
 
 Shared instruction for every prompt:
