@@ -1,6 +1,6 @@
 # Who GrowthReceipt is for
 
-Draft for the README and the Devpost "Inspiration" and "What's next" sections. Pricing is planned. The app shows it on the home page roadmap only and charges nothing today.
+Pricing is planned and not shown in the app. GrowthReceipt charges nothing today.
 
 ## The person
 

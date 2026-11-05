@@ -50,7 +50,7 @@ flowchart TB
   end
 
   subgraph ai [OpenAI]
-    agents[Agents API<br/>campaign, next move, follow up, revise]
+    agents[Agents API<br/>brief, campaign, revise, next move,<br/>follow up, dashboard assistant]
   end
 
   linkedin[LinkedIn API<br/>publish approved posts]
@@ -260,7 +260,7 @@ flowchart LR
 
 1. **More autonomy, in steps.** Today the agent suggests and the founder approves. Next, offers move into the database so the agent can propose a new pack or price within limits the founder sets. After that, an autopilot that acts inside a budget, with every action logged and reversible.
 2. **Specialist agents.** A writer, an analyst that holds the PayPal tools and a pricing agent, coordinated by one planner. Buyer agents could also buy through the same verified checkout, which opens a new sales channel.
-3. **Scale.** Agent runs already live in the `agent_jobs` table, so a page can reattach after a reload. The runs still execute inside the API process. The next step moves them to a job queue served by the worker service (`services/worker`, a stub today), takes PayPal webhooks in through the same queue, and runs several API copies. The per workspace and global agent limits already exist.
+3. **Scale.** Agent runs already live in the `agent_jobs` table, so a page can reattach after a reload. The runs still execute inside the API process. The next step moves them to a job queue served by a separate worker service, takes PayPal webhooks in through the same queue, and runs several API copies. The per workspace and global agent limits already exist.
 4. **Deeper PayPal use.** Partner onboarding so founders are paid directly (see the production money flow above), PayPal Subscriptions, and disputes in the proof chain. Refunds are built: a refunded purchase already stops counting as revenue and as evidence.
 5. **Measuring the agent.** Check each past recommendation against the purchases that came after it, and run split tests with a minimum sample size before a winner is called.
 
@@ -278,7 +278,7 @@ Judges enter with one click. Each judge gets an anonymous session and a private 
 
 Model calls are capped. Each workspace can run the agent 20 times a day, and all workspaces together 300 times a day. The API records every run in `growthreceipt.agent_runs` and answers 429 with a plain message once a limit is reached. Both limits are settings (`AGENT_RUNS_PER_WORKSPACE_DAY`, `AGENT_RUNS_PER_DAY`).
 
-Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`. The source lives in the private repository `tekbel/growthreceipt` until the submission audit makes it public. Manual `railway up` deploys are retired.
+Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`. The source is at https://github.com/tekbel/growthreceipt. Manual `railway up` deploys are retired.
 
 ## Using it in the demo video
 

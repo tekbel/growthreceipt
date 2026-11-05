@@ -8,7 +8,7 @@ Run it from the repository root:
 npm run dev:web
 ```
 
-The interface uses self hosted Instrument Sans, Lucide interface icons, and official provider marks from React Icons. It supports light and dark appearance, desktop navigation, and a mobile navigation drawer.
+The interface uses Figtree, Lucide interface icons, and official provider marks from React Icons. It supports light and dark appearance, desktop navigation, and a mobile navigation drawer.
 
 Start the API as well when testing verified revenue, recommendations, or checkout:
 

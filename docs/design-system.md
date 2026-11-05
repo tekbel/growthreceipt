@@ -17,9 +17,9 @@ The home view answers one question: what needs attention today? Campaign review,
 
 ## Visual system
 
-1. Use warm white and charcoal surfaces with subtle neutral separation.
-2. Use `#087A72` as the interface accent.
-3. Use self hosted Instrument Sans for display, body, labels, controls, and tabular numbers.
+1. Use a cool grey canvas, white surfaces and navy black ink, with subtle slate separation.
+2. Use `#4458b8` as the interface accent (hover `#36479a`, dark mode `#9fb2ff`). Tokens live in `apps/web/src/app/globals.css`.
+3. Use Figtree for display, body, labels, controls, and tabular numbers.
 4. Use hairline rules to organize related information.
 5. Use restrained four to seven pixel corners for controls and working surfaces.
 6. Keep typography left aligned.
@@ -56,7 +56,7 @@ The home view answers one question: what needs attention today? Campaign review,
 15. Form fields are 16px on phones so iOS does not zoom on focus.
 16. The current page is in the URL path (`/content`), so refresh, back, and shared links land on the same page. Old hash links such as `/#content` move to the path on load.
 17. Every page title uses `--type-title` and section headings stay at `--type-2xl` or below. Fixed min heights on headers and panels are not used, content sets the height. Filters are soft pills, not bordered boxes.
-18. Visual direction follows Otter.ai: Figtree (a free stand in for Averta and Circular), light 400 weight on large headings with little tracking, cool slate neutrals, and a dimmed blue accent (#3a5bc7) instead of Otter's bright #144fff. Primary actions are blue filled, a paired second action is a blue outline (`.button.outline`), everything else stays neutral.
+18. Visual direction follows Otter.ai: Figtree (a free stand in for Averta and Circular), light 400 weight on large headings with little tracking, cool slate neutrals, and a dimmed blue accent (#4458b8) instead of Otter's bright #144fff. Primary actions are blue filled, a paired second action is a blue outline (`.button.outline`), everything else stays neutral.
 19. Every button variant shares one disabled look (subtle surface, muted text). Previews of third party UI such as the LinkedIn post use theme tokens, so dark mode has no white slabs. On wide screens the topbar actions line up with the content edge (page max width 1480px).
 20. Label and value rows (metrics, product brief, campaign details) all use the metric strip pattern: one hairline above and below, vertical dividers, muted 12px label, value under it. Results reuses the Today `Metric` component, and money always goes through `formatMoney`.
 21. Status is always a pill (`status-tag`), including neutral states like "Not connected". A pair of actions sits side by side, primary fill then outline. Form section headings sit inside their section with a 10px gap to the first field.

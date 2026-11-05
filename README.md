@@ -46,10 +46,8 @@ The repository started as a broader approval first marketing system: brief to ca
 ```text
 apps/web              Next.js campaign review workspace
 apps/api              FastAPI and agent/job interfaces
-services/worker       Background worker process shell
-packages/contracts    Shared TypeScript API contract
 supabase              Local configuration and migrations
-docs/design           Accepted visual concept
+docs/background       Original pre hackathon plan, kept as background
 ```
 
 ### Local setup
@@ -65,16 +63,16 @@ make dev-web
 
 `make demo-seed` applies migrations and loads the judge demo campaign. `make demo-reset` deletes the demo workspace campaigns and PayPal orders, then reseeds. Both refuse to run when `APP_ENV=production`.
 
-Use separate terminals for the API and web commands. The API runs on port 8000 and the web app on port 3000 by default.
+Use separate terminals for the API and web commands. The API runs on port 8000 and the web app on port 3000 by default. If port 3000 is taken, run the web app on 3001 (`npm run dev:web -- -p 3001`), the port the LinkedIn redirect and Playwright use locally.
 
-For local PayPal webhooks, start the restricted relay and fixed ngrok endpoint in two more terminals:
+For local PayPal webhooks, start the restricted relay and a fixed ngrok endpoint in two more terminals. Set `NGROK_URL` to your reserved ngrok https URL first:
 
 ```bash
 make dev-paypal-relay
 make dev-paypal-tunnel
 ```
 
-The tunnel always uses `https://justify-usual-twirl.ngrok-free.dev/v1/paypal/webhooks`, so the PayPal sandbox webhook configuration does not need to change after restarts. Only the webhook route is exposed by the relay. Other paths return `404`.
+The tunnel always uses `$NGROK_URL/v1/paypal/webhooks`, so the PayPal sandbox webhook configuration does not need to change after restarts. Only the webhook route is exposed by the relay. Other paths return `404`.
 
 ### Implemented API slices
 
@@ -151,7 +149,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 ## Documents
 
 - [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
-- [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers the questions judges ask most: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
+- [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers common questions: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
 - [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.

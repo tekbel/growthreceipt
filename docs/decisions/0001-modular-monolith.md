@@ -1,6 +1,6 @@
 # ADR 0001: Modular monolith with deterministic orchestration
 
-Status: accepted
+Status: accepted, with one change. The Python worker was never built. Agent runs are stored as jobs in Postgres and run inside the API process (`apps/api/app/jobs/agent_jobs.py`). A separate worker is planned work, described in docs/hackathon/architecture.md.
 
 ## Decision
 

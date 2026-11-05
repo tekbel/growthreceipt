@@ -30,3 +30,12 @@ plan.json
 
 # Written by the local SessionEnd hook
 reference_last_session.md
+
+# Private owner notes, kept on disk, never public
+docs/handoff/
+docs/research/
+docs/hackathon/category-plan.md
+docs/hackathon/prize-outlook.md
+docs/hackathon/external-audit.md
+docs/hackathon/audit-responses.md
+docs/hackathon/devpost-registration.md
