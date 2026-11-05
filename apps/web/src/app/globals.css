@@ -200,6 +200,37 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .loop-stages { --mark: 44px; --row-gap: 28px; position: relative; display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .loop-stages::before { content: ""; position: absolute; top: calc(var(--mark) / 2); bottom: calc(var(--mark) / 2); left: calc(var(--mark) / 2 - 1px); width: 2px; background: var(--line); }
 .loop-stage { position: relative; }
+/* The measured path replaces the drawn line: a base track, the trail behind the dot, and the dot. */
+.loop-map { position: relative; }
+.loop-map[data-ready] .loop-stages::before { display: none; }
+.loop-track { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.loop-track path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.loop-track-base { stroke: var(--line); }
+.loop-trail { stroke: var(--accent); stroke-dasharray: 0 100000; }
+.loop-dot { position: absolute; top: -6px; left: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px var(--accent); opacity: 0; pointer-events: none; will-change: transform; }
+.loop-map[data-ready] .loop-dot { opacity: 1; }
+.loop-map[data-glide] .loop-dot { transition: transform 520ms var(--ease); }
+.loop-map[data-glide] .loop-trail { transition: stroke-dasharray 520ms var(--ease); }
+/* While playing, a ring around the active stage fills for the time left on that stage. */
+.loop-mark { position: relative; }
+.loop-stages[data-playing] .loop-stage[data-state="active"] .loop-mark::after { content: ""; position: absolute; inset: -6px; padding: 2px; border-radius: 50%; background: conic-gradient(var(--accent) calc(var(--t, 0) * 1turn), transparent 0); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.loop-stages[data-playing] .loop-stage[data-approval][data-state="active"] .loop-mark::after { border-radius: calc(var(--corner-md) + 6px); }
+.loop-body { display: grid; gap: 16px; }
+.loop-receipt { display: grid; align-content: start; gap: 10px; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: var(--corner-md); background: var(--surface); font-size: var(--type-xs); }
+.loop-receipt header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.loop-receipt-title { color: var(--muted); font-weight: 600; }
+.loop-receipt-total { color: var(--ink); font-size: var(--type-md); font-weight: 600; font-variant-numeric: tabular-nums; }
+.loop-receipt dl { display: grid; gap: 6px; margin: 0; }
+.loop-receipt-row { display: flex; justify-content: space-between; gap: 12px; opacity: .3; transform: translateY(3px); transition: opacity var(--duration-base) var(--ease), transform var(--duration-base) var(--ease); }
+.loop-receipt-row[data-shown] { opacity: 1; transform: none; }
+.loop-receipt dt { color: var(--muted); }
+.loop-receipt dd { display: inline-flex; align-items: center; gap: 4px; margin: 0; color: var(--ink); font-weight: 600; text-align: right; }
+.loop-receipt-check { width: 14px; height: 14px; fill: none; stroke: var(--accent-strong); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 480ms var(--ease) 120ms; }
+.loop-receipt-row[data-shown] .loop-receipt-check { stroke-dashoffset: 0; }
+.loop-receipt-note { margin: 0; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .loop-map[data-glide] .loop-dot, .loop-map[data-glide] .loop-trail, .loop-receipt-row, .loop-receipt-check { transition: none; }
+}
 .loop-stage button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--corner-sm); }
 .loop-mark { display: grid; place-items: center; width: var(--mark); height: var(--mark); flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--muted); transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease); }
 .loop-mark svg { width: 18px; height: 18px; }
@@ -240,10 +271,12 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .loop-stage:nth-child(10) { grid-column: 1; }
   .loop-stage button { flex-direction: column; align-items: center; gap: 8px; height: 100%; text-align: center; }
   .loop-return { justify-content: center; }
+  .loop-body { grid-template-columns: minmax(0, 1fr) 280px; }
 }
 @media (max-width: 719px) {
   .loop-dialog { width: 100%; max-width: none; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; }
   .loop-detail { min-height: 0; }
+  .loop-map { padding-left: 8px; }
 }
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-captcha { min-height: 65px; margin-top: 16px; }
