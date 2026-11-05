@@ -46,7 +46,7 @@ export function workflowSteps({
     {
       id: "purchase",
       title: "Test the purchase",
-      copy: "Buy from your own post in PayPal's sandbox. No real money moves.",
+      copy: "Buy from your own post in the PayPal sandbox. No real money moves.",
       action: "Open checkout",
       view: "checkout",
       complete: hasRevenue,

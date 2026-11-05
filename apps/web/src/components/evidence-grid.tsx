@@ -75,7 +75,7 @@ function signalFor(row: EvidenceRow, tops: Tops): string {
   if (row.revenue === tops.revenue) {
     if (tops.revenueCount > 1) return "Tied for most";
     if (mixed) return "Most revenue";
-    return row.purchases >= LEADER_MIN_ORDERS ? "Strongest signal" : "Early signal";
+    return row.purchases >= LEADER_MIN_ORDERS ? "Clear leader" : "Early signal";
   }
   if (mixed && row.purchases === tops.purchases) return "Most purchases";
   return "Smaller signal";
@@ -143,7 +143,7 @@ export function EvidenceGrid({
         attribution: confirmed.length
           ? "Verified by PayPal webhook"
           : paid.length
-            ? "Capture recorded, webhook pending"
+            ? "Paid, PayPal confirmation on its way"
             : "",
         signal: "",
         nextAction: nextActions[post.id] ?? "",

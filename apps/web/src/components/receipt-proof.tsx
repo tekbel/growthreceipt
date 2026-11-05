@@ -222,7 +222,7 @@ function RefundStatus({ receipt }: { receipt: Receipt }) {
         {countsAsRevenue(receipt) ? "Partly refunded" : "Refunded"}
       </span>
       <span className={confirmed ? "refund-note confirmed" : "refund-note"}>
-        {confirmed ? "Webhook verified" : "Webhook on its way"}
+        {confirmed ? "Webhook verified" : "PayPal confirmation on its way"}
       </span>
       <InfoTip label="About this refund" align="end">
         {confirmed

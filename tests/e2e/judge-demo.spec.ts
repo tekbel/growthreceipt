@@ -364,7 +364,7 @@ test("@paypal purchase closes the verified revenue loop", async ({
 		timeout: 60_000,
 	});
 	await expect(checkout.getByText("1 refunded", { exact: true })).toBeVisible();
-	await expect(checkout.getByText("Webhook on its way")).toBeVisible();
+	await expect(checkout.getByText("PayPal confirmation on its way")).toBeVisible();
 	// The page checks again on its own until PayPal's signed refund webhook is stored.
 	await expect(checkout.getByText("Webhook verified", { exact: true })).toBeVisible({
 		timeout: 130_000,

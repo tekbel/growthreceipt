@@ -3,7 +3,7 @@
 import { Bot, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { type Campaign, type CampaignEvent, campaignApi } from "@/lib/campaign";
+import { type Campaign, type CampaignEvent, campaignApi, formatMoney } from "@/lib/campaign";
 import { formatMoment } from "@/lib/time";
 
 type Run = {
@@ -67,10 +67,10 @@ function toRuns(campaign: Campaign, events: CampaignEvent[]): Run[] {
       );
       runs.push({
         id: event.id,
-        title: "Next recommendation",
+        title: "Next experiment",
         at: event.created_at,
         meta: runMeta(detail),
-        input: `Verified PayPal revenue: ${evidence.completed_orders ?? 0} purchase${evidence.completed_orders === 1 ? "" : "s"}, ${evidence.gross_revenue ?? "0.00"} ${evidence.currency ?? "USD"}.`,
+        input: `Verified PayPal revenue: ${evidence.completed_orders ?? 0} purchase${evidence.completed_orders === 1 ? "" : "s"}, ${formatMoney(evidence.gross_revenue ?? "0.00", evidence.currency ?? "USD")}.`,
         evidence: [
           ...(evidence.paid_posts ?? []).map(
             (post) => `Day ${post.day} on ${post.channel}, "${post.theme}", earned ${post.revenue}`,
@@ -100,7 +100,7 @@ function toRuns(campaign: Campaign, events: CampaignEvent[]): Run[] {
       const post = campaign.posts.find((item) => item.id === event.post_id);
       runs.push({
         id: event.id,
-        title: "Follow-up post",
+        title: "Follow up post",
         at: event.created_at,
         meta: runMeta(detail),
         input: `Your approved plan: ${text(detail.approved_plan) ?? "the approved next move"}`,

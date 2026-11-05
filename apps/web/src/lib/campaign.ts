@@ -255,6 +255,10 @@ export const campaignApi = {
   offers: () => request<Offer[]>("/v1/paypal/offers"),
 };
 
+export function formatMoney(amount: string, currency: string): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount));
+}
+
 export function postDate(campaign: Campaign, post: Post): string {
   const date = new Date(`${campaign.starts_on}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + post.day - 1);

@@ -76,6 +76,7 @@ import {
   type DraftStage,
   exampleBrief,
   type FollowUpResult,
+  formatMoney,
   type Offer,
   type Post,
   type PostStatus,
@@ -684,7 +685,7 @@ export function CampaignWorkspace({
       if (!response.ok) throw new Error("offer change failed");
       const updated = (await response.json()) as Campaign;
       setCampaign(updated);
-      notify(`Every buy link now sells the ${updated.offer.name}.`);
+      notify(`Customers now buy the ${updated.offer.name} from every buy link.`);
     } catch {
       notify("The offer could not be changed. Please try again.");
     }
@@ -1638,8 +1639,8 @@ function JudgeBar({
         PayPal sandbox. No real money moves.
         {preparedAt ? <PreparedAgo at={preparedAt} /> : null}
         <InfoTip label="About the judge demo" align="end" side="bottom">
-          Private demo workspace, prepared with a sample LaunchCheck campaign. Payments run in
-          PayPal's sandbox, and each recommendation is generated live.
+          Private demo workspace, prepared with a sample LaunchCheck campaign. Payments run in the
+          PayPal sandbox, and each recommendation is generated live.
         </InfoTip>
       </p>
       {confirming ? (
@@ -1824,9 +1825,9 @@ function Topbar({
 // Same answers as docs/hackathon/judge-faq.md, kept short for the panel.
 const helpQuestions = [
   {
-    question: "How is a sale linked to a post?",
+    question: "How is a purchase linked to a post?",
     answer:
-      "Every approved post has its own buy link. The PayPal order carries that post's ID, so when PayPal captures the payment the sale is credited to the post. PayPal's signed webhook is stored as a second proof.",
+      "Every approved post has its own buy link. The PayPal order carries that post's ID, so when PayPal captures the payment the purchase is credited to the post. PayPal's signed webhook is stored as a second proof.",
   },
   {
     question: "What if the agent is wrong?",
@@ -1882,7 +1883,9 @@ function HelpPanel({
           <div>
             <span className="eyebrow">Help</span>
             <h2 id="help-title">Learn the workflow</h2>
-            <p>Five steps from a product brief to a next move backed by real revenue.</p>
+            <p>
+              Five steps from a product brief to a next move backed by verified PayPal purchases.
+            </p>
             <button className="text-button" type="button" onClick={onTour}>
               Take the guided tour
             </button>
@@ -2011,10 +2014,6 @@ function excerpt(content: string): string {
   return content.split("\n").find((line) => line.trim()) ?? content;
 }
 
-function formatMoney(amount: string, currency: string): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount));
-}
-
 function TodayPage({
   campaign,
   revenue,
@@ -2093,7 +2092,7 @@ function TodayPage({
           value={campaignLabels[campaign.status]}
           detail={
             needsReview
-              ? `${needsReview} post${needsReview === 1 ? "" : "s"} need a decision`
+              ? `${needsReview} ${needsReview === 1 ? "post needs" : "posts need"} a decision`
               : `All ${campaign.posts.length} posts approved`
           }
           tone={needsReview ? "review" : "success"}
@@ -2263,7 +2262,7 @@ function TodayResultCard({
           <div>
             <dt>Attribution</dt>
             <dd className={verified ? "verified" : "pending"}>
-              {verified ? "Verified by PayPal webhook" : "Captured. Webhook on its way"}
+              {verified ? "Verified by PayPal webhook" : "Paid. PayPal confirmation on its way."}
             </dd>
           </div>
           <div>
@@ -2346,7 +2345,7 @@ function FocusCard({
       : needsReview
         ? {
             label: "Next decision",
-            title: `${needsReview} post${needsReview === 1 ? "" : "s"} need your review`,
+            title: `${needsReview} ${needsReview === 1 ? "post needs" : "posts need"} your review`,
             action: "Review posts",
             view: "content" as View,
           }
@@ -2354,7 +2353,7 @@ function FocusCard({
           ? {
               label: "Next up",
               title: "Your campaign is approved. Now be your own customer",
-              note: `You are the founder of ${campaign.product_name}. Picture a customer who saw one of your posts and bought the ${campaign.offer.credits} scan pack for ${formatMoney(campaign.offer.amount, campaign.offer.currency)}. Make that purchase yourself with a PayPal sandbox account. The payment is credited to this campaign as revenue, and the agent learns from it to plan posts around what people paid for, not what they liked.`,
+              note: `Buy the ${campaign.offer.credits} scan pack for ${formatMoney(campaign.offer.amount, campaign.offer.currency)} with a PayPal sandbox account, as a customer who saw your post would. The agent then plans posts around what people paid for.`,
               action: "Open checkout",
               view: "checkout" as View,
             }
@@ -3480,7 +3479,7 @@ function OfferSplit({
             <span>
               {total.orders} purchase{total.orders === 1 ? "" : "s"}
             </span>
-            <span>{offerId === current.id ? "On sale now" : ""}</span>
+            <span>{offerId === current.id ? "Current offer" : ""}</span>
             <strong>{formatMoney((total.cents / 100).toFixed(2), total.currency)}</strong>
           </li>
         ))}
@@ -3675,7 +3674,7 @@ function ResultsPage({
             </>
           ) : (
             <>
-              <h2>Choose the next test from real results.</h2>
+              <h2>Choose the next experiment from verified purchases.</h2>
               <p>
                 The agent compares verified purchase signals across posts and recommends one focused
                 next experiment. When several posts bring purchases, the agent ranks them by
@@ -3900,7 +3899,7 @@ const signalCopy: Record<EvidenceSignal, string> = {
   leader: "Clear leader. One post earned the most from at least 3 purchases.",
   tie: "Tied. Posts earned the same amount, so the agent compares them instead of picking one.",
   mixed:
-    "Mixed. One post earned the most, but another sold more often, so the agent compares them instead of picking one.",
+    "Mixed. One post earned the most, but another was bought more often, so the agent compares them instead of picking one.",
 };
 
 const confidenceCopy: Record<Recommendation["confidence"], string> = {
@@ -3982,7 +3981,7 @@ function MoveDecisionPanel({
             : "This move will not run. The agent can propose a different one from the same evidence."}
         </p>
         {approved && decision.offer_change ? (
-          <p>Every buy link now sells the {offerLabel(currentOffer)}.</p>
+          <p>Customers now buy the {offerLabel(currentOffer)} from every buy link.</p>
         ) : null}
         {approved ? (
           followUp ? (
@@ -4199,7 +4198,7 @@ function ExperimentPage({
                   {recommendationLoading ? (
                     <BusyLabel text="Reviewing results" elapsed />
                   ) : (
-                    "Refresh recommendation"
+                    "Find next move again"
                   )}
                 </button>
               </div>
@@ -4243,10 +4242,12 @@ function ExperimentPage({
             <span className={`status-tag ${ready ? "success" : "neutral"}`}>
               {ready ? "Ready" : "Waiting for evidence"}
             </span>
-            <h2>{ready ? "Ready for a recommendation." : "Complete a verified purchase first."}</h2>
+            <h2>
+              {ready ? "Ready to plan your next post." : "Complete a verified purchase first."}
+            </h2>
             <p>
               {ready
-                ? "There is a verified purchase to learn from. Ask the agent for one next experiment."
+                ? "There is a verified purchase to learn from. The agent suggests your next post, written to test what your purchases show."
                 : "Recommendations begin after a verified purchase. Additional purchases are compared as they arrive."}
             </p>
             <p className="move-run">
@@ -4270,7 +4271,7 @@ function ExperimentPage({
                 {recommendationLoading ? (
                   <BusyLabel text="Reviewing results" elapsed />
                 ) : (
-                  "Prepare next experiment"
+                  "Suggest my next post"
                 )}
               </button>
             </div>
@@ -4536,7 +4537,7 @@ function CheckoutPage({
       <PageHeader
         eyebrow="Customer view"
         title="Buy as your customer"
-        description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page and never sees GrowthReceipt. Each purchase is attributed to the post that referred it. This demo uses PayPal sandbox, so no real money moves."
+        description="Every approved post has its own buy link. A customer who clicks it pays on a simple checkout page. Each purchase is credited to its post. This demo uses the PayPal sandbox, so no real money moves."
       />
       <section className="checkout-preview-card" data-tour="purchase">
         <div>
@@ -4561,7 +4562,7 @@ function CheckoutPage({
           <strong>{formatMoney(offer.amount, offer.currency)}</strong>
           {offers.length > 1 ? (
             <fieldset className="offer-picker">
-              <legend>What every buy link sells</legend>
+              <legend>What customers buy from every buy link</legend>
               {offers.map((item) => (
                 <label key={item.id}>
                   <input
@@ -4702,7 +4703,7 @@ function LinkedInPostButton({
       <legend className="visually-hidden">Confirm LinkedIn post</legend>
       <p>
         Post this publicly on LinkedIn as {memberName || "your profile"}, with its buy link? It
-        cannot be edited here afterwards.
+        cannot be edited here afterward.
       </p>
       <div>
         <button
@@ -4775,7 +4776,7 @@ function PublishButton({
       </button>
       <span className="tip" id={tipId} role="tooltip">
         {target.url
-          ? `Opens ${post.channel} with this post and its buy link filled in. You review it and press Post. GrowthReceipt never posts for you.`
+          ? `Opens ${post.channel} with this post and its buy link filled in. You review it and press Post.`
           : "Instagram has no web composer, so the post and its buy link are copied for the Instagram app."}
       </span>
     </span>
@@ -5210,7 +5211,7 @@ function ProductMark({
 
 const channelIntegration: Record<Channel, string> = {
   LinkedIn:
-    "Publish from Content opens LinkedIn with the post and its buy link filled in. Automatic posting is planned.",
+    "Publish from Content opens LinkedIn with the post and its buy link filled in. Once LinkedIn is connected here, you can turn on automatic posting for approved posts.",
   Facebook:
     "Publish from Content opens Facebook with the buy link and copies the post for you to paste.",
   X: "Publish from Content opens X with the post and its buy link filled in. Automatic posting is planned.",

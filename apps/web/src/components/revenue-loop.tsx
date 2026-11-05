@@ -70,14 +70,14 @@ const stages: Stage[] = [
     label: "Buy link per post",
     actor: "GrowthReceipt",
     icon: Link2,
-    copy: "Each approved post gets its own buy link, so a later purchase stays tied to the message. LinkedIn posts publish in one click. For other channels you copy and post.",
+    copy: "Each approved post gets its own buy link, so a later purchase stays tied to the post. With LinkedIn connected, approved posts can publish on their scheduled day. For other channels you copy and post.",
     hold: 1800,
   },
   {
     label: "Customer checkout",
     actor: "Buyer",
     icon: SiPaypal,
-    copy: "A customer opens the link and pays with PayPal, in the PayPal sandbox for the demo. The price comes from the server catalog, never the page.",
+    copy: "A customer opens the link and pays with PayPal, in the PayPal sandbox for the demo. The price comes from GrowthReceipt's server, so the page cannot change it.",
     hold: 1800,
   },
   {
@@ -91,7 +91,7 @@ const stages: Stage[] = [
     label: "Revenue attributed",
     actor: "GrowthReceipt",
     icon: ReceiptText,
-    copy: "Order, capture, webhook, campaign, offer and the post that sold form one receipt. The post now shows verified revenue.",
+    copy: "Order, capture, webhook, campaign, offer and the post that earned it form one receipt. The post now shows verified revenue.",
     hold: 1800,
   },
   {
@@ -99,14 +99,14 @@ const stages: Stage[] = [
     actor: "Agent",
     role: "Next move agent",
     icon: TrendingUp,
-    copy: "Code ranks the paying posts and labels the evidence as early, a clear leader, a tie or mixed. The agent checks the orders it cites with PayPal, then proposes one experiment with its reason and confidence.",
+    copy: "GrowthReceipt ranks the posts customers bought from and rates the evidence as early, a clear leader, a tie or mixed. The agent checks the orders it cites with PayPal, then proposes your next post, for example the same angle again or a different offer, with its reason and confidence.",
     hold: 2200,
   },
   {
     label: "You decide",
     actor: "You",
     icon: UserCheck,
-    copy: "Approve, edit or reject the move. An offer switch is optional, comes only from the existing catalog and needs at least one purchase behind it.",
+    copy: "Approve, edit or reject the move. The agent may also suggest a different offer, but only one from your catalog that customers have bought at least once.",
     hold: 3000,
     approval: true,
   },
@@ -150,7 +150,7 @@ const receiptRows: {
   check?: boolean;
 }[] = [
   { label: "Post", from: 3, value: () => "Day 1 LinkedIn post" },
-  { label: "Buy link", from: 3, value: () => "Its own" },
+  { label: "Buy link", from: 3, value: () => "Unique to this post" },
   { label: "Checkout", from: 4, value: () => "Paid with PayPal" },
   { label: "Capture", from: 5, value: () => "Completed" },
   { label: "Webhook", from: 5, value: () => "Signature verified", check: true },

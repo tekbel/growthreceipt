@@ -310,9 +310,9 @@ export function AuthShell() {
               </span>
               <h1>Know which posts generate revenue.</h1>
               <p>
-                See how each post contributes to sales through purchases verified by PayPal. The AI
-                agent identifies your best performing content and recommends what to post next to
-                increase sales, with every recommendation subject to your approval.
+                Each approved post gets its own PayPal buy link, so every verified purchase is
+                credited to the post that earned it. An AI agent reads those purchases and plans
+                your next post around what customers bought. Nothing runs until you approve it.
               </p>
               <div className="home-actions">
                 {demoButton("hero", "")}
@@ -344,7 +344,7 @@ export function AuthShell() {
                   key={theme}
                   className={`${theme}-only`}
                   src={`/home/results-${theme}.webp`}
-                  alt="The Results page of the judge demo after a PayPal sandbox purchase, with 9.00 USD of verified revenue credited to one post"
+                  alt="The Results page of the judge demo after a PayPal sandbox purchase, with $9.00 of verified revenue credited to one post"
                   width={1600}
                   height={1081}
                   decoding="async"
@@ -361,8 +361,8 @@ export function AuthShell() {
               <span className="home-kicker">PayPal AI Hackathon 2026</span>
               <h2 id="sign-in-title">The loop in 90 seconds</h2>
               <p>
-                Approve a post, buy it through PayPal sandbox, and watch the payment change the
-                agent's next recommendation.
+                Approve a post, buy LaunchCheck from its link in the PayPal sandbox, and watch the
+                purchase change what the agent suggests for your next post.
               </p>
               <div className="home-actions">{demoButton("end", "")}</div>
               {demoFacts}
@@ -506,7 +506,7 @@ const flowSteps = [
   { label: "Brief", detail: "LaunchCheck, a launch page scanner", actor: "You" },
   { label: "Campaign drafted", detail: "7 posts for 3 channels", actor: "Agent" },
   { label: "Approved", detail: "Nothing publishes without you", actor: "You" },
-  { label: "PayPal checkout", detail: "10 scan pack at 9.00 USD", actor: "Buyer" },
+  { label: "PayPal checkout", detail: "10 scans for $9.00", actor: "Buyer" },
   { label: "Payment verified", detail: "Capture and webhook match", actor: "PayPal" },
   { label: "Next move", detail: "Learned from the purchase", actor: "Agent" },
 ];
@@ -554,7 +554,7 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
             <BadgeCheck aria-hidden="true" />
             <span>Attributed revenue</span>
             <strong>
-              <CountUp to={9} delayMs={(flowSteps.length + 1) * 160} /> USD
+              $<CountUp to={9} delayMs={(flowSteps.length + 1) * 160} />
             </strong>
           </div>
           {loopButton}

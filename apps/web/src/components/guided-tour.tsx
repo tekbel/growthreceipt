@@ -12,7 +12,7 @@ const tourCopy: Record<WorkflowStepId, string> = {
   product:
     "GrowthReceipt drafts launch posts, gives each one its own buy link, and traces every PayPal purchase back to the post that earned it. This demo comes with LaunchCheck, a sample product.",
   content:
-    "These are the drafted posts. Each approved post gets a tracked buy link, so a sale is credited to the exact post a customer clicked.",
+    "These are the drafted posts. Each approved post gets a tracked buy link, so each purchase is credited to the post the customer clicked.",
   purchase:
     "Buy LaunchCheck as a customer would, with the PayPal sandbox buyer. No real money moves.",
   results:

@@ -156,7 +156,7 @@ function ReceiptProof(params: AgWidgetParams<ReceiptProofWidget>) {
                   : proof.confirmed
                     ? `${proof.webhooks} verified ${proof.webhooks === "1" ? "webhook" : "webhooks"}`
                     : proof.paid
-                      ? "Waiting for PayPal webhook"
+                      ? "Paid. PayPal confirmation on its way."
                       : "Not paid"}
               </span>
             </div>

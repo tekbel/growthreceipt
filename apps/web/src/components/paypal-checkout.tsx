@@ -5,7 +5,7 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
 import { InfoTip } from "@/components/info-tip";
-import { API_URL } from "@/lib/campaign";
+import { API_URL, formatMoney } from "@/lib/campaign";
 
 // The customer side of GrowthReceipt. It needs no sign in: the post id in the
 // buy link decides the campaign and the offer on the server.
@@ -152,7 +152,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         setStatus("Checkout needs attention.");
         throw new Error(message);
       }
-      if (!response.ok) throw new Error("The approved order could not be captured.");
+      if (!response.ok) throw new Error("Your payment could not be completed. Please try again.");
       const capture = (await response.json()) as {
         capture_id: string;
         amount: string;
@@ -180,12 +180,12 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         const methods = await sdk.findEligibleMethods({ currencyCode: checkoutOffer.currency });
         if (disposed) return;
         if (!methods.isEligible("paypal")) {
-          throw new Error("PayPal is not available for this sandbox account.");
+          throw new Error("PayPal checkout is not available right now. Please reload the page.");
         }
 
         const paymentSession = sdk.createPayPalOneTimePaymentSession({
           onApprove: ({ orderId }) => captureOrder(orderId),
-          onCancel: () => setStatus("Checkout cancelled. You can try again when ready."),
+          onCancel: () => setStatus("Checkout canceled. You can try again when ready."),
           onError: () => {
             setError("PayPal could not complete checkout. Please try again.");
             setStatus("Checkout needs attention.");
@@ -213,7 +213,11 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         setStatus("Choose PayPal to continue.");
       } catch (reason) {
         if (disposed) return;
-        setError(reason instanceof Error ? reason.message : "PayPal could not be initialized.");
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "PayPal could not start. Reload the page to try again.",
+        );
         setStatus("Checkout needs attention.");
       }
     }
@@ -296,15 +300,13 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
               </span>
               <h2>Thanks for your purchase</h2>
               <p>
-                Your payment is complete. This was a sandbox purchase, so no scans are delivered. In
-                a live store {productName} would deliver them now.
+                Your payment is complete. This was a PayPal sandbox purchase, so no scans are
+                delivered. A live store would deliver them now.
               </p>
               <dl>
                 <div>
                   <dt>Amount</dt>
-                  <dd>
-                    {receipt.amount} {receipt.currency}
-                  </dd>
+                  <dd>{formatMoney(receipt.amount, receipt.currency)}</dd>
                 </div>
                 <div>
                   <dt>PayPal receipt</dt>
@@ -361,7 +363,9 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                     setSdkReady(true);
                     setStatus("Checking PayPal availability…");
                   }}
-                  onError={() => setError("The PayPal SDK could not be loaded.")}
+                  onError={() =>
+                    setError("PayPal could not load. Check your connection and reload the page.")
+                  }
                 />
               ) : null}
               {/* PayPal draws its own button. A same size placeholder holds the space until then. */}
