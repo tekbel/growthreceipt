@@ -13,11 +13,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
-COPY packages/contracts/package.json packages/contracts/
 RUN npm ci
 
 COPY apps/web apps/web
-COPY packages packages
 RUN npm run build:web
 
 FROM node:24-slim

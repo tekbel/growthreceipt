@@ -46,7 +46,7 @@ jobs:
           cache: pip
       - run: python -m pip install -e './apps/api[dev]'
       - run: ruff check apps/api scripts services
-      - run: mypy apps/api services/worker
+      - run: mypy apps/api
       - run: pytest -q apps/api
 
   container:

@@ -7,7 +7,6 @@ export const metadata: Metadata = {
 
 const UPDATED = "11 October 2026";
 const SUPPORT = "support@mail.addisstack.com";
-const MAKER = "tekbelbzu@gmail.com";
 
 export default function PrivacyPage() {
   return (
@@ -84,8 +83,7 @@ export default function PrivacyPage() {
 
         <h2>Contact</h2>
         <p>
-          Questions or requests go to <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a>. You can also
-          reach Teklie Belay directly at <a href={`mailto:${MAKER}`}>{MAKER}</a>.
+          Questions or requests go to <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a>.
         </p>
       </article>
     </main>

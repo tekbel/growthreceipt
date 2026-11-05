@@ -43,7 +43,7 @@ import {
   useState,
 } from "react";
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
-import { SiPaypal, SiPosthog } from "react-icons/si";
+import { SiPaypal } from "react-icons/si";
 import { AgentRuns } from "@/components/agent-runs";
 import { EvidenceGrid } from "@/components/evidence-grid";
 import { GuidedTour, savedTourStep, saveTourStep, takeFirstTour } from "@/components/guided-tour";
@@ -4309,12 +4309,6 @@ function IntegrationsPage({
           status="Connected"
           action="Open checkout"
           onAction={() => navigate("checkout")}
-        />
-        <Integration
-          provider="PostHog"
-          description="Product activation, trials, and conversion events."
-          icon={<SiPosthog aria-hidden="true" />}
-          status="Planned"
         />
         {channels.map((channel) =>
           channel === "LinkedIn" && linkedin?.configured ? (
