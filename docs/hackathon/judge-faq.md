@@ -2,13 +2,13 @@
 
 Short answers to the questions judges ask most. The same answers are in the in app Help panel.
 
-## How is a sale linked to a post?
+## How is a purchase linked to a post?
 
-Every approved post gets its own buy link. When a customer pays through it, the PayPal order carries that post's attribution ID in `custom_id` and the offer in `reference_id`. When PayPal captures the payment, GrowthReceipt stores the capture and credits the sale to that post. PayPal's signed webhook for the same capture is stored as a second proof.
+Every approved post gets its own buy link. When a customer pays through it, the PayPal order carries that post's attribution ID in `custom_id` and the offer in `reference_id`. When PayPal captures the payment, GrowthReceipt stores the capture and credits the purchase to that post. PayPal's signed webhook for the same capture is stored as a second proof.
 
 ## What if the agent is wrong?
 
-Nothing the agent writes goes out on its own. You approve every post, and every next move waits for your decision. Before the agent runs, code decides how strong the purchase evidence is, so with one or two purchases it says the signal is early instead of claiming a winner. The agent can also look up the campaign's own orders in PayPal, and each lookup is recorded so you can see what PayPal said.
+Nothing the agent writes goes out until you approve it. You approve every post, and every next move waits for your decision. Before the agent runs, code decides how strong the purchase evidence is, so with one or two purchases it says the signal is early instead of claiming a winner. The agent can also look up the campaign's own orders in PayPal, and each lookup is recorded so you can see what PayPal said.
 
 ## Why PayPal?
 

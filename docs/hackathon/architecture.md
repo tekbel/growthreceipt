@@ -17,8 +17,8 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 5. **Capture.** The API captures the order with a request ID, so a repeated capture is never counted twice.
 6. **Webhook verified.** PayPal sends the capture event. The API checks its signature with PayPal before trusting it.
 7. **Revenue attributed.** The captured amount is stored against the campaign in Postgres.
-8. **Next move.** The agent reads the payment evidence and proposes one next action with its confidence. The founder approves it. Code, not the model, ranks the paying posts and labels the evidence: none, early signal (the leading post has fewer than 3 purchases), clear leader, or tie. A tie asks for a controlled comparison instead of a winner. Each recommendation shows the time of the latest purchase it read, and the Next experiment page flags new purchases that arrived after it.
-9. **Offer switch.** Once there is at least one purchase, the agent may also suggest that the buy links sell a different pack from the catalog. Code drops any suggestion that is not in the catalog or matches the current pack. The founder sees "Switch the buy link offer from X to Y" and can approve the plan with or without the switch. An approved switch is saved as an `offer_changed` campaign event, the latest one decides what every buy link sells, and Results splits revenue by offer. The agent cannot invent an offer or a price. The founder can also pick the pack by hand on the Checkout page, which saves the same event.
+8. **Next move.** The agent reads the payment evidence and proposes one next action with its confidence. The founder approves it. Code, not the model, ranks the paying posts and labels the evidence: none, early signal (the leading post has fewer than 3 purchases), clear leader, tie, or mixed (one post earned the most and another was bought more often). A tie asks for a controlled comparison instead of a winner. Each recommendation shows the time of the latest purchase it read, and the Next experiment page flags new purchases that arrived after it.
+9. **Offer switch.** Once there is at least one purchase, the agent may also suggest that customers buy a different pack from the catalog. Code drops any suggestion that is not in the catalog or matches the current pack. The founder sees "Switch the buy link offer from X to Y" and can approve the plan with or without the switch. An approved switch is saved as an `offer_changed` campaign event, the latest one decides what customers buy from every buy link, and Results splits revenue by offer. The agent cannot invent an offer or a price. The founder can also pick the pack by hand on the Checkout page, which saves the same event.
 
 ## Diagrams
 
@@ -206,7 +206,7 @@ sequenceDiagram
 
 The PayPal payment is a buyer paying the founder for the founder's product. It is not a fee for using GrowthReceipt.
 
-In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offers are LaunchCheck's real one time scan packs: 3 scans for 4 USD, 10 scans for 9 USD and 30 scans for 19 USD. A campaign starts on the 10 scan pack. A buyer who arrives from a campaign post buys the pack the campaign sells, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and in the demo customers buy the same pack through PayPal.
+In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offers are LaunchCheck's real one time scan packs: 3 scans for $4, 10 scans for $9 and 30 scans for $19. A campaign starts on the 10 scan pack. A buyer who arrives from a campaign post buys the campaign's current pack, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and in the demo customers buy the same pack through PayPal.
 
 GrowthReceipt's own pricing is separate from that payment. It is planned as a 3% fee on verified revenue, collected through the same PayPal split described below, or a monthly plan with no fee. See [who-its-for.md](./who-its-for.md).
 
@@ -219,7 +219,7 @@ No real money moves, and the founder receives nothing. The demo exists to prove 
 3. The buyer approves the payment and the API captures it. The sandbox money lands in that one account.
 4. PayPal sends the capture webhook, the API verifies it, and the revenue is credited to the campaign and the post.
 
-The checkout sells the campaign's current pack from the catalog in `apps/api/app/offers.py`. Posts written before a switch keep their text, so the buy page always shows the pack and price the buyer pays.
+The checkout offers the campaign's current pack from the catalog in `apps/api/app/offers.py`. Posts written before a switch keep their text, so the buy page always shows the pack and price the buyer pays.
 
 ### How the money moves in production (planned, not built)
 

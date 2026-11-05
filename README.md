@@ -1,6 +1,6 @@
 # GrowthReceipt
 
-Know which posts generate revenue. GrowthReceipt is a marketing agent for indie founders and small teams selling digital products. Each approved post gets its own PayPal buy link, PayPal verifies every purchase, and the agent proposes the next experiment from those verified purchases. Nothing changes until the founder approves it.
+Know which posts generate revenue. GrowthReceipt is a marketing agent for indie founders and small teams selling digital products. Each approved post gets its own PayPal buy link, PayPal verifies every purchase, and the agent plans the next post from those verified purchases. Nothing changes until the founder approves it.
 
 Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addisstack.com**.
 
@@ -15,7 +15,7 @@ The home page also has **See the full revenue loop**, a walk through every stage
 
 ![The GrowthReceipt revenue loop](./docs/hackathon/deck/shots/loop.png)
 
-| PayPal proves which post sold | Posts ranked by verified revenue |
+| PayPal proves which post paid off | Posts ranked by verified revenue |
 | --- | --- |
 | ![Technical proof: order, capture and credit to the post](./docs/hackathon/deck/shots/crop-proof.png) | ![Results table with the evidence labeled early signal](./docs/hackathon/deck/shots/crop-table.png) |
 
@@ -100,7 +100,7 @@ Until PayPal sandbox credentials are configured, PayPal routes return `503`. Tes
 
 ### PayPal sandbox checkout
 
-Approved posts also get **Publish on LinkedIn** or **Publish on X**. It opens that channel's official share composer with the post and its buy link filled in, and the founder presses Post. GrowthReceipt never posts on its own. Facebook's sharer takes only the link, so the text is copied for pasting, and Instagram gets a copy button because it has no web composer.
+Approved posts also get **Open in LinkedIn** or **Open in X**. It opens that channel's official share composer with the post and its buy link filled in, and the founder presses Post. With LinkedIn connected, GrowthReceipt can also post approved LinkedIn posts for the founder, as described in LinkedIn publishing below. Facebook's sharer takes only the link, so the text is copied for pasting, and Instagram gets a copy button because it has no web composer.
 
 Approve a post, then select **Make a test purchase** or open **Customer checkout**. Each approved post has a public buy page at `/buy/{post id}` that needs no sign in. It loads PayPal Web SDK v6, checks PayPal eligibility, creates the order through the public API (`/v1/public/...`), captures it after approval, and shows the receipt. The server resolves the campaign from the post and refuses posts that are not approved. Use a Personal account from PayPal's Sandbox Accounts page. Set `PAYPAL_SANDBOX_BUYER_EMAIL` and `PAYPAL_SANDBOX_BUYER_PASSWORD` to show that login on the buy page, which is how judges pay on the hosted demo. The API only shares them in sandbox mode. No real money moves in sandbox mode.
 
@@ -140,7 +140,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 ## Known limitations
 
 - PayPal sandbox only. Buyers pay one GrowthReceipt sandbox merchant. Founders connecting their own PayPal account is planned.
-- Only purchases made through a post's buy link are attributed. A sale that skips the link is not credited to any post.
+- Only purchases made through a post's buy link are attributed. A purchase that skips the link is not credited to any post.
 - One time purchases only. Subscriptions are planned.
 - The agent picks offers from a fixed catalog, not from the founder's own products.
 - Automatic posting covers LinkedIn personal profiles. X and Facebook open the official share composer, Instagram gets a copy button, and views and clicks are not imported.
