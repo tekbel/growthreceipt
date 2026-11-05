@@ -19,11 +19,12 @@ import {
   CampaignWorkspace,
   type WorkspaceIdentity,
 } from "@/components/campaign-workspace";
+import { HeroLoop } from "@/components/revenue-loop-view";
 import { apiFetch, DEMO_RESET_KEY, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
 
-// Loaded only when a visitor opens it, so the home page stays as light as before.
+// The dialog code loads only when a visitor opens it. The hero loop shares its drawing.
 const RevenueLoop = dynamic(() => import("@/components/revenue-loop"), { ssr: false });
 
 type AuthState = "loading" | "signed-out" | "bootstrapping" | "ready" | "error";
@@ -353,45 +354,7 @@ export function AuthShell() {
                 </li>
               </ul>
             </div>
-            <figure className="home-shot">
-              <div className="home-shot-bar" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className="home-shot-media">
-                {/* The crop skips the app top bar and the offer table, so the numbers read larger. */}
-                <div className="home-shot-crop">
-                  {(["light", "dark"] as const).map((theme) => (
-                    // biome-ignore lint/performance/noImgElement: static screenshots swapped by theme in CSS.
-                    <img
-                      key={theme}
-                      className={`${theme}-only`}
-                      src={`/home/results-${theme}.webp`}
-                      alt="Results in the judge demo after a PayPal sandbox purchase. $9.00 of verified revenue is credited to the Day 3 X post."
-                      width={1600}
-                      height={1081}
-                      decoding="async"
-                      fetchPriority={theme === "light" ? "high" : "low"}
-                    />
-                  ))}
-                </div>
-                <ul className="home-callouts">
-                  <li className="home-callout home-callout-paypal">
-                    <span>
-                      <BadgeCheck aria-hidden="true" />
-                      Verified by PayPal webhook
-                    </span>
-                  </li>
-                  <li className="home-callout home-callout-post">
-                    <span>
-                      <Check aria-hidden="true" />
-                      Credited to the Day 3 post
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </figure>
+            <HeroLoop onOpen={() => setLoopOpen(true)} />
           </section>
           <section className="home-band">
             <SampleFlow loopButton={loopButton("outline")} />
@@ -600,6 +563,45 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
           {loopButton}
         </div>
       </div>
+      <figure className="home-shot flow-shot">
+        <div className="home-shot-bar" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="home-shot-media">
+          {/* The crop skips the app top bar and the offer table, so the numbers read larger. */}
+          <div className="home-shot-crop">
+            {(["light", "dark"] as const).map((theme) => (
+              // biome-ignore lint/performance/noImgElement: static screenshots swapped by theme in CSS.
+              <img
+                key={theme}
+                className={`${theme}-only`}
+                src={`/home/results-${theme}.webp`}
+                alt="Results in the judge demo after a PayPal sandbox purchase. $9.00 of verified revenue is credited to the Day 3 X post."
+                width={1600}
+                height={1081}
+                decoding="async"
+                loading="lazy"
+              />
+            ))}
+          </div>
+          <ul className="home-callouts">
+            <li className="home-callout home-callout-paypal">
+              <span>
+                <BadgeCheck aria-hidden="true" />
+                Verified by PayPal webhook
+              </span>
+            </li>
+            <li className="home-callout home-callout-post">
+              <span>
+                <Check aria-hidden="true" />
+                Credited to the Day 3 post
+              </span>
+            </li>
+          </ul>
+        </div>
+      </figure>
     </figure>
   );
 }

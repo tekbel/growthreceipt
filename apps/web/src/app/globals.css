@@ -126,7 +126,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-proof { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 28px 0 0; padding: 20px 0 0; border-top: 1px solid var(--line); list-style: none; }
 .auth-proof li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: var(--type-sm); }
 .auth-proof svg { width: 16px; height: 16px; color: var(--ink); }
-.home-shot { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--stage); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); transform: perspective(1600px) rotateY(-6deg); transform-origin: left center; }
+.home-shot { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--stage); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); }
+/* The Results shot under the sample flow, as proof of what the loop ends in. */
+.flow-shot { max-width: 960px; margin-top: 56px; }
 :root[data-theme="dark"] .home-shot { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
 .home-shot-bar { display: flex; gap: 6px; padding: 4px 6px 10px; }
 .home-shot-bar span { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
@@ -190,7 +192,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @media (max-width: 1080px) {
   .home-hero { grid-template-columns: 1fr; gap: 48px; padding: 56px 0 72px; }
   .home-copy > p { max-width: 640px; }
-  .home-shot { transform: none; }
   .flow-grid { grid-template-columns: 1fr; }
   .flow-side { max-width: 560px; }
 }
@@ -212,7 +213,6 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 }
 @media (min-width: 761px) and (max-width: 1080px) { .flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) {
-  .home-shot { transform: none; }
   .home-header-demo, .home-header-demo[data-shown="false"] { transform: none; transition: none; }
 }
 .loop-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
@@ -258,7 +258,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 @media (prefers-reduced-motion: reduce) {
   .loop-map[data-glide] .loop-dot, .loop-map[data-glide] .loop-trail, .loop-receipt-row, .loop-receipt-check { transition: none; }
 }
-.loop-stage button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--corner-sm); }
+.loop-target { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: var(--corner-sm); }
 .loop-mark { display: grid; place-items: center; width: var(--mark); height: var(--mark); flex-shrink: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--muted); transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease); }
 .loop-mark svg { width: 18px; height: 18px; }
 .loop-stage[data-approval] .loop-mark { border-radius: var(--corner-md); border-width: 2px; }
@@ -290,13 +290,8 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   /* Steps 1 to 5 run left to right, 6 to 10 come back right to left, so the path closes. */
   .loop-stages { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--row-gap) 8px; }
   .loop-stages::before { left: 10%; right: 10%; width: auto; bottom: calc(50% - var(--row-gap) / 2 - var(--mark) / 2); border: 2px solid var(--line); border-radius: 28px; background: none; }
-  .loop-stage:nth-child(n + 6) { grid-row: 2; }
-  .loop-stage:nth-child(6) { grid-column: 5; }
-  .loop-stage:nth-child(7) { grid-column: 4; }
-  .loop-stage:nth-child(8) { grid-column: 3; }
-  .loop-stage:nth-child(9) { grid-column: 2; }
-  .loop-stage:nth-child(10) { grid-column: 1; }
-  .loop-stage button { flex-direction: column; align-items: center; gap: 8px; height: 100%; text-align: center; }
+  .loop-stage { grid-column: var(--col); grid-row: var(--row); }
+  .loop-target { flex-direction: column; align-items: center; gap: 8px; height: 100%; text-align: center; }
   .loop-return { justify-content: center; }
   .loop-body { grid-template-columns: minmax(0, 1fr) 280px; }
 }
@@ -304,6 +299,45 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .loop-dialog { width: 100%; max-width: none; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; }
   .loop-detail { min-height: 0; }
   .loop-map { padding-left: 8px; }
+}
+/* The compact loop in the home hero. Always two rows, smaller marks, no stage copy or controls. */
+.loop-hero { display: grid; gap: 12px; margin: 0; }
+.loop-hero-card { position: relative; padding: 20px 22px 22px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-base) var(--ease); }
+:root[data-theme="dark"] .loop-hero-card { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
+.loop-hero-card:hover { border-color: var(--line-strong); }
+.loop-hero-visual { display: grid; gap: 20px; }
+.loop-hero-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; }
+.loop-hero-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-strong); font-size: var(--type-xs); transition: border-color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease); }
+.loop-hero-chip svg { width: 12px; height: 12px; fill: currentColor; }
+.loop-hero-card:hover .loop-hero-chip { border-color: var(--accent); background: var(--accent-soft); }
+/* One button covers the whole card, so it opens the dialog from anywhere and reads as one control. */
+.loop-hero-open { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.loop-hero-open:focus-visible { outline-offset: 2px; }
+.loop-hero-caption { color: var(--muted); font-size: var(--type-sm); text-align: center; }
+.loop-hero .loop-stages { --mark: 36px; --row-gap: 22px; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--row-gap) 6px; }
+.loop-hero .loop-stages::before { left: 10%; right: 10%; width: auto; bottom: calc(50% - var(--row-gap) / 2 - var(--mark) / 2); border: 2px solid var(--line); border-radius: 24px; background: none; }
+.loop-hero .loop-stage { grid-column: var(--col); grid-row: var(--row); }
+.loop-hero .loop-target { flex-direction: column; align-items: center; gap: 6px; height: 100%; text-align: center; }
+.loop-hero .loop-mark svg { width: 16px; height: 16px; }
+.loop-hero .loop-copy { padding: 1px 4px; }
+.loop-hero .loop-label { font-size: var(--type-xs); line-height: 1.3; }
+.loop-hero .loop-actor { font-size: var(--type-2xs); }
+.loop-hero .loop-receipt dl { grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 6px 28px; }
+@media (max-width: 760px) {
+  .loop-hero-card { padding: 16px 14px 16px; }
+  .loop-hero-visual { gap: 16px; }
+  .loop-hero .loop-stages { --mark: 32px; --row-gap: 18px; gap: var(--row-gap) 2px; }
+  .loop-hero .loop-copy { padding: 1px 2px; }
+  .loop-hero .loop-label { font-size: var(--type-2xs); }
+  .loop-hero .loop-actor { display: none; }
+}
+/* Narrow screens drop the card heading and stack each receipt label over its value. */
+@media (max-width: 560px) {
+  .loop-hero-head { display: none; }
+  .loop-hero .loop-receipt { padding: 12px 14px; }
+  .loop-hero .loop-receipt dl { gap: 8px 16px; }
+  .loop-hero .loop-receipt-row { flex-direction: column; gap: 0; }
+  .loop-hero .loop-receipt dd { text-align: left; }
 }
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-captcha { min-height: 65px; margin-top: 16px; }
