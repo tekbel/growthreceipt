@@ -16,7 +16,9 @@ const page = await context.newPage();
 await page.goto(BASE);
 await page.getByRole("button", { name: "Try the judge demo" }).first().click();
 await page.getByRole("button", { name: "Close tour" }).click({ timeout: 30_000 });
-await page.getByRole("button", { name: "Results", exact: true }).first().click();
+// Customer checkout holds the seeded Day 3 post's buy link, the same path the e2e purchase uses.
+await page.getByRole("button", { name: "Customer checkout", exact: true }).first().click();
+await page.waitForURL(/\/checkout$/);
 
 const opened = page.waitForEvent("popup");
 await page.getByRole("button", { name: "Open as customer" }).click();
@@ -47,6 +49,7 @@ await checkout.locator(".checkout-success").waitFor({ timeout: 60_000 });
 await checkout.screenshot({ path: `${out}paid.png` });
 
 await page.bringToFront();
+await page.getByRole("button", { name: "Results", exact: true }).first().click();
 await page.reload();
 await page.getByText("Technical proof", { exact: true }).waitFor({ timeout: 45_000 });
 await page.waitForTimeout(1500);

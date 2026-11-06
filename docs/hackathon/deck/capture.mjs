@@ -13,7 +13,7 @@ const page = await browser.newPage({
 });
 
 await page.goto(BASE);
-await page.getByRole("button", { name: "See the full revenue loop" }).first().click();
+await page.getByRole("button", { name: "Play the revenue loop" }).first().click();
 const loop = page.getByRole("dialog");
 await loop.getByRole("button", { name: /^Next post/ }).click();
 await page.waitForTimeout(500);
