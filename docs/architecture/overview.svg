@@ -2,13 +2,13 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&amp;display=swap');
     .box { fill: #111a26; stroke: #273447; stroke-width: 1.5; }
-    .actor { fill: #152030; stroke: #9fb2ff; stroke-width: 1.5; }
+    .actor { fill: #152030; stroke: #a9b8d9; stroke-width: 1.5; }
     .title { fill: #eef2f6; font-size: 24px; font-weight: 600; }
     .sub { fill: #93a2b3; font-size: 17px; }
     .line { stroke: #5d7390; stroke-width: 2; fill: none; marker-end: url(#arrow); }
     .dash { stroke-dasharray: 7 7; }
     .tag { fill: #c3cdd8; font-size: 15px; }
-    .num { fill: #9fb2ff; }
+    .num { fill: #a9b8d9; }
     .numt { fill: #101727; font-size: 15px; font-weight: 600; text-anchor: middle; }
     .step { fill: #eef2f6; font-size: 19px; font-weight: 600; }
     .stepd { fill: #93a2b3; font-size: 16px; }
