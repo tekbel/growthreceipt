@@ -72,6 +72,17 @@ const options = parseArgs(process.argv.slice(2));
 if (options.fresh) await rm(PROFILE, { recursive: true, force: true });
 await mkdir(options.out, { recursive: true });
 
+// The saved profile is signed in, and a signed in home redirects to Today, so the home page
+// comes from a clean browser. The wait lets the hero sequence reach its finished state.
+const signedOut = await chromium.launch({ channel: "chrome" });
+const home = await signedOut.newPage({ viewport: VIEWPORT });
+await home.goto(options.base);
+await home.getByRole("heading", { level: 1 }).waitFor();
+await home.waitForTimeout(6500);
+await home.screenshot({ path: join(options.out, "01-home.png") });
+console.log(`saved ${join(options.out, "01-home.png")}`);
+await signedOut.close();
+
 const context = await chromium.launchPersistentContext(PROFILE, {
   channel: "chrome",
   headless: false,
@@ -81,9 +92,6 @@ const context = await chromium.launchPersistentContext(PROFILE, {
 const page = context.pages()[0] ?? (await context.newPage());
 
 try {
-  await page.goto(options.base);
-  await shoot(page, options.out, "01-home");
-
   await enterWorkspace(page, options.base);
   if (options.wait) {
     // Works without a terminal: the script continues once Results is open in the window.
@@ -101,6 +109,8 @@ try {
   ];
   for (const [name, button, path] of pages) {
     await openWorkspacePage(page, button, path);
+    // AG Studio loads its widgets after the page settles.
+    if (path === "dashboard") await page.waitForTimeout(6000);
     await shoot(page, options.out, name);
   }
 } finally {
