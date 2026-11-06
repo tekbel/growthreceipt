@@ -172,7 +172,7 @@ test("guided tour walks a first time judge through the loop", async ({
 test("home page explains the full revenue loop", async ({ page }) => {
 	await page.goto("/");
 	const trigger = page
-		.getByRole("button", { name: "See the full revenue loop" })
+		.getByRole("button", { name: "Play the revenue loop" })
 		.first();
 	await trigger.click();
 	const loop = page.getByRole("dialog", {

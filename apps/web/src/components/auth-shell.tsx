@@ -55,19 +55,6 @@ export function AuthShell() {
   // Three buttons open the demo, so a failure shows next to the one that was used.
   const [judgeFrom, setJudgeFrom] = useState<JudgeButton>("hero");
   const [loopOpen, setLoopOpen] = useState(false);
-  // The header demo button appears only once the hero's own buttons have scrolled away.
-  const [heroActions, setHeroActions] = useState<HTMLDivElement | null>(null);
-  const [heroActionsGone, setHeroActionsGone] = useState(false);
-  useEffect(() => {
-    if (!heroActions) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setHeroActionsGone(!entry.isIntersecting),
-      // The sticky header covers the top 64px, so a button under it counts as gone.
-      { rootMargin: "-64px 0px 0px 0px" },
-    );
-    observer.observe(heroActions);
-    return () => observer.disconnect();
-  }, [heroActions]);
   const captcha = useTurnstile();
   const captchaPending = Boolean(turnstileSiteKey) && !captcha.token;
 
@@ -282,7 +269,7 @@ export function AuthShell() {
         aria-haspopup="dialog"
         onClick={() => setLoopOpen(true)}
       >
-        See the full revenue loop
+        Play the revenue loop
       </button>
     );
     const judgeError = (where: "top" | "end") =>
@@ -309,27 +296,27 @@ export function AuthShell() {
               GrowthReceipt
             </div>
             <nav aria-label="Get started">
-              {/* Before Sign in, so Sign in keeps its place at the edge while this fades in. */}
-              <span
-                className="home-header-demo"
-                data-shown={heroActionsGone}
-                inert={!heroActionsGone}
-                aria-hidden={!heroActionsGone}
+              <button
+                className="home-nav-link"
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setLoopOpen(true)}
               >
-                {demoButton("header", "")}
-              </span>
+                Revenue loop
+              </button>
               <button className="button secondary" type="button" onClick={showSignIn}>
                 Sign in
               </button>
+              <span className="home-header-demo">{demoButton("header", "")}</span>
             </nav>
           </div>
         </header>
         <main>
           <section className="home-wrap home-hero">
             <div className="home-copy">
-              <span className="eyebrow">
-                For indie founders and small teams selling SaaS, templates, courses and other
-                digital products
+              <span className="eyebrow home-pill">
+                <span className="home-pill-dot" aria-hidden="true" />
+                For founders selling digital products
               </span>
               <h1>
                 The marketing posts that drive sales,{" "}
@@ -340,7 +327,7 @@ export function AuthShell() {
                 earned each sale, and the agent proposes your next experiment. Nothing runs until
                 you approve it.
               </p>
-              <div className="home-actions" ref={setHeroActions}>
+              <div className="home-actions">
                 {demoButton("hero", "")}
                 {loopButton("outline")}
               </div>
@@ -360,7 +347,7 @@ export function AuthShell() {
             </div>
             <HeroSequence />
           </section>
-          <section className="home-band" data-reveal>
+          <section className="home-band" id="the-loop" data-reveal>
             <SampleFlow loopButton={loopButton("outline")} />
           </section>
           <section className="home-wrap home-cta" aria-labelledby="sign-in-title" data-reveal>
@@ -523,8 +510,8 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
   return (
     <figure className="home-wrap flow" aria-labelledby="flow-caption">
       <figcaption id="flow-caption" className="flow-head">
-        <span className="home-kicker">How it works</span>
-        <span>Sample from the judge demo</span>
+        <span className="home-kicker">From the judge demo</span>
+        <span>Sample values. No real order.</span>
       </figcaption>
       <div className="flow-grid">
         <ol className="flow-steps">

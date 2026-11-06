@@ -11,7 +11,7 @@ Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addissta
 3. Back in the workspace, **Results** shows the verified revenue credited to the post. Open **Technical proof** for the order, the capture and the verified webhook.
 4. Choose **Find next move**. The agent reads the verified purchase and proposes one experiment that waits for your approval.
 
-The home page also has **See the full revenue loop**, a walk through every stage in about 20 seconds.
+The home page also has **Play the revenue loop**, a walk through every stage in about 20 seconds.
 
 ![The GrowthReceipt revenue loop](./docs/hackathon/deck/shots/loop.png)
 
