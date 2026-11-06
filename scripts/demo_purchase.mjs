@@ -1,5 +1,5 @@
 // Buys from one or more GrowthReceipt buy links with the PayPal sandbox buyer, the same way
-// a customer would. Used to set up the demo video state off camera.
+// a customer would. Used to add sandbox purchases to a demo workspace.
 //
 //   node scripts/demo_purchase.mjs <buy link> [<buy link> ...] [--count N] [--headless]
 //

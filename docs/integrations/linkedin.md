@@ -6,17 +6,17 @@ Shipped on October 11, 2026 in commit `62c11fe`. A founder connects their own Li
 
 The feature stays inactive until the three `LINKEDIN_*` variables are set on the Railway api service. Without them the Integrations page keeps the share link behaviour.
 
-Checked against the Microsoft Learn LinkedIn docs on October 11, 2026. Recheck them before changing scopes or endpoints, because LinkedIn changes products and versions often. The `microsoft-learn` MCP server is configured for this project and searches those docs.
+Checked against the Microsoft Learn LinkedIn docs on October 11, 2026. Recheck them before changing scopes or endpoints, because LinkedIn changes products and versions often.
 
 ## Setup runbook
 
 ### 1. LinkedIn account and Page
 
-Use your real LinkedIn account. LinkedIn's User Agreement allows one account per real person, and fake accounts get restricted, which would break the app before judging. Test posts go to your real profile, so delete them afterwards if needed.
+Use your real LinkedIn account. LinkedIn's User Agreement allows one account per real person, and fake accounts get restricted, which breaks the connection. Test posts go to your real profile, so delete them afterwards if needed.
 
 The developer app must be linked to a LinkedIn Company Page that you administer. A personal profile is not accepted.
 
-The Addis Stack page is `https://www.linkedin.com/company/123143924/`. To get a page URL from the admin view, drop the `/admin/dashboard/` part from `https://www.linkedin.com/company/123143924/admin/dashboard/`.
+Use the URL of a Company Page you administer, such as `https://www.linkedin.com/company/<id>/`. From the admin view, drop the `/admin/dashboard/` part of the URL.
 
 ### 2. Create the app
 
@@ -25,9 +25,9 @@ Go to https://www.linkedin.com/developers/apps and choose **Create app**.
 | Field | Value |
 |---|---|
 | App name | `GrowthReceipt` |
-| LinkedIn Page | `https://www.linkedin.com/company/123143924/`. This cannot be changed after saving. |
+| LinkedIn Page | `https://www.linkedin.com/company/<id>/`. This cannot be changed after saving. |
 | Privacy policy URL | `https://growthreceipt.addisstack.com/privacy` |
-| App logo | `growthreceipt-logo-512.png`, the blue receipt mark rendered at 512 px from `apps/web/src/app/icon.svg` |
+| App logo | A 512 px PNG of `apps/web/src/app/icon.svg` |
 | Legal agreement | Tick the box |
 
 To render the logo again, screenshot `icon.svg` at 512 by 512 with the corner radius set to 0. LinkedIn wants a square image of at least 100 px.
@@ -71,7 +71,7 @@ On the Railway **api** service, under Variables, set:
 
 The key encrypts stored access tokens. Changing it makes every saved connection unreadable, so each workspace has to reconnect. Keep all three values out of chat, git and any `NEXT_PUBLIC_` variable. Railway redeploys on save.
 
-The database migration `supabase/migrations/20261011000100_linkedin_publishing.sql` was run on the hosted Supabase on October 11, 2026.
+Run the database migration `supabase/migrations/20261011000100_linkedin_publishing.sql` on your Supabase project.
 
 ### 6. Test
 
@@ -84,8 +84,6 @@ The database migration `supabase/migrations/20261011000100_linkedin_publishing.s
 ### 7. Token expiry
 
 Access tokens last 60 days and self serve apps get no refresh token. When Integrations says the connection expired, choose **Reconnect**. If your LinkedIn grant is still valid, LinkedIn skips the consent screen, so it is one click.
-
-Reconnect around November 25, 2026, before recording the demo video, so the token is valid through judging (December 1 to 15).
 
 ## How it works
 

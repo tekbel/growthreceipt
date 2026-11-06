@@ -24,28 +24,5 @@ northstar-*.zip
 content-review-*.png
 web-proto-type-skill/
 
-# Internal tool for video prep, not part of the submission
-scripts/sandbox_purchases.mjs
-plan.json
-
 # Written by the local SessionEnd hook
 reference_last_session.md
-
-# Private owner notes, kept on disk, never public
-docs/handoff/
-docs/research/
-docs/hackathon/category-plan.md
-docs/hackathon/prize-outlook.md
-docs/hackathon/external-audit.md
-docs/hackathon/audit-responses.md
-docs/hackathon/devpost-registration.md
-docs/hackathon/demo-video.md
-docs/hackathon/devpost-submission.md
-docs/hackathon/judge-runbook.md
-docs/hackathon/paypal-ai-2026.md
-docs/hackathon/rules-compliance-checklist.md
-docs/hackathon/build-log.md
-docs/hackathon/founder-validation.md
-docs/hackathon/deck/PLAN.md
-docs/hackathon/deck/review.md
-docs/qa/

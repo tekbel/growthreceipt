@@ -148,7 +148,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 ## Documents
 
 - [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers common questions: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
-- [docs/hackathon/devpost-whats-next.md](./docs/hackathon/devpost-whats-next.md) describes what comes next: subscriptions, direct payouts to founders, offers from the founder's products and more publishing channels.
+- [docs/hackathon/whats-next.md](./docs/hackathon/whats-next.md) describes what comes next: subscriptions, direct payouts to founders, offers from the founder's products and more publishing channels.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.

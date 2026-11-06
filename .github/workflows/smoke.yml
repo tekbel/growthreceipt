@@ -1,4 +1,4 @@
-# Daily check that the live judge demo still works, through judging on 2026-12-21.
+# Daily check that the live demo still works.
 # Runs the hosted browser tests without the PayPal purchase, so it costs nothing.
 # GitHub emails the owner when a scheduled run fails.
 name: Smoke

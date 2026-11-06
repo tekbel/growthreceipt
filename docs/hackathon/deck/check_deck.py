@@ -1,4 +1,4 @@
-"""Quality gates for the deck, modeled on addispublisher's copy and asset checks.
+"""Quality gates for the deck.
 
 Copy gate: banned stock words, no dashes or semicolons, every number in facts.json, headline and
 body limits. Output gate: five pages at 1920 by 1080 and no visually blank page.

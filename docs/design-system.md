@@ -39,9 +39,9 @@ The home view answers one question: what needs attention today? Campaign review,
 
 ## Interaction rules
 
-1. Primary actions use charcoal. Deep teal identifies progress, selection, and approval.
+1. Primary actions use the blue accent. The same blue identifies progress, selection, and approval.
 2. Hover feedback changes surface or border color without moving the layout.
-3. Focus uses a visible teal ring.
+3. Focus uses a visible blue ring.
 4. Loading controls remain disabled until the action completes.
 5. Reduced motion preferences disable nonessential motion.
 6. Motion uses `--duration-fast` (120ms), `--duration-base` (220ms) and `--ease`. Lists reveal with a 45ms stagger. Reduced motion sets both durations to zero.

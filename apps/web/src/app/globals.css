@@ -89,7 +89,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .auth-wordmark { display: inline-flex; align-items: center; gap: 10px; font-size: var(--type-xl); font-weight: 600; letter-spacing: -.02em; }
 .auth-wordmark > span, .auth-loading-mark { width: 30px; height: 30px; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: var(--corner-sm); }
 .auth-wordmark svg, .auth-loading-mark svg { width: 17px; height: 17px; stroke-width: 1.8; }
-/* Names the example product, so judges know what LaunchCheck is before they meet it. */
+/* Names the example product before the visitor meets it. */
 /* Signed out home: split hero with the real product, how it works, then sign in. */
 .home { min-height: 100vh; background: var(--surface); color: var(--ink); }
 .home-wrap { width: min(1200px, 100% - 48px); margin: 0 auto; }
@@ -168,7 +168,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .flow-step.current strong { color: var(--accent-strong); }
 .flow-step > span:last-child { color: var(--muted); font-size: var(--type-sm); line-height: 1.5; }
 .flow-side { display: grid; gap: 20px; }
-/* Names the example product, so judges know what LaunchCheck is before they meet it. */
+/* Names the example product before the visitor meets it. */
 .flow-example { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--ink-soft); font-size: var(--type-base); line-height: 1.55; }
 .flow-example img { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; }
 .flow-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }

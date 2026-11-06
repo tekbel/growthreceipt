@@ -22,7 +22,7 @@ GrowthReceipt is a marketing agent that learns from verified PayPal payments ins
 
 ## Diagrams
 
-Each diagram is drawn from the code. A change to one of these flows updates its diagram in the same commit. GitHub renders them, and PNG copies for Devpost are in [docs/architecture/](../architecture/).
+Each diagram is drawn from the code. A change to one of these flows updates its diagram in the same commit. GitHub renders them, and PNG copies are in [docs/architecture/](../architecture/).
 
 ### System
 
@@ -278,8 +278,4 @@ Judges enter with one click. Each judge gets an anonymous session and a private 
 
 Model calls are capped. Each workspace can run the agent 20 times a day, and all workspaces together 300 times a day. The API records every run in `growthreceipt.agent_runs` and answers 429 with a plain message once a limit is reached. Both limits are settings (`AGENT_RUNS_PER_WORKSPACE_DAY`, `AGENT_RUNS_PER_DAY`).
 
-Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`. The source is at https://github.com/tekbel/growthreceipt. Manual `railway up` deploys are retired.
-
-## Using it in the demo video
-
-Show the diagram for about ten seconds right after the opening problem statement. Point at the numbered loop on the right, then cut to the live product and follow the same numbers in order.
+Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`. The source is at https://github.com/tekbel/growthreceipt.

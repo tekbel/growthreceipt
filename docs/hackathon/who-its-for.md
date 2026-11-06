@@ -47,7 +47,3 @@ Why this shape:
 * Annual plans are priced at 10 months, a common two months free offer.
 
 Open risk: platform fees need PayPal partner approval for multiparty payments, which can take weeks. Until then the hosted demo runs on one PayPal sandbox merchant and charges nothing.
-
-## Short version for Devpost
-
-GrowthReceipt is for indie founders and small teams selling digital products through PayPal. They can see which posts get likes but not which posts bring paying customers. GrowthReceipt drafts the posts, gives each one its own PayPal buy link, counts only purchases PayPal confirms, and suggests one next experiment from that evidence.
