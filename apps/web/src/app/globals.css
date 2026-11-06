@@ -967,6 +967,15 @@ html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 .page-shell > * { animation: rise var(--duration-base) var(--ease) both; }
 .reveal { animation: rise var(--duration-base) var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+/* Same rhythm as the home page, but quieter. Runs when a view opens, never on a data refresh,
+   because the page shell remounts only when the view changes. */
+@media (prefers-reduced-motion: no-preference) {
+  .page-shell > * { animation-duration: 320ms; }
+  .page-shell > :nth-child(2) { animation-delay: 60ms; }
+  .page-shell > :nth-child(3) { animation-delay: 120ms; }
+  .page-shell > :nth-child(n + 4) { animation-delay: 180ms; }
+  .page-shell .panel, .page-shell .plain-panel { animation: rise 380ms var(--ease) both; animation-delay: 140ms; }
+}
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 /* Loading and error states */

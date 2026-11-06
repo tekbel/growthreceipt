@@ -45,7 +45,6 @@ import {
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { SiPaypal } from "react-icons/si";
 import { AgentRuns } from "@/components/agent-runs";
-import { EvidenceGrid } from "@/components/evidence-grid";
 import { GuidedTour, savedTourStep, saveTourStep, takeFirstTour } from "@/components/guided-tour";
 import { InfoTip } from "@/components/info-tip";
 import { PostRef } from "@/components/post-ref";
@@ -97,6 +96,14 @@ import { isView, type View, views } from "@/lib/views";
 import { type WorkflowStep, workflowSteps } from "@/lib/workflow";
 
 // AG Studio is large, so it loads only when the dashboard opens, and only in the browser.
+// AG Grid is large, so the evidence grid loads only when Results opens, not on first load.
+const EvidenceGrid = dynamic(
+  () => import("@/components/evidence-grid").then((module) => module.EvidenceGrid),
+  {
+    ssr: false,
+    loading: () => <div className="skeleton-block panel" aria-busy="true" />,
+  },
+);
 const RevenueStudio = dynamic(() => import("@/components/revenue-studio/revenue-studio"), {
   ssr: false,
   loading: () => (
