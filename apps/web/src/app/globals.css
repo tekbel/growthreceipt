@@ -13,9 +13,9 @@
   --muted: #5c6877;
   --line: #dfe4ea;
   --line-strong: #d3d9e0;
-  --accent: #4458b8;
-  --accent-strong: #36479a;
-  --accent-soft: #e5e9fb;
+  --accent: #14213d;
+  --accent-strong: #0b1428;
+  --accent-soft: #e1e6f0;
   --success: #287a59;
   --success-soft: #e8f3ed;
   --warning: #8b6818;
@@ -71,9 +71,9 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   --muted: #a0adbc;
   --line: #1f2b3b;
   --line-strong: #273447;
-  --accent: #9fb2ff;
-  --accent-strong: #bac5ff;
-  --accent-soft: #202a43;
+  --accent: #a9b8d9;
+  --accent-strong: #c6d1e8;
+  --accent-soft: #1c2638;
   --success: #83c9a9;
   --success-soft: #243a30;
   --warning: #dfc06c;
@@ -733,7 +733,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .checkout-price span { margin-top: 5px; color: #a9b5cb; }
 .checkout-benefits { display: grid; gap: 12px; margin: auto 0 0; padding: 30px 0 0; list-style: none; color: #d5dcea; }
 .checkout-benefits li { display: flex; align-items: center; gap: 9px; }
-.checkout-benefits svg { width: 16px; color: #9fb2ff; }
+.checkout-benefits svg { width: 16px; color: #a9b8d9; }
 .checkout-payment { display: flex; flex-direction: column; justify-content: center; padding: 72px 60px 48px; background: var(--surface); }
 .checkout-payment-head h2, .checkout-success h2 { margin: 0; font-size: var(--type-title); letter-spacing: -.02em; font-weight: 400; }
 .checkout-payment-head p, .checkout-success > p { margin: 12px 0 30px; color: var(--muted); font-size: var(--type-base); line-height: 1.6; }
