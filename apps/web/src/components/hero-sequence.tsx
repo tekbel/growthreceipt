@@ -7,6 +7,7 @@ import {
   nextChange,
   SEQUENCE_END,
   STAGE_COUNT,
+  STAGE_STARTS,
   type StageStatus,
   stageAt,
   stageStatus,
@@ -99,6 +100,8 @@ export function HeroSequence() {
   const [started, setStarted] = useState(false);
   const [manualPause, setManualPause] = useState(false);
   const [onScreen, setOnScreen] = useState(false);
+  // Bumped on replay, so the timer bar restarts even when the stage index is the same.
+  const [runId, setRunId] = useState(0);
   const current = stageAt(elapsed);
   const finished = current >= STAGE_COUNT;
   const running = started && !manualPause && onScreen && !finished;
@@ -154,6 +157,7 @@ export function HeroSequence() {
     setElapsed(0);
     setManualPause(false);
     setStarted(true);
+    setRunId((id) => id + 1);
   };
 
   const announcement = !started
@@ -172,7 +176,12 @@ export function HeroSequence() {
         {stages.map((stage, index) => {
           const status = stageStatus(index, current);
           return (
-            <li key={stage.title} className="seq-card" data-status={status}>
+            <li
+              key={stage.title}
+              className="seq-card"
+              data-status={status}
+              data-reached={(index > 0 && current >= index) || undefined}
+            >
               {index > 0 ? (
                 <svg
                   className="seq-link"
@@ -185,7 +194,13 @@ export function HeroSequence() {
                 </svg>
               ) : null}
               <span className="seq-num" aria-hidden="true">
-                {status === "done" ? <Check /> : index + 1}
+                {status === "done" ? (
+                  <svg className="seq-check" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
               </span>
               <div className="seq-top">
                 <h3>
@@ -196,6 +211,17 @@ export function HeroSequence() {
               </div>
               <p>{stage.copy}</p>
               <div className="seq-detail">{stage.detail}</div>
+              {started && status === "active" ? (
+                <span
+                  key={`${runId}-${stage.title}`}
+                  className="seq-timer"
+                  aria-hidden="true"
+                  style={{
+                    animationDuration: `${(nextChange(STAGE_STARTS[index]) ?? SEQUENCE_END) - STAGE_STARTS[index]}ms`,
+                    animationPlayState: running ? "running" : "paused",
+                  }}
+                />
+              ) : null}
             </li>
           );
         })}

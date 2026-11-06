@@ -172,7 +172,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .flow-example { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--ink-soft); font-size: var(--type-base); line-height: 1.55; }
 .flow-example img { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; }
 .flow-example a { color: var(--accent-strong); font-weight: 600; text-underline-offset: 2px; }
-.flow-step, .flow-result { animation: flow-in 420ms var(--ease) both; animation-delay: calc(var(--i, 0) * 140ms + 250ms); }
+[data-revealed] .flow-step, [data-revealed] .flow-result { animation: flow-in 420ms var(--ease) both; animation-delay: calc(var(--i, 0) * 140ms + 250ms); }
 .flow-result { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-radius: var(--corner-md); background: var(--success-soft); color: var(--success); font-size: var(--type-base); font-weight: 600; }
 .flow-result svg { width: 18px; height: 18px; }
 .flow-result strong { margin-left: auto; color: var(--ink); font-size: var(--type-2xl); font-variant-numeric: tabular-nums; }
@@ -345,6 +345,33 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .seq-card[data-status="pending"] { transform: none; }
 }
 .home-h1-accent { color: var(--accent); }
+/* Motion pass. Each piece plays once and only when the visitor has not asked for reduced motion. */
+.seq-check { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.seq-timer { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 2px; background: var(--accent); transform-origin: left; transform: scaleX(0); opacity: .7; }
+@keyframes home-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes seq-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes seq-fill { to { transform: scaleX(1); } }
+@keyframes seq-travel { 0% { opacity: 0; transform: translateY(0); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(16px); } }
+@keyframes callout-in { from { opacity: 0; transform: scale(.97); } }
+@media (prefers-reduced-motion: no-preference) {
+  .home-copy > *, .home-hero > .seq { animation: home-rise 620ms var(--ease) both; }
+  .home-copy > :nth-child(2) { animation-delay: 70ms; }
+  .home-copy > :nth-child(3) { animation-delay: 140ms; }
+  .home-copy > :nth-child(4) { animation-delay: 210ms; }
+  .home-copy > :nth-child(n + 5) { animation-delay: 280ms; }
+  .home-hero > .seq { animation-delay: 200ms; }
+  .seq-timer { animation: seq-fill linear both; }
+  .seq-check path { stroke-dasharray: 1; animation: seq-draw 340ms var(--ease) both; }
+  .seq-card[data-status="active"] .seq-detail > * { animation: home-rise 380ms var(--ease) both; }
+  .seq-card[data-status="active"] .seq-detail > :nth-child(2) { animation-delay: 220ms; }
+  .seq-card[data-status="active"] .seq-detail > :nth-child(3) { animation-delay: 440ms; }
+  /* A dot runs down the connector once, like the sale moving to the next stage. */
+  .seq-card[data-reached]::before { content: ""; position: absolute; top: -17px; left: calc(var(--pad) + var(--num) / 2 - 3px); width: 6px; height: 6px; border-radius: 50%; background: var(--accent); pointer-events: none; animation: seq-travel 520ms var(--ease) both; }
+  .home[data-reveal-ready] [data-reveal] { transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
+  .home[data-reveal-ready] [data-reveal]:not([data-revealed]) { opacity: 0; transform: translateY(18px); }
+  [data-revealed] .home-callout { animation: callout-in 420ms var(--ease) both; animation-delay: 600ms; }
+  [data-revealed] .home-callout + .home-callout { animation-delay: 820ms; }
+}
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-captcha { min-height: 65px; margin-top: 16px; }
 .auth-divider { display: flex; align-items: center; gap: 13px; margin: 24px 0; color: var(--muted); font-size: var(--type-xs); }

@@ -21,6 +21,7 @@ import {
 } from "@/components/campaign-workspace";
 import { HeroSequence } from "@/components/hero-sequence";
 import { apiFetch, DEMO_RESET_KEY, setApiAccessToken } from "@/lib/campaign";
+import { revealOnScroll } from "@/lib/reveal";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
 
@@ -298,7 +299,7 @@ export function AuthShell() {
       </ul>
     );
     return (
-      <div className="home">
+      <div className="home" ref={revealOnScroll}>
         <header className="home-header">
           <div className="home-wrap">
             <div className="auth-wordmark">
@@ -359,10 +360,10 @@ export function AuthShell() {
             </div>
             <HeroSequence />
           </section>
-          <section className="home-band">
+          <section className="home-band" data-reveal>
             <SampleFlow loopButton={loopButton("outline")} />
           </section>
-          <section className="home-wrap home-cta" aria-labelledby="sign-in-title">
+          <section className="home-wrap home-cta" aria-labelledby="sign-in-title" data-reveal>
             <div className="home-cta-copy">
               <span className="home-kicker">PayPal AI Hackathon 2026</span>
               <h2 id="sign-in-title">The loop in 90 seconds</h2>
