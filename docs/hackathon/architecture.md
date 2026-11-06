@@ -2,7 +2,7 @@
 
 ![GrowthReceipt architecture](../architecture/overview.png)
 
-The source is [overview.svg](../architecture/overview.svg). The PNG is 1920 by 1080, so it can go straight into the demo video and the Devpost gallery.
+The source is [overview.svg](../architecture/overview.svg).
 
 ## What the system does
 
@@ -206,7 +206,7 @@ sequenceDiagram
 
 The PayPal payment is a buyer paying the founder for the founder's product. It is not a fee for using GrowthReceipt.
 
-In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offers are LaunchCheck's real one time scan packs: 3 scans for $4, 10 scans for $9 and 30 scans for $19. A campaign starts on the 10 scan pack. A buyer who arrives from a campaign post buys the campaign's current pack, and GrowthReceipt credits that revenue to the campaign. LaunchCheck takes card payments through Stripe on its own site, and in the demo customers buy the same pack through PayPal.
+In the demo, Teklie Belay, the maker of GrowthReceipt, promotes LaunchCheck (launchcheck.addisstack.com), a scanner Teklie also built that finds launch issues on a public page. The offers are LaunchCheck's real one time scan packs: 3 scans for $4, 10 scans for $9 and 30 scans for $19. LaunchCheck sells them through Stripe on its own site. For this demo, GrowthReceipt sells the same packs through the PayPal sandbox, as if LaunchCheck took PayPal. A campaign starts on the 10 scan pack. A buyer who arrives from a campaign post buys the campaign's current pack, and GrowthReceipt credits that revenue to the campaign.
 
 GrowthReceipt's own pricing is separate from that payment. It is planned as a 3% fee on verified revenue, collected through the same PayPal split described below, or a monthly plan with no fee. See [who-its-for.md](./who-its-for.md).
 
