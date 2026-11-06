@@ -675,7 +675,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 .checkout-preview-card > div:first-child p { color: color-mix(in srgb, var(--canvas) 72%, transparent); }
 .checkout-preview-card ul { display: grid; gap: 12px; margin: 36px 0 0; padding: 0; list-style: none; }
 .checkout-preview-card li { display: flex; align-items: center; gap: 10px; }
-.checkout-preview-card li svg { width: 17px; color: var(--accent); }
+/* Light checks on the dark product panel. Accent is near black, so it would vanish here. */
+.checkout-preview-card li svg { width: 17px; color: #a9b8d9; }
 .checkout-offer { display: flex; flex-direction: column; justify-content: center; }
 .checkout-offer > svg { width: 32px; height: 32px; color: #003087; }
 .checkout-offer > span { margin-top: 13px; color: var(--muted); }
@@ -686,7 +687,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 .offer-picker label { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--corner-md); font-size: var(--type-sm); font-variant-numeric: tabular-nums; cursor: pointer; }
 .offer-picker label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 .offer-picker input { accent-color: var(--accent); }
-.checkout-offer small { margin-top: 16px; color: var(--muted); overflow-wrap: anywhere; }
+.checkout-offer > p { margin: 0; color: var(--ink-soft); font-size: var(--type-sm); }
+.checkout-offer small { margin-top: 16px; color: var(--muted); font-size: var(--type-sm); overflow-wrap: anywhere; }
 .buy-links { margin-top: 40px; }
 .buy-links h2 { margin: 0; font-size: var(--type-lg); font-weight: 500; }
 .buy-links > p { margin: 8px 0 0; color: var(--muted); line-height: 1.6; }

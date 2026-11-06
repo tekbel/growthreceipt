@@ -5,7 +5,7 @@
 // Chrome opens visibly with its own saved profile, so the same judge workspace comes back on
 // every run. Make sandbox purchases in that workspace first, otherwise Results is empty.
 //   --new   start a fresh judge workspace (drops the saved session first)
-//   --wait  pause after opening the workspace so you can buy in that window, then press Enter
+//   --wait  pause after opening the workspace so you can buy in that window, then open Results
 //   --base  site to capture (default https://growthreceipt.addisstack.com)
 //   --out   folder for the PNG files (default ~/Desktop/growthreceipt-screenshots)
 // Needs Google Chrome installed.
@@ -13,7 +13,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { chromium } from "playwright-core";
 
 const VIEWPORT = { width: 1500, height: 1000 };
@@ -86,9 +85,9 @@ try {
 
   await enterWorkspace(page, options.base);
   if (options.wait) {
-    const prompt = createInterface({ input: process.stdin, output: process.stdout });
-    await prompt.question("Make the sandbox purchases in the Chrome window, then press Enter. ");
-    prompt.close();
+    // Works without a terminal: the script continues once Results is open in the window.
+    console.log("Make the sandbox purchases in the Chrome window, then open Results.");
+    await page.waitForURL(/\/results$/, { timeout: 0 });
   }
 
   const pages = [

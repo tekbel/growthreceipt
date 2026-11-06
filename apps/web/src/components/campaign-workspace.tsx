@@ -4589,9 +4589,9 @@ function CheckoutPage({
             </>
           ) : (
             <>
-              <small>Approve a post first. Every approved post gets its own buy link.</small>
+              <small>Every approved post gets its own buy link.</small>
               <button className="button dark" type="button" onClick={() => navigate("content")}>
-                Review posts
+                Approve a post first
               </button>
             </>
           )}
