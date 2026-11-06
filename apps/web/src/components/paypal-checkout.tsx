@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Copy, LockKeyhole } from "lucide-react";
+import { ArrowRight, Check, Copy, LockKeyhole, RotateCw } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
@@ -76,6 +76,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [status, setStatus] = useState("Preparing secure checkout…");
   const [error, setError] = useState<string | null>(null);
+  const [setupFailed, setSetupFailed] = useState(false);
   const [receipt, setReceipt] = useState<{
     captureId: string;
     amount: string;
@@ -180,7 +181,7 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         const methods = await sdk.findEligibleMethods({ currencyCode: checkoutOffer.currency });
         if (disposed) return;
         if (!methods.isEligible("paypal")) {
-          throw new Error("PayPal checkout is not available right now. Please reload the page.");
+          throw new Error("PayPal is not eligible for this checkout.");
         }
 
         const paymentSession = sdk.createPayPalOneTimePaymentSession({
@@ -213,12 +214,9 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
         setStatus("Choose PayPal to continue.");
       } catch (reason) {
         if (disposed) return;
-        setError(
-          reason instanceof Error
-            ? reason.message
-            : "PayPal could not start. Reload the page to try again.",
-        );
-        setStatus("Checkout needs attention.");
+        // SDK errors are written for developers, so the buyer gets one plain message and a reload.
+        console.warn("PayPal setup failed", reason);
+        setSetupFailed(true);
       }
     }
 
@@ -229,6 +227,14 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
       paypalButton?.remove();
     };
   }, [contentId, offer, receipt, sdkReady]);
+
+  // The PayPal SDK can hang without an error. After 20 seconds, offer a reload instead of a spinner.
+  useEffect(() => {
+    if (!offer || buttonReady || setupFailed || receipt) return;
+    const timer = window.setTimeout(() => setSetupFailed(true), 20_000);
+    return () => window.clearTimeout(timer);
+  }, [offer, buttonReady, setupFailed, receipt]);
+  const showReload = setupFailed && !buttonReady && !error;
 
   if (unavailable) {
     return (
@@ -363,24 +369,36 @@ export function BuyCheckout({ contentId }: { contentId: string }) {
                     setSdkReady(true);
                     setStatus("Checking PayPal availability…");
                   }}
-                  onError={() =>
-                    setError("PayPal could not load. Check your connection and reload the page.")
-                  }
+                  onError={() => setSetupFailed(true)}
                 />
               ) : null}
               {/* PayPal draws its own button. A same size placeholder holds the space until then. */}
-              <div className="paypal-button-frame">
+              <div className="paypal-button-frame" hidden={showReload}>
                 <div
                   className={`paypal-button-slot${buttonReady ? " ready" : ""}`}
                   ref={buttonContainer}
                 />
-                {!buttonReady && !error ? (
+                {!buttonReady && !error && !setupFailed ? (
                   <div className="paypal-button-skeleton" aria-hidden="true" />
                 ) : null}
               </div>
-              <p className={`checkout-status ${error ? "error" : ""}`} aria-live="polite">
-                {error ?? status}
+              <p
+                className={`checkout-status ${error || showReload ? "error" : ""}`}
+                aria-live="polite"
+              >
+                {error ??
+                  (showReload ? "PayPal did not load. Reload the page to try again." : status)}
               </p>
+              {showReload ? (
+                <button
+                  className="button secondary checkout-reload"
+                  type="button"
+                  onClick={() => window.location.reload()}
+                >
+                  <RotateCw aria-hidden="true" />
+                  Reload page
+                </button>
+              ) : null}
               <div className="checkout-secure">
                 <LockKeyhole aria-hidden="true" />
                 PayPal handles your payment details securely.

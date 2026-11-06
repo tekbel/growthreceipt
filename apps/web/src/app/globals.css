@@ -750,6 +750,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 .paypal-button-slot { min-height: 48px; }
 .checkout-status { min-height: 18px; margin: 15px 0 0; color: var(--muted); }
 .checkout-status.error { color: var(--danger); }
+.checkout-reload { margin-top: 12px; }
 .checkout-secure { display: flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); }
 .checkout-secure svg { width: 14px; }
 .test-buyer { margin: -14px 0 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface-subtle); }
