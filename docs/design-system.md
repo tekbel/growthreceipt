@@ -18,7 +18,7 @@ The home view answers one question: what needs attention today? Campaign review,
 ## Visual system
 
 1. Use a cool grey canvas, white surfaces and navy black ink, with subtle slate separation.
-2. Use `#4458b8` as the interface accent (hover `#36479a`, dark mode `#9fb2ff`). Tokens live in `apps/web/src/app/globals.css`.
+2. Use midnight blue `#14213d` as the interface accent (strong `#0b1428`, soft `#e1e6f0`, dark mode `#a9b8d9`). Green `#287a59` is the only bright color and means verified by PayPal. Tokens live in `apps/web/src/app/globals.css`.
 3. Use Figtree for display, body, labels, controls, and tabular numbers.
 4. Use hairline rules to organize related information.
 5. Use restrained four to seven pixel corners for controls and working surfaces.
@@ -39,7 +39,7 @@ The home view answers one question: what needs attention today? Campaign review,
 
 ## Interaction rules
 
-1. Primary actions use the blue accent. The same blue identifies progress, selection, and approval.
+1. Primary actions use the midnight blue accent. The same color identifies progress, selection, and approval. Each screen has one filled action. Other header and toolbar actions are quiet text buttons of the same height.
 2. Hover feedback changes surface or border color without moving the layout.
 3. Focus uses a visible blue ring.
 4. Loading controls remain disabled until the action completes.

@@ -66,8 +66,8 @@ flowchart TB
   api --> db
   api -->|Only approved posts| linkedin
 
-  classDef human fill:#4458b8,stroke:#36479a,color:#ffffff
-  classDef gate fill:#e8ebf8,stroke:#4458b8,color:#1b2240
+  classDef human fill:#14213d,stroke:#0b1428,color:#ffffff
+  classDef gate fill:#e1e6f0,stroke:#14213d,color:#14213d
   class founder,buyer human
   class web,api gate
 ```

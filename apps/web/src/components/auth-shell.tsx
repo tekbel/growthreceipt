@@ -304,7 +304,7 @@ export function AuthShell() {
               >
                 Revenue loop
               </button>
-              <button className="button secondary" type="button" onClick={showSignIn}>
+              <button className="home-nav-link" type="button" onClick={showSignIn}>
                 Sign in
               </button>
               <span className="home-header-demo">{demoButton("header", "")}</span>

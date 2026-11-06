@@ -346,8 +346,11 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 /* Eyebrow as a quiet pill. The green dot echoes the verified color. */
 .home-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; }
 .home-pill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
-.home-nav-link { padding: 0 10px; border: 0; background: none; cursor: pointer; font-family: inherit; color: var(--ink-soft); font-size: var(--type-base); font-weight: 600; text-decoration: none; }
-.home-nav-link:hover { color: var(--ink); }
+.home-nav-link { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border: 0; border-radius: var(--corner-sm); background: none; cursor: pointer; font-family: inherit; transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease); color: var(--ink-soft); font-size: var(--type-base); font-weight: 600; text-decoration: none; }
+.home-nav-link:hover { background: var(--surface-hover); color: var(--ink); }
+/* Header actions share one height and type size. Only the demo button is filled. */
+.home-header .home-demo { min-height: 40px; padding: 0 16px; font-size: var(--type-base); box-shadow: none; }
+.home-header .home-demo:hover:not(:disabled) { transform: none; box-shadow: none; }
 html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 /* Motion pass. Each piece plays once and only when the visitor has not asked for reduced motion. */
