@@ -4,7 +4,7 @@ import "@fontsource-variable/figtree";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GrowthReceipt | Know which marketing posts drive sales and what to post next",
+  title: "GrowthReceipt | The marketing posts that drive sales, and what to post next",
   description: "Turn verified PayPal purchases into your next approved marketing experiment.",
 };
 

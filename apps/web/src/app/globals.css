@@ -108,7 +108,7 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .home-copy .eyebrow, .home-kicker { color: var(--accent-strong); font-size: var(--type-base); font-weight: 600; }
 /* One line on wide screens, slightly smaller so it ends before the shot. */
 @media (min-width: 1240px) { .home-copy .eyebrow { font-size: var(--type-sm); white-space: nowrap; } }
-.home-copy h1 { margin: 16px 0 0; font-size: clamp(2.5rem, 1.6rem + 3.2vw, 4.25rem); font-weight: 400; line-height: 1.03; letter-spacing: -.03em; text-wrap: balance; }
+.home-copy h1 { margin: 16px 0 0; font-size: clamp(2.5rem, 1.6rem + 3.2vw, 3.75rem); font-weight: 400; line-height: 1.03; letter-spacing: -.03em; text-wrap: balance; }
 .home-copy > p { max-width: 560px; margin: 22px 0 30px; color: var(--ink-soft); font-size: var(--type-lg); line-height: 1.65; }
 .home-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .home-actions .button { min-height: 52px; padding: 0 22px; font-size: var(--type-md); }
@@ -300,45 +300,51 @@ button:disabled { cursor: not-allowed; opacity: .46; }
   .loop-detail { min-height: 0; }
   .loop-map { padding-left: 8px; }
 }
-/* The compact loop in the home hero. Always two rows, smaller marks, no stage copy or controls. */
-.loop-hero { display: grid; gap: 12px; margin: 0; }
-.loop-hero-card { position: relative; padding: 20px 22px 22px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-base) var(--ease); }
-:root[data-theme="dark"] .loop-hero-card { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
-.loop-hero-card:hover { border-color: var(--line-strong); }
-.loop-hero-visual { display: grid; gap: 20px; }
-.loop-hero-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; }
-.loop-hero-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-strong); font-size: var(--type-xs); transition: border-color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease); }
-.loop-hero-chip svg { width: 12px; height: 12px; fill: currentColor; }
-.loop-hero-card:hover .loop-hero-chip { border-color: var(--accent); background: var(--accent-soft); }
-/* One button covers the whole card, so it opens the dialog from anywhere and reads as one control. */
-.loop-hero-open { position: absolute; inset: 0; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
-.loop-hero-open:focus-visible { outline-offset: 2px; }
-.loop-hero-caption { color: var(--muted); font-size: var(--type-sm); text-align: center; }
-.loop-hero .loop-stages { --mark: 36px; --row-gap: 22px; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--row-gap) 6px; }
-.loop-hero .loop-stages::before { left: 10%; right: 10%; width: auto; bottom: calc(50% - var(--row-gap) / 2 - var(--mark) / 2); border: 2px solid var(--line); border-radius: 24px; background: none; }
-.loop-hero .loop-stage { grid-column: var(--col); grid-row: var(--row); }
-.loop-hero .loop-target { flex-direction: column; align-items: center; gap: 6px; height: 100%; text-align: center; }
-.loop-hero .loop-mark svg { width: 16px; height: 16px; }
-.loop-hero .loop-copy { padding: 1px 4px; }
-.loop-hero .loop-label { font-size: var(--type-xs); line-height: 1.3; }
-.loop-hero .loop-actor { font-size: var(--type-2xs); }
-.loop-hero .loop-receipt dl { grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 6px 28px; }
-@media (max-width: 760px) {
-  .loop-hero-card { padding: 16px 14px 16px; }
-  .loop-hero-visual { gap: 16px; }
-  .loop-hero .loop-stages { --mark: 32px; --row-gap: 18px; gap: var(--row-gap) 2px; }
-  .loop-hero .loop-copy { padding: 1px 2px; }
-  .loop-hero .loop-label { font-size: var(--type-2xs); }
-  .loop-hero .loop-actor { display: none; }
-}
-/* Narrow screens drop the card heading and stack each receipt label over its value. */
+/* The four stage hero sequence. Example values only, the stages light up once and then hold. */
+.seq { --num: 32px; --pad: 16px; display: grid; gap: 16px; padding: 22px; border: 1px solid var(--line); border-radius: var(--corner-lg); background: var(--surface); box-shadow: 0 30px 80px -30px rgb(34 40 47 / 28%); }
+:root[data-theme="dark"] .seq { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 60%); }
+.seq-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.seq-head h2 { margin: 0; font-size: var(--type-md); font-weight: 600; }
+.seq-sample { color: var(--muted); font-size: var(--type-xs); }
+.seq-list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.seq-card { position: relative; display: grid; grid-template-columns: var(--num) minmax(0, 1fr); column-gap: 14px; row-gap: 4px; padding: 14px var(--pad); border: 1px solid var(--line); border-radius: var(--corner-md); background: var(--surface); transition: border-color var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease), opacity var(--duration-base) var(--ease), transform var(--duration-base) var(--ease); }
+.seq-card[data-status="pending"] { opacity: .72; transform: translateY(4px); }
+.seq-card[data-status="active"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.seq-card[data-status="waiting"] { border-color: var(--accent); }
+.seq-num { grid-row: 1 / span 3; display: grid; place-items: center; width: var(--num); height: var(--num); border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ink-soft); font-size: var(--type-sm); font-weight: 600; transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease); }
+.seq-num svg { width: 16px; height: 16px; }
+.seq-card[data-status="active"] .seq-num, .seq-card[data-status="waiting"] .seq-num { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.seq-card[data-status="done"] .seq-num { border-color: var(--success-soft); background: var(--success-soft); color: var(--success); }
+.seq-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.seq-top h3 { margin: 0; font-size: var(--type-base); font-weight: 600; }
+.seq-status { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--surface-subtle); color: var(--ink-soft); font-size: var(--type-2xs); font-weight: 600; white-space: nowrap; }
+.seq-card[data-status="done"] .seq-status { background: var(--success-soft); color: var(--success); }
+.seq-card[data-status="active"] .seq-status, .seq-card[data-status="waiting"] .seq-status { background: var(--accent-soft); color: var(--accent-strong); }
+.seq-card p { margin: 0; color: var(--ink-soft); font-size: var(--type-sm); line-height: 1.5; }
+.seq-detail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-top: 4px; color: var(--ink-soft); font-size: var(--type-xs); line-height: 1.5; }
+.seq-detail q { flex-basis: 100%; color: var(--ink); }
+.seq-meta { display: inline-flex; align-items: center; gap: 5px; }
+.seq-meta svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.seq-meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--type-xs); }
+.seq-ok { color: var(--success); }
+.seq-amount { color: var(--ink); font-weight: 600; }
+.seq-amount small { color: var(--muted); font-size: var(--type-xs); font-weight: 400; }
+/* Connector from the card above, drawn once when this stage is reached. */
+.seq-link { position: absolute; top: -15px; left: calc(var(--pad) + var(--num) / 2 - 1px); width: 2px; height: 15px; overflow: visible; background: var(--line); }
+.seq-link line { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 420ms var(--ease); }
+.seq-link[data-drawn] line { stroke-dashoffset: 0; }
+.seq-foot { display: flex; flex-wrap: wrap; gap: 8px; }
+.seq-control { min-height: 36px; padding: 0 12px; font-size: var(--type-sm); }
+.seq-control svg { width: 14px; height: 14px; }
 @media (max-width: 560px) {
-  .loop-hero-head { display: none; }
-  .loop-hero .loop-receipt { padding: 12px 14px; }
-  .loop-hero .loop-receipt dl { gap: 8px 16px; }
-  .loop-hero .loop-receipt-row { flex-direction: column; gap: 0; }
-  .loop-hero .loop-receipt dd { text-align: left; }
+  .seq { --num: 28px; --pad: 12px; padding: 16px; }
+  .seq-card { column-gap: 12px; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .seq-card, .seq-num, .seq-link line { transition: none; }
+  .seq-card[data-status="pending"] { transform: none; }
+}
+.home-h1-accent { color: var(--accent); }
 @keyframes flow-in { from { opacity: 0; transform: translateY(6px); } }
 .auth-captcha { min-height: 65px; margin-top: 16px; }
 .auth-divider { display: flex; align-items: center; gap: 13px; margin: 24px 0; color: var(--muted); font-size: var(--type-xs); }

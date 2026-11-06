@@ -6,7 +6,6 @@ import {
   Link2,
   type LucideIcon,
   PenLine,
-  Play,
   ReceiptText,
   ShieldCheck,
   TrendingUp,
@@ -425,69 +424,5 @@ export function LoopReceipt({ loop, labelled }: { loop: LoopClock; labelled?: bo
       </dl>
       <p className="loop-receipt-note">Sample values. No real order.</p>
     </Box>
-  );
-}
-
-/**
- * The compact loop in the home hero. It plays once while in view, then holds the finished loop.
- * Screen readers get one button that opens the full dialog, so the drawing itself is hidden.
- */
-export function HeroLoop({ onOpen }: { onOpen: () => void }) {
-  const loop = useLoopClock(false);
-  const card = useRef<HTMLDivElement>(null);
-  const { setPlaying, finish, done } = loop;
-
-  // Runs before the first paint, so reduced motion never sees the empty start.
-  useLayoutEffect(() => {
-    if (prefersReducedMotion()) finish();
-  }, [finish]);
-
-  // Plays only while the card is on screen and the tab is visible, and never twice.
-  useEffect(() => {
-    const element = card.current;
-    if (!element || prefersReducedMotion()) return;
-    let inView = false;
-    const update = () => setPlaying(inView && !document.hidden && !done());
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        inView = entry.isIntersecting;
-        update();
-      },
-      { threshold: 0.4 },
-    );
-    observer.observe(element);
-    document.addEventListener("visibilitychange", update);
-    return () => {
-      observer.disconnect();
-      document.removeEventListener("visibilitychange", update);
-    };
-  }, [setPlaying, done]);
-
-  return (
-    <figure className="loop-hero">
-      <div className="loop-hero-card" ref={card}>
-        <div className="loop-hero-visual" aria-hidden="true">
-          <div className="loop-hero-head">
-            <span>The revenue loop</span>
-            <span className="loop-hero-chip">
-              <Play />
-              Step through it
-            </span>
-          </div>
-          <LoopMap loop={loop} />
-          <LoopReceipt loop={loop} />
-        </div>
-        <button
-          className="loop-hero-open"
-          type="button"
-          aria-haspopup="dialog"
-          aria-label="Play the full revenue loop"
-          onClick={onOpen}
-        />
-      </div>
-      <figcaption className="loop-hero-caption">
-        Plays the loop with sample values. Select to open it step by step.
-      </figcaption>
-    </figure>
   );
 }

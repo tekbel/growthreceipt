@@ -19,7 +19,7 @@ import {
   CampaignWorkspace,
   type WorkspaceIdentity,
 } from "@/components/campaign-workspace";
-import { HeroLoop } from "@/components/revenue-loop-view";
+import { HeroSequence } from "@/components/hero-sequence";
 import { apiFetch, DEMO_RESET_KEY, setApiAccessToken } from "@/lib/campaign";
 import { getSupabase, googleAuthEnabled, supabaseConfigured } from "@/lib/supabase";
 import { setWorkspaceTimeZone } from "@/lib/time";
@@ -331,13 +331,13 @@ export function AuthShell() {
                 digital products
               </span>
               <h1>
-                Know which marketing posts drive sales and what to post next, backed by verified
-                PayPal purchases.
+                The marketing posts that drive sales,{" "}
+                <span className="home-h1-accent">and what to post next.</span>
               </h1>
               <p>
-                Each approved marketing post gets its own PayPal buy link. Verified purchases show
-                which post earned the money, and an AI agent plans your next post from them. Nothing
-                runs until you approve it.
+                Each approved post gets its own PayPal buy link. Verified purchases show which post
+                earned each sale, and the agent proposes your next experiment. Nothing runs until
+                you approve it.
               </p>
               <div className="home-actions" ref={setHeroActions}>
                 {demoButton("hero", "")}
@@ -357,7 +357,7 @@ export function AuthShell() {
                 </li>
               </ul>
             </div>
-            <HeroLoop onOpen={() => setLoopOpen(true)} />
+            <HeroSequence />
           </section>
           <section className="home-band">
             <SampleFlow loopButton={loopButton("outline")} />
@@ -559,9 +559,7 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
           <div className="flow-result" style={{ "--i": flowSteps.length } as CSSProperties}>
             <BadgeCheck aria-hidden="true" />
             <span>Attributed revenue</span>
-            <strong>
-              $<CountUp to={9} delayMs={(flowSteps.length + 1) * 160} />
-            </strong>
+            <strong>$9.00</strong>
           </div>
           {loopButton}
         </div>
@@ -606,37 +604,6 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
         </div>
       </figure>
     </figure>
-  );
-}
-
-/** Counts the sample revenue up once the flow has played. Reduced motion shows the final value. */
-function CountUp({ to, delayMs }: { to: number; delayMs: number }) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setValue(to);
-      return;
-    }
-    let frame = 0;
-    const timer = window.setTimeout(() => {
-      const start = performance.now();
-      const tick = (now: number) => {
-        const progress = Math.min((now - start) / 700, 1);
-        setValue(to * (1 - (1 - progress) ** 3));
-        if (progress < 1) frame = requestAnimationFrame(tick);
-      };
-      frame = requestAnimationFrame(tick);
-    }, delayMs);
-    return () => {
-      window.clearTimeout(timer);
-      cancelAnimationFrame(frame);
-    };
-  }, [to, delayMs]);
-  return (
-    <>
-      <span aria-hidden="true">{value.toFixed(2)}</span>
-      <span className="visually-hidden">{to.toFixed(2)}</span>
-    </>
   );
 }
 
