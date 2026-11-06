@@ -330,11 +330,14 @@ export function AuthShell() {
                 For indie founders and small teams selling SaaS, templates, courses and other
                 digital products
               </span>
-              <h1>Know which posts earn revenue and what to post next.</h1>
+              <h1>
+                Know which marketing posts drive sales and what to post next, backed by verified
+                PayPal purchases.
+              </h1>
               <p>
-                Each approved post gets its own PayPal buy link. Verified purchases show which post
-                earned the money, and an AI agent plans your next post from them. Nothing runs until
-                you approve it.
+                Each approved marketing post gets its own PayPal buy link. Verified purchases show
+                which post earned the money, and an AI agent plans your next post from them. Nothing
+                runs until you approve it.
               </p>
               <div className="home-actions" ref={setHeroActions}>
                 {demoButton("hero", "")}

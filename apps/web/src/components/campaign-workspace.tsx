@@ -3652,7 +3652,7 @@ function ResultsPage({
           <p>
             {hasRevenue
               ? `Customers bought the offer ${revenue?.completed_orders} time${revenue?.completed_orders === 1 ? "" : "s"} in the PayPal sandbox. PayPal confirmed each payment.`
-              : "Complete a sandbox checkout to verify attribution from campaign to revenue."}
+              : "Your workspace starts empty, so every number here comes from a real sandbox purchase. Click Open as customer, pay with the sandbox buyer and come back. The result shows in a few seconds."}
           </p>
           <button className="button dark" type="button" onClick={openCheckout}>
             Open as customer

@@ -17,7 +17,7 @@ async function enterJudgeDemo(page: Page, { keepTour = false } = {}) {
 	await page.goto("/");
 	await expect(page).toHaveTitle(/GrowthReceipt/);
 	await expect(
-		page.getByRole("heading", { name: "Know which posts earn revenue and what to post next." }),
+		page.getByRole("heading", { name: "Know which marketing posts drive sales and what to post next, backed by verified PayPal purchases." }),
 	).toBeVisible();
 	await page
 		.getByRole("button", { name: "Try the judge demo" })
