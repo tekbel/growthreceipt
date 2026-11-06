@@ -144,13 +144,11 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - Automatic posting covers LinkedIn personal profiles. X and Facebook open the official share composer, Instagram gets a copy button, and views and clicks are not imported.
 - Small samples stay small. Fewer than 3 purchases on the leading post is labeled an early signal, and the agent is told not to call a winner. When one post earns the most but another has more purchases, the evidence is labeled mixed and the agent compares the two.
 - LinkedIn self serve tokens last 60 days with no refresh, so founders reconnect.
-- Sign up captcha is off during judging so judges are not blocked.
 
 ## Documents
 
-- [docs/hackathon/paypal-ai-2026.md](./docs/hackathon/paypal-ai-2026.md) maps official requirements and judging criteria to the competition build.
 - [docs/hackathon/judge-faq.md](./docs/hackathon/judge-faq.md) answers common questions: attribution, wrong recommendations, why PayPal, agent data, run cost and refunds.
-- [docs/hackathon/judge-runbook.md](./docs/hackathon/judge-runbook.md) defines the canonical judge path, expected evidence, and final rehearsal.
+- [docs/hackathon/devpost-whats-next.md](./docs/hackathon/devpost-whats-next.md) describes what comes next: subscriptions, direct payouts to founders, offers from the founder's products and more publishing channels.
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.

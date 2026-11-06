@@ -1,7 +1,5 @@
 # What's next for GrowthReceipt
 
-Draft for the Devpost "What's next" section. Keep it in sync with what the demo really does.
-
 ## Subscriptions
 
 Today GrowthReceipt attributes one time PayPal orders. Most indie software is paid for by subscription, so the next step is the PayPal Subscriptions API.
