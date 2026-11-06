@@ -141,11 +141,11 @@ button:disabled { cursor: not-allowed; opacity: .46; }
 .home-callout { position: absolute; border: 2px solid var(--accent); border-radius: 8px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
 .home-callout > span { position: absolute; left: -2px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 10px 24px -12px rgb(34 40 47 / 45%); color: var(--ink); font-size: var(--type-xs); font-weight: 600; line-height: 1.2; white-space: nowrap; }
 .home-callout svg { flex: 0 0 auto; width: 15px; height: 15px; color: var(--success); }
-/* The verified revenue figure, labelled to its right so no text in the shot is covered. */
-.home-callout-paypal { left: 2%; top: 23.5%; width: 23%; height: 18.5%; }
-.home-callout-paypal > span { top: 50%; left: calc(100% + 12px); transform: translateY(-50%); white-space: nowrap; }
-/* The Day 3 X post in the strip, labelled below. */
-.home-callout-post { left: 2%; top: 71.3%; width: 13.5%; height: 8.4%; }
+/* The verified revenue tile, labelled below in the gap above the next heading. */
+.home-callout-paypal { left: 15.6%; top: 12.6%; width: 19.4%; height: 15%; }
+.home-callout-paypal > span { top: calc(100% + 6px); white-space: nowrap; }
+/* The Day 1 LinkedIn post in the strip, labelled below. */
+.home-callout-post { left: 15.8%; top: 45.8%; width: 14.6%; height: 11.2%; }
 .home-callout-post > span { top: calc(100% + 6px); }
 @media (min-width: 761px) { :root[data-theme="dark"] .home-callout > span { box-shadow: 0 10px 24px -12px rgb(0 0 0 / 70%); } }
 .home-shot .dark-only, :root[data-theme="dark"] .home-shot .light-only { display: none; }

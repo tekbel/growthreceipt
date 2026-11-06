@@ -48,7 +48,8 @@ async function closeTour(page) {
 async function enterWorkspace(page, base) {
   await page.goto(`${base}/today`);
   const today = page.getByRole("button", { name: "Today", exact: true });
-  if (await today.isVisible({ timeout: 8_000 }).catch(() => false)) return;
+  // A saved session can take a while to restore, so wait before falling back to a new demo.
+  if (await today.waitFor({ timeout: 30_000 }).then(() => true, () => false)) return;
   await page.goto(base);
   await page.getByRole("button", { name: "Try the judge demo" }).first().click();
   await today.waitFor({ timeout: 30_000 });

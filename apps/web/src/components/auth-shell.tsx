@@ -567,7 +567,7 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
                 key={theme}
                 className={`${theme}-only`}
                 src={`/home/results-${theme}.webp`}
-                alt="Results in the judge demo after a PayPal sandbox purchase. $9.00 of verified revenue is credited to the Day 3 X post."
+                alt="Results in the judge demo after a PayPal sandbox purchase. $9.00 of verified revenue is credited to the Day 1 LinkedIn post."
                 width={1600}
                 height={1081}
                 decoding="async"
@@ -585,7 +585,7 @@ function SampleFlow({ loopButton }: { loopButton: ReactNode }) {
             <li className="home-callout home-callout-post">
               <span>
                 <Check aria-hidden="true" />
-                Credited to the Day 3 post
+                Credited to the Day 1 post
               </span>
             </li>
           </ul>
