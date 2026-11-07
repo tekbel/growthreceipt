@@ -323,9 +323,9 @@ export function AuthShell() {
                 <span className="home-h1-accent">and what to post next.</span>
               </h1>
               <p>
-                Each approved post gets its own PayPal buy link. Verified purchases show which post
-                earned each sale, and the agent proposes your next experiment. Nothing runs until
-                you approve it.
+                Each approved post gets its own PayPal buy link, so every verified purchase is
+                credited to the post that earned it. An OpenAI agent reads those sales and proposes
+                your next experiment. Nothing runs until you approve it.
               </p>
               <div className="home-actions">
                 {demoButton("hero", "")}

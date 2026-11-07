@@ -13,6 +13,13 @@ Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addissta
 
 The home page also has **Play the revenue loop**, a walk through every stage in about 20 seconds.
 
+Testing details:
+
+* Sandbox buyer login, also shown on every buy page: `judge-buyer@personal.example.com` / `JudgeBuyer2026!`. It only works in the PayPal sandbox.
+* Expected result: Results shows $9.00 verified by PayPal (for the 10 scan pack), credited to the post whose link you opened, and Technical proof lists the PayPal order, capture and webhook IDs.
+* Each judge gets a private workspace that starts with no purchases. **Reset demo** in the top bar clears it and prepares a fresh sample campaign.
+* If the PayPal button does not appear within 20 seconds, the page offers a reload.
+
 ![The GrowthReceipt revenue loop](./docs/hackathon/deck/shots/loop.png)
 
 | PayPal proves which post paid off | Posts ranked by verified revenue |
@@ -153,3 +160,7 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
 - [SPEC.md](./docs/background/SPEC.md), [ARCHITECTURE.md](./docs/background/ARCHITECTURE.md) and [PROMPTS.md](./docs/background/PROMPTS.md) are the original pre hackathon plan and build prompts, kept as background. They describe more than GrowthReceipt ships.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

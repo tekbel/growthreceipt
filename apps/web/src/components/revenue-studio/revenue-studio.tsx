@@ -153,6 +153,8 @@ export default function RevenueStudio({
 }) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [mode, setMode] = useState<AgStudioMode>("view");
+  // Charts draw a few seconds after the data arrives. The skeleton stays until Studio reports rendered.
+  const [rendered, setRendered] = useState(false);
   const [assistant, setAssistant] = useState(false);
   // Studio reads initialState once, when it is created. This component only renders in the browser.
   const [saved] = useState(() => savedReport(campaign.id));
@@ -265,18 +267,24 @@ export default function RevenueStudio({
     setMode("view");
   }
 
-  if (load.status === "loading") {
-    return (
-      <section className="skeleton" aria-busy="true" aria-label="Loading the revenue dashboard">
-        <div className="skeleton-row">
-          <div className="skeleton-block card" />
-          <div className="skeleton-block card" />
-          <div className="skeleton-block card" />
-        </div>
-        <div className="skeleton-block panel" />
-      </section>
-    );
-  }
+  // Fallback so the dashboard never stays hidden if the render event does not arrive.
+  useEffect(() => {
+    if (load.status !== "ready" || rendered) return;
+    const timer = window.setTimeout(() => setRendered(true), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [load.status, rendered]);
+
+  const skeleton = (
+    <section className="skeleton" aria-busy="true" aria-label="Loading the revenue dashboard">
+      <div className="skeleton-row">
+        <div className="skeleton-block card" />
+        <div className="skeleton-block card" />
+        <div className="skeleton-block card" />
+      </div>
+      <div className="skeleton-block panel" />
+    </section>
+  );
+  if (load.status === "loading") return skeleton;
   if (load.status === "error" || !data) {
     return (
       <div className="empty-state boxed" role="alert">
@@ -356,6 +364,7 @@ export default function RevenueStudio({
         </div>
       </div>
       <div className="revenue-studio-canvas">
+        {rendered ? null : <div className="revenue-studio-loading">{skeleton}</div>}
         <AgStudioProvider modules={modules} licenseKey={studioLicenseKey}>
           <AgStudio<RevenueRegistry>
             style={{ height: "100%", width: "100%" }}
@@ -370,6 +379,9 @@ export default function RevenueStudio({
             onApiReady={(event) => {
               // The ready event is typed with the default registry, the api is ours.
               api.current = event.api as unknown as AgStudioApi<RevenueRegistry>;
+            }}
+            onRenderStateChanged={(event) => {
+              if (event.renderState === "rendered") setRendered(true);
             }}
             onStateUpdated={(event) => {
               // The note goes away when the founder removes the filter in the filters panel.

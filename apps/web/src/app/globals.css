@@ -1355,7 +1355,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 .revenue-studio-sample .text-button, .revenue-studio-focus .text-button { font-size: inherit; }
 .revenue-studio-real { margin: 0; color: var(--ink-soft); }
 .revenue-studio-focus { margin: 0; padding: 8px 14px; border-radius: var(--corner-md); color: var(--ink); background: var(--accent-soft); }
-.revenue-studio-canvas { height: max(640px, calc(100dvh - 220px)); min-width: 0; border: 1px solid var(--line); border-radius: var(--corner-md); overflow: hidden; }
+.revenue-studio-canvas { position: relative; height: max(640px, calc(100dvh - 220px)); min-width: 0; border: 1px solid var(--line); border-radius: var(--corner-md); overflow: hidden; }
+.revenue-studio-loading { position: absolute; inset: 0; z-index: 2; padding: 16px; background: var(--surface); }
 .receipt-widget { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; color: var(--ink); font-size: var(--type-sm); }
 .receipt-widget-summary { margin: 0; color: var(--ink-soft); }
 .receipt-widget ul { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; }
