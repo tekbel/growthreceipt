@@ -323,9 +323,10 @@ export function AuthShell() {
                 <span className="home-h1-accent">and what to post next.</span>
               </h1>
               <p>
-                Each approved post gets its own PayPal buy link, so every verified purchase is
-                credited to the post that earned it. An OpenAI agent reads those sales and proposes
-                your next experiment. Nothing runs until you approve it.
+                Each approved post gets its own PayPal buy link. When a purchase is verified,
+                GrowthReceipt attributes the sale to the post that drove it. An OpenAI agent uses
+                those results to recommend your next experiment. Nothing moves forward until you
+                approve it.
               </p>
               <div className="home-actions">
                 {demoButton("hero", "")}
