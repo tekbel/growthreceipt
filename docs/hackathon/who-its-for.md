@@ -46,4 +46,4 @@ Why this shape:
 * Once a maker earns more than about $630 a month through campaigns, Maker at $19 costs less than the 3% fee, so growing makers have a clear reason to upgrade.
 * Annual plans are priced at 10 months, a common two months free offer.
 
-Open risk: platform fees need PayPal partner approval for multiparty payments, which can take weeks. Until then the hosted demo runs on one PayPal sandbox merchant and charges nothing.
+Dependency: the 3% platform fee needs PayPal partner approval for multiparty payments, which can take weeks. Until then the hosted demo runs on one PayPal sandbox merchant and takes no platform fee.
