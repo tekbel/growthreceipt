@@ -49,6 +49,27 @@ jobs:
       - run: mypy apps/api
       - run: pytest -q apps/api
 
+  # Not a promotion requirement. A newly published advisory turns this red
+  # without blocking a hotfix, and the daily smoke run repeats it.
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-audit
+      # Only what ships is audited. Dev tools never reach production.
+      - name: Audit API dependencies
+        run: pip-audit apps/api
+      - name: Audit web dependencies
+        run: npm audit --omit=dev
+
   container:
     name: Production image (${{ matrix.service }})
     runs-on: ubuntu-latest

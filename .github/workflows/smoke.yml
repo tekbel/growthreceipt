@@ -1,5 +1,6 @@
 # Daily check that the live demo still works.
 # Runs the hosted browser tests without the PayPal purchase, so it costs nothing.
+# It also audits dependencies, so an advisory published after the last push is caught.
 # GitHub emails the owner when a scheduled run fails.
 name: Smoke
 
@@ -39,3 +40,22 @@ jobs:
           name: playwright-failures
           path: /tmp/growthreceipt-playwright
           retention-days: 7
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-audit
+      # Only what ships is audited. Dev tools never reach production.
+      - name: Audit API dependencies
+        run: pip-audit apps/api
+      - name: Audit web dependencies
+        run: npm audit --omit=dev
