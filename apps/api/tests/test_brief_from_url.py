@@ -75,6 +75,20 @@ async def test_read_product_page_extracts_title_description_and_text() -> None:
 
 
 @pytest.mark.asyncio
+async def test_read_product_page_uses_an_svg_icon_when_it_is_the_only_one() -> None:
+    page_html = b"""<html><head><title>LaunchCheck</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"></head><body>Scan</body></html>"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=page_html, headers={"content-type": "text/html"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        page = await read_product_page("https://example.com/", client=client, resolve=PUBLIC)
+
+    assert page.image_url == "https://example.com/favicon.svg"
+
+
+@pytest.mark.asyncio
 async def test_read_product_page_checks_every_redirect() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(302, headers={"location": "https://evil.example/admin"})

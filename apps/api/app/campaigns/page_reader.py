@@ -140,7 +140,8 @@ class _PageParser(HTMLParser):
         self.text: list[str] = []
         self.skip = 0
         self.in_title = False
-        # (rank, size, href). An apple-touch-icon beats a plain PNG icon, then bigger wins.
+        # (rank, size, href). An apple-touch-icon beats a raster icon, which beats an SVG icon,
+        # then bigger wins. SVG is safe here because the app only shows icons in an <img>.
         self.icons: list[tuple[int, int, str]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -159,6 +160,8 @@ class _PageParser(HTMLParser):
                 self.icons.append((2, size or 180, href))
             elif "icon" in rel and raster:
                 self.icons.append((1, size, href))
+            elif "icon" in rel and href.lower().split("?")[0].endswith(".svg"):
+                self.icons.append((0, 0, href))
         elif tag == "title":
             self.in_title = True
         if tag in self.SKIP:
