@@ -6,6 +6,20 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // No page is meant to be framed, so a hidden frame cannot trick a click on approve,
+        // refund or publish. A full CSP is left out because PayPal, Turnstile and AG Studio
+        // load scripts from their own hosts.
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+      {
         source: "/products/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
