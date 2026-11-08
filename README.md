@@ -38,7 +38,7 @@ Built with PayPal Orders, Web SDK v6 and verified webhooks, OpenAI agents with h
 ## Tests
 
 ```bash
-pytest -q apps/api                                           # API tests
+make test                                                    # web and API tests
 E2E_BASE_URL=https://growthreceipt.addisstack.com npx playwright test   # hosted browser tests
 ```
 
@@ -59,27 +59,75 @@ docs/background       Original pre hackathon plan, kept as background
 
 ### Local setup
 
+The hosted judge demo is the fastest way to evaluate GrowthReceipt. Run it locally when you want to inspect or change the code.
+
+**Prerequisites:** Node.js 20.9 or newer with npm, Python 3.12 or newer, Docker with Docker Compose, GNU Make and Git. ngrok is only needed to receive PayPal sandbox webhooks locally.
+
+**1. Clone and configure**
+
 ```bash
+git clone https://github.com/tekbel/growthreceipt.git
+cd growthreceipt
 cp .env.example .env
-make setup
-make db-up
-make demo-seed
-make dev-api
-make dev-web
 ```
 
-`make demo-seed` applies migrations and loads the judge demo campaign. `make demo-reset` deletes the demo workspace campaigns and PayPal orders, then reseeds. Both refuse to run when `APP_ENV=production`.
+Fill in `.env` using the table below. Never commit `.env` or any file with real credentials.
 
-Use separate terminals for the API and web commands. The API runs on port 8000 and the web app on port 3000 by default. If port 3000 is taken, run the web app on 3001 (`npm run dev:web -- -p 3001`), the port the LinkedIn redirect and Playwright use locally.
+**2. Install and seed**
 
-For local PayPal webhooks, start the restricted relay and a fixed ngrok endpoint in two more terminals. Set `NGROK_URL` to your reserved ngrok https URL first:
+```bash
+make setup       # npm workspace and the .venv for the API
+make db-up       # local Postgres 17 in Docker, on port 54329
+make demo-seed   # applies migrations and loads the sample LaunchCheck campaign
+```
+
+`make demo-reset` deletes the demo workspace campaigns and PayPal orders, then reseeds. Both commands refuse to run when `APP_ENV=production`.
+
+**3. Run the API and the web app** in two terminals from the repository root:
+
+```bash
+make dev-api     # terminal 1: API on http://localhost:8000
+make dev-web     # terminal 2: web app on http://localhost:3000
+```
+
+Open the web app and choose **Try the judge demo**. If port 3000 is taken, run `npm run dev:web -- -p 3001`. Port 3001 is also the port the LinkedIn redirect and Playwright use locally, so set `WEB_ORIGIN` to match whichever port you use.
+
+**4. Verify**
+
+```bash
+make check       # lint, typecheck, web and API tests, production build
+```
+
+**Environment variables.** `.env.example` lists every variable. These are the ones that matter locally:
+
+| Variable | Purpose |
+|---|---|
+| `APP_ENV` | `development` locally. The seed commands refuse to run with `production`. |
+| `WEB_ORIGIN` | The web app origin the API accepts, for example `http://localhost:3000`. |
+| `NEXT_PUBLIC_API_URL` | The API URL the web app calls, for example `http://localhost:8000`. |
+| `DATABASE_URL` | Postgres connection string. Point it at the container from `make db-up`. |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Model access for the campaign and next move agents. |
+| `PAYPAL_ENVIRONMENT` | Set to `sandbox`. |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Sandbox REST app credentials from the PayPal Developer Dashboard. The secret stays on the server. |
+| `PAYPAL_WEBHOOK_ID` | ID of the sandbox webhook, used to verify every webhook signature. |
+| `AUTH_REQUIRED` | `false` keeps the open judge demo. `true` requires Supabase sign in. |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and the `NEXT_PUBLIC_` copies | Needed for email sign in and for `AUTH_REQUIRED=true`. The judge demo works without them. |
+
+**PayPal webhooks locally (optional).** Only needed for a real sandbox purchase on your machine. Set `NGROK_URL` to your reserved ngrok https URL, then start the restricted relay and the tunnel in two more terminals:
 
 ```bash
 make dev-paypal-relay
 make dev-paypal-tunnel
 ```
 
-The tunnel always uses `$NGROK_URL/v1/paypal/webhooks`, so the PayPal sandbox webhook configuration does not need to change after restarts. Only the webhook route is exposed by the relay. Other paths return `404`.
+The tunnel always uses `$NGROK_URL/v1/paypal/webhooks`, so the PayPal sandbox webhook configuration does not change after restarts. The relay exposes only the webhook route. Other paths return `404`.
+
+**Troubleshooting**
+
+* **No PayPal button:** wait up to 20 seconds and use the reload action on the buy page. Check `PAYPAL_CLIENT_ID` and `PAYPAL_ENVIRONMENT`.
+* **Paid but not credited:** the purchase must start from an approved post's buy link, and the webhook tunnel must be reachable.
+* **No next move:** the payment must be captured and its signed webhook accepted, and the workspace must be under its daily agent run limit.
+* **Web app cannot reach the API:** `NEXT_PUBLIC_API_URL` must match the API port and `WEB_ORIGIN` must match the web port.
 
 ### Implemented API slices
 
