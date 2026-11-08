@@ -13,6 +13,8 @@ from app.jobs.dependencies import get_agent_job_store
 from app.main import app
 from app.paypal.dependencies import get_optional_paypal_gateway
 from app.quota import FakeAgentQuota, client_run_limit, client_studio_limit, get_agent_quota
+from app.routes.agents import page_read_limit
+from app.routes.paypal import webhook_rate_limit
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +22,8 @@ def fresh_client_limits() -> None:
     # The per address limits live in the process, so each test starts with none used.
     client_run_limit.hits.clear()
     client_studio_limit.hits.clear()
+    page_read_limit.hits.clear()
+    webhook_rate_limit.hits.clear()
 
 
 CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"

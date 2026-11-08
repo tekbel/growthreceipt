@@ -106,8 +106,8 @@ make check       # lint, typecheck, web and API tests, production build
 | `PAYPAL_ENVIRONMENT` | Set to `sandbox`. |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Sandbox REST app credentials from the PayPal Developer Dashboard. The secret stays on the server. |
 | `PAYPAL_WEBHOOK_ID` | ID of the sandbox webhook, used to verify every webhook signature. |
-| `AUTH_REQUIRED` | `false` keeps the open judge demo. `true` requires Supabase sign in. |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and the `NEXT_PUBLIC_` copies | Needed for email sign in and for `AUTH_REQUIRED=true`. The judge demo works without them. |
+| `AUTH_REQUIRED` | `true` requires Supabase sign in. `APP_ENV=staging` or `production` always requires it, whatever this says. |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and the `NEXT_PUBLIC_` copies | Needed for sign in. Without them a local API serves the demo workspace, and a staging or production API refuses every request. |
 
 **PayPal webhooks locally (optional).** Only needed for a real sandbox purchase on your machine. Set `NGROK_URL` to your reserved ngrok https URL, then start the restricted relay and the tunnel in two more terminals:
 

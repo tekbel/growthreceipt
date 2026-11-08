@@ -27,6 +27,12 @@ CAMPAIGN_ID = "11111111-1111-4111-8111-111111111111"
 CONTENT_ID = "22222222-2222-4222-8222-222222222222"
 
 
+# PayPal sends this on every delivery. Verification itself is faked.
+PAYPAL_HEADERS = {
+    "paypal-cert-url": "https://api.sandbox.paypal.com/v1/notifications/certs/CERT-test"
+}
+
+
 @pytest.fixture(autouse=True)
 def clear_overrides() -> Generator[None, None, None]:
     yield
@@ -52,7 +58,9 @@ async def client() -> AsyncIterator[AsyncClient]:
     store = FakePaymentStore()
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as value:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as value:
         yield value
 
 
@@ -153,7 +161,9 @@ async def test_capture_order_returns_normalized_capture(client: AsyncClient) -> 
 async def test_webhook_rejects_invalid_signature() -> None:
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway(webhook_valid=False)
     app.dependency_overrides[get_payment_store] = lambda: FakePaymentStore()
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         response = await client.post(
             "/v1/paypal/webhooks",
             json={"id": "WH-001", "event_type": "PAYMENT.CAPTURE.COMPLETED"},
@@ -167,7 +177,9 @@ async def test_capture_is_attributed_to_campaign() -> None:
     store = FakePaymentStore()
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         create_response = await client.post(
             "/v1/paypal/orders",
             json={
@@ -200,7 +212,9 @@ async def test_an_abandoned_checkout_counts_as_started_but_not_completed() -> No
     store = FakePaymentStore()
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         await client.post(
             "/v1/paypal/orders",
             json={
@@ -313,7 +327,9 @@ async def test_public_purchase_is_attributed_to_the_post() -> None:
     store = FakePaymentStore()
     app.dependency_overrides[get_paypal_gateway] = lambda: FakePayPalGateway()
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
         order_id = order.json()["order_id"]
         capture = await client.post(f"/v1/public/orders/{order_id}/capture")
@@ -447,7 +463,9 @@ async def test_a_capture_that_is_not_completed_is_not_revenue() -> None:
     gateway = FakePayPalGateway(capture_status="PENDING")
     app.dependency_overrides[get_paypal_gateway] = lambda: gateway
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
         capture = await client.post(f"/v1/public/orders/{order.json()['order_id']}/capture")
 
@@ -461,7 +479,9 @@ async def test_a_repeated_capture_reuses_the_paypal_request_id() -> None:
     store = FakePaymentStore()
     app.dependency_overrides[get_paypal_gateway] = lambda: gateway
     app.dependency_overrides[get_payment_store] = lambda: store
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=PAYPAL_HEADERS
+    ) as client:
         order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
         order_id = order.json()["order_id"]
         await client.post(f"/v1/public/orders/{order_id}/capture")
@@ -684,3 +704,45 @@ async def test_customers_count_distinct_buyers_and_those_who_came_back() -> None
     summary = await store.revenue_summary(campaign_id=UUID(CAMPAIGN_ID))
 
     assert (summary.unique_customers, summary.repeat_customers) == (2, 1)
+
+
+@pytest.mark.parametrize(
+    "cert_url",
+    [
+        None,
+        "http://api.paypal.com/cert",
+        "https://paypal.com.evil.example/cert",
+        "https://evilpaypal.com/c",
+    ],
+)
+@pytest.mark.asyncio
+async def test_webhook_from_outside_paypal_is_refused_before_verification(
+    client: AsyncClient, cert_url: str | None
+) -> None:
+    headers = {} if cert_url is None else {"paypal-cert-url": cert_url}
+    client.headers.pop("paypal-cert-url", None)
+
+    response = await client.post(
+        "/v1/paypal/webhooks",
+        json={"id": "WH-FORGED", "event_type": "PAYMENT.CAPTURE.COMPLETED", "resource": {}},
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_webhooks_are_rate_limited(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routes import paypal
+
+    monkeypatch.setattr(paypal.webhook_rate_limit, "limit", 1)
+    monkeypatch.setattr(paypal.webhook_rate_limit, "hits", defaultdict(deque))
+    event = {"id": "WH-LIMIT", "event_type": "CHECKOUT.ORDER.APPROVED", "resource": {}}
+
+    first = await client.post("/v1/paypal/webhooks", json=event)
+    second = await client.post("/v1/paypal/webhooks", json=event)
+
+    assert first.status_code == 200
+    assert second.status_code == 429

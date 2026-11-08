@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
@@ -20,6 +21,7 @@ from app.paypal.gateway import (
 )
 from app.paypal.store import PaymentStore, Receipt
 from app.paypal.store_dependencies import get_payment_store
+from app.rate_limit import RateLimit
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/paypal", tags=["paypal"])
@@ -360,6 +362,18 @@ async def refund_order(
 
 REFUND_EVENTS = {"PAYMENT.CAPTURE.REFUNDED"}
 
+# Every webhook costs a PayPal verification call, so forged ones are capped and refused early.
+webhook_rate_limit = RateLimit(
+    120, window_seconds=60, detail="Too many webhook deliveries. Please retry later."
+)
+
+
+def paypal_cert_url(url: str | None) -> bool:
+    """PayPal signs webhooks with certificates it serves from its own https hosts."""
+    parts = urlsplit(url or "")
+    host = parts.hostname or ""
+    return parts.scheme == "https" and (host == "paypal.com" or host.endswith(".paypal.com"))
+
 
 def refund_from_event(resource: dict[str, object]) -> PayPalRefund | None:
     """The refund a verified PayPal event describes, or None when it is incomplete."""
@@ -381,12 +395,16 @@ def refund_from_event(resource: dict[str, object]) -> PayPalRefund | None:
     )
 
 
-@router.post("/webhooks", response_model=WebhookResponse)
+@router.post(
+    "/webhooks", response_model=WebhookResponse, dependencies=[Depends(webhook_rate_limit)]
+)
 async def receive_webhook(
     request: Request,
     gateway: Annotated[PayPalGateway, Depends(get_paypal_gateway)],
     store: Annotated[PaymentStore, Depends(get_payment_store)],
 ) -> WebhookResponse:
+    if not paypal_cert_url(request.headers.get("paypal-cert-url")):
+        raise HTTPException(status_code=400, detail="Invalid PayPal webhook signature")
     try:
         event = await request.json()
     except ValueError as error:

@@ -69,7 +69,7 @@ async def get_current_actor(
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthActor:
     if gateway is None:
-        if settings.auth_required:
+        if settings.auth_enforced:
             raise HTTPException(status_code=503, detail="Authentication is not configured")
         return AuthActor(user_id=None, email=None, is_anonymous=True)
     if authorization is None or not authorization.startswith("Bearer "):

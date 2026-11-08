@@ -158,3 +158,29 @@ async def test_brief_from_url_returns_suggestion_and_icon(agent_jobs: FakeAgentJ
             assert refused.json()["detail"] == "That link does not point to a public site."
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_page_reads_are_rate_limited_before_any_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.routes import agents
+
+    monkeypatch.setattr(agents.page_read_limit, "limit", 1)
+    reads: list[str] = []
+
+    async def refuse(url: str) -> ProductPage:
+        reads.append(url)
+        raise PageReadError("That link does not point to a public site.")
+
+    app.dependency_overrides[get_page_reader] = lambda: refuse
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            body = {"url": "https://example.com/"}
+            first = await client.post("/v1/agents/brief-from-url", json=body)
+            second = await client.post("/v1/agents/brief-from-url", json=body)
+    finally:
+        app.dependency_overrides.pop(get_page_reader, None)
+
+    assert (first.status_code, second.status_code) == (422, 429)
+    assert reads == ["https://example.com/"]

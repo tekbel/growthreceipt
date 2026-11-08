@@ -38,6 +38,7 @@ from app.paypal.gateway import PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore, Receipt, RevenueSummary
 from app.paypal.store_dependencies import get_payment_store
 from app.quota import CampaignDraftRun, ClientAddress, NextActionRun, Quota, claim_run
+from app.rate_limit import RateLimit
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
@@ -875,7 +876,17 @@ def get_page_reader() -> PageReader:
     return read_product_page
 
 
-@router.post("/brief-from-url", response_model=BriefFromUrlResponse)
+# The page is read before a run is claimed, so reads need their own cap.
+page_read_limit = RateLimit(
+    30, window_seconds=3600, detail="Too many links read. Please try again later."
+)
+
+
+@router.post(
+    "/brief-from-url",
+    response_model=BriefFromUrlResponse,
+    dependencies=[Depends(page_read_limit)],
+)
 async def suggest_brief_from_url(
     request: BriefFromUrlRequest,
     gateway: Annotated[AgentGateway, Depends(get_agent_gateway)],

@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     linkedin_publish_interval_seconds: int = 300
 
     @property
+    def auth_enforced(self) -> bool:
+        """Hosted environments always need sign in, so a missing Supabase setting fails closed."""
+        return self.auth_required or self.app_env in ("staging", "production")
+
+    @property
     def linkedin_configured(self) -> bool:
         return bool(
             self.linkedin_client_id and self.linkedin_client_secret and self.linkedin_token_key
