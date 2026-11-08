@@ -2,7 +2,7 @@
 
 The marketing posts that drive sales, and what to post next. GrowthReceipt is a marketing agent for indie founders and small teams selling digital products. Each approved marketing post gets its own PayPal buy link, PayPal verifies every purchase, and the agent plans the next post from those verified purchases. Nothing changes until the founder approves it.
 
-Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addisstack.com**.
+Entry for the 2026 PayPal AI Hackathon. Live at **https://growthreceipt.addisstack.com**. Demo video (2:24): **https://www.youtube.com/watch?v=wvHcoLFWl3k**
 
 ## Judge path in 60 seconds
 
