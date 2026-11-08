@@ -37,7 +37,7 @@ from app.paypal.dependencies import get_optional_paypal_gateway
 from app.paypal.gateway import PayPalAPIError, PayPalGateway
 from app.paypal.store import PaymentStore, Receipt, RevenueSummary
 from app.paypal.store_dependencies import get_payment_store
-from app.quota import CampaignDraftRun, NextActionRun, Quota, claim_run
+from app.quota import CampaignDraftRun, ClientAddress, NextActionRun, Quota, claim_run
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/agents", tags=["agents"])
@@ -608,6 +608,7 @@ async def draft_follow_up_post(
     campaigns: Annotated[CampaignStore, Depends(get_campaign_store)],
     workspace_id: WorkspaceId,
     quota: Quota,
+    client: ClientAddress,
     jobs: AgentJobs,
     stores: Annotated[CampaignStoreScope, Depends(get_campaign_store_scope)],
 ) -> FollowUpResponse:
@@ -673,7 +674,7 @@ async def draft_follow_up_post(
         },
         indent=2,
     )
-    await claim_run(quota, workspace_id, "campaign_draft")
+    await claim_run(quota, workspace_id, "campaign_draft", client)
     return await detached(
         jobs,
         _follow_up_post(gateway, stores, workspace_id, campaign, prompt, day, source, approved),
@@ -881,6 +882,7 @@ async def suggest_brief_from_url(
     read_page: Annotated[PageReader, Depends(get_page_reader)],
     workspace_id: WorkspaceId,
     quota: Quota,
+    client: ClientAddress,
     jobs: AgentJobs,
 ) -> BriefFromUrlResponse:
     """Reads a public product page and suggests a brief. The founder edits it before drafting."""
@@ -891,7 +893,7 @@ async def suggest_brief_from_url(
     if len(page.title + page.description + page.text) < 40:
         raise HTTPException(status_code=422, detail="That page has too little text to read.")
     # Claimed after the page is read, so a bad link does not use up a run.
-    await claim_run(quota, workspace_id, "campaign_draft")
+    await claim_run(quota, workspace_id, "campaign_draft", client)
     prompt = json.dumps(
         {
             "url": page.url,

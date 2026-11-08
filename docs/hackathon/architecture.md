@@ -276,6 +276,6 @@ flowchart LR
 
 Judges enter with one click. Each judge gets an anonymous session and a private seeded workspace.
 
-Model calls are capped. Each workspace can run the agent 20 times a day, and all workspaces together 150 times a day. The API records every run in `growthreceipt.agent_runs` and answers 429 with a plain message once a limit is reached. Both limits are settings (`AGENT_RUNS_PER_WORKSPACE_DAY`, `AGENT_RUNS_PER_DAY`).
+Model calls are capped. Each workspace can run the agent 20 times a day, and all workspaces together 150 times a day. The API records every run in `growthreceipt.agent_runs` and answers 429 with a plain message once a limit is reached. Both limits are settings (`AGENT_RUNS_PER_WORKSPACE_DAY`, `AGENT_RUNS_PER_DAY`). A guest workspace costs one captcha, so one address is also capped at 40 runs a day across all its workspaces (`AGENT_RUNS_PER_CLIENT_DAY`). The dashboard assistant has its own limits: 60 turns per workspace, 120 per address and 300 in total a day. It accepts only function tools and at most 500,000 characters of input per turn (`STUDIO_AI_MAX_INPUT_CHARS`). The client address is the last `X-Forwarded-For` entry, the one Railway's edge adds, because earlier entries come from the client and can be forged.
 
 Releases go through `dev`. CI runs the web checks, the API checks and both production images. When all pass on a `dev` push, CI fast forwards `main` to that commit, and Railway deploys from `main`. The source is at https://github.com/tekbel/growthreceipt.

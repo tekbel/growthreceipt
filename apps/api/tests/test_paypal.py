@@ -350,6 +350,29 @@ async def test_public_orders_are_rate_limited(
 
 
 @pytest.mark.asyncio
+async def test_forging_the_first_hop_does_not_reset_the_checkout_limit(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routes import public
+
+    monkeypatch.setattr(public.order_rate_limit, "limit", 1)
+    monkeypatch.setattr(public.order_rate_limit, "hits", defaultdict(deque))
+    # Railway adds the real address last. A buyer can only prepend made up ones.
+    statuses = [
+        (
+            await client.post(
+                "/v1/public/orders",
+                json={"content_id": CONTENT_ID},
+                headers={"X-Forwarded-For": f"10.0.0.{n}, 203.0.113.7"},
+            )
+        ).status_code
+        for n in range(2)
+    ]
+
+    assert statuses == [200, 429]
+
+
+@pytest.mark.asyncio
 async def test_receipt_links_post_capture_and_verified_webhooks(client: AsyncClient) -> None:
     order = await client.post("/v1/public/orders", json={"content_id": CONTENT_ID})
     order_id = order.json()["order_id"]

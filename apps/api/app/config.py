@@ -33,11 +33,16 @@ class Settings(BaseSettings):
     supabase_publishable_key: SecretStr | None = None
     agent_runs_per_workspace_day: int = 20
     agent_runs_per_day: int = 150
+    # One address across all its workspaces, so guest sign ins cannot drain the daily budget.
+    agent_runs_per_client_day: int = 40
     # The dashboard assistant takes several model turns per question, so it has its own limits.
     studio_ai_model: str | None = None
     studio_ai_max_output_tokens: int = 6_000
     studio_turns_per_workspace_day: int = 60
     studio_turns_per_day: int = 300
+    studio_turns_per_client_day: int = 120
+    # Characters of input, instructions and tools one assistant turn may send to the model.
+    studio_ai_max_input_chars: int = 500_000
     demo_workspace_id: UUID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     linkedin_client_id: str | None = None
     linkedin_client_secret: SecretStr | None = None

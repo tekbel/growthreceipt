@@ -5,6 +5,7 @@ here, so the OpenAI key stays on the server and the API decides the model, the o
 many turns a workspace gets per day.
 """
 
+import json
 import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal, Protocol
@@ -12,10 +13,10 @@ from typing import Annotated, Any, Literal, Protocol
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import get_settings
-from app.quota import Quota, claim_run
+from app.quota import ClientAddress, Quota, claim_run
 from app.workspaces import WorkspaceId
 
 router = APIRouter(prefix="/v1/studio", tags=["studio"])
@@ -73,6 +74,35 @@ class StudioTurn(BaseModel):
     text: dict[str, Any] | None = None
     effort: Literal["low", "medium"] = "low"
 
+    @field_validator("tools")
+    @classmethod
+    def function_tools_only(cls, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # Studio only sends function tools. Hosted tools (web search, code interpreter, image
+        # generation, remote MCP) would bill extra and could reach any server, so they are refused.
+        if any(tool.get("type") != "function" for tool in tools):
+            raise ValueError("Only function tools are allowed")
+        return tools
+
+    @field_validator("tool_choice")
+    @classmethod
+    def function_choice_only(
+        cls, choice: str | dict[str, Any] | None
+    ) -> str | dict[str, Any] | None:
+        if isinstance(choice, str) and choice not in {"auto", "none", "required"}:
+            raise ValueError("Unknown tool choice")
+        if isinstance(choice, dict) and choice.get("type") != "function":
+            raise ValueError("Only a function tool can be chosen")
+        return choice
+
+    @model_validator(mode="after")
+    def bounded_size(self) -> "StudioTurn":
+        # Each turn is billed by its input, so one turn may not send more than the cap.
+        sent = (self.input, self.tools, self.instructions or "")
+        size = sum(len(json.dumps(part)) for part in sent)
+        if size > get_settings().studio_ai_max_input_chars:
+            raise ValueError("This conversation is too long. Start a new one.")
+        return self
+
 
 def provider_body(turn: StudioTurn) -> dict[str, Any]:
     settings = get_settings()
@@ -107,11 +137,11 @@ async def _until_deadline(first: bytes, rest: AsyncIterator[bytes]) -> AsyncIter
 
 @router.post("/ai/responses")
 async def studio_turn(
-    turn: StudioTurn, workspace_id: WorkspaceId, quota: Quota, model: Model
+    turn: StudioTurn, workspace_id: WorkspaceId, quota: Quota, client: ClientAddress, model: Model
 ) -> StreamingResponse:
     if model is None:
         raise HTTPException(status_code=503, detail="The dashboard assistant is not set up.")
-    await claim_run(quota, workspace_id, "studio_turn")
+    await claim_run(quota, workspace_id, "studio_turn", client)
     chunks = model.stream(provider_body(turn))
     try:
         first = await anext(chunks)

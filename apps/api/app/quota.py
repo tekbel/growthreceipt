@@ -3,12 +3,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal, Protocol
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
+from app.rate_limit import RateLimit, client_address
 from app.workspaces import WorkspaceId
 
 RunKind = Literal["campaign_draft", "next_action", "studio_turn"]
@@ -79,19 +80,35 @@ def get_agent_quota(session: Annotated[AsyncSession, Depends(get_session)]) -> A
 
 
 Quota = Annotated[AgentQuota, Depends(get_agent_quota)]
+ClientAddress = Annotated[str, Depends(client_address)]
+
+LIMIT_DETAIL = "The agent has reached today's limit. Please try again tomorrow."
+# A guest workspace costs one captcha, so the workspace limit alone cannot stop one person from
+# spending the whole daily budget. These cap one address across all of its workspaces.
+_settings = get_settings()
+client_run_limit = RateLimit(
+    _settings.agent_runs_per_client_day, window_seconds=WINDOW.total_seconds(), detail=LIMIT_DETAIL
+)
+client_studio_limit = RateLimit(
+    _settings.studio_turns_per_client_day,
+    window_seconds=WINDOW.total_seconds(),
+    detail=LIMIT_DETAIL,
+)
 
 
-async def claim_run(quota: AgentQuota, workspace_id: UUID, kind: RunKind) -> None:
+async def claim_run(quota: AgentQuota, workspace_id: UUID, kind: RunKind, client: str) -> None:
+    # The address is checked first, so a refused address never takes from the shared budget.
+    (client_studio_limit if kind == "studio_turn" else client_run_limit).hit(client)
     if not await quota.claim(workspace_id=workspace_id, kind=kind):
         raise HTTPException(
             status_code=429,
-            detail="The agent has reached today's limit. Please try again tomorrow.",
+            detail=LIMIT_DETAIL,
         )
 
 
-def _claim(kind: RunKind) -> Callable[[Quota, WorkspaceId], Awaitable[None]]:
-    async def claim(quota: Quota, workspace_id: WorkspaceId) -> None:
-        await claim_run(quota, workspace_id, kind)
+def _claim(kind: RunKind) -> Callable[[Quota, WorkspaceId, Request], Awaitable[None]]:
+    async def claim(quota: Quota, workspace_id: WorkspaceId, request: Request) -> None:
+        await claim_run(quota, workspace_id, kind, client_address(request))
 
     return claim
 

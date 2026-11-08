@@ -6,7 +6,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.config import get_settings
 from app.main import app
-from app.quota import FakeAgentQuota
+from app.quota import FakeAgentQuota, client_studio_limit
 from app.routes.studio import StudioModelError, get_studio_model
 
 SSE = [
@@ -107,3 +107,67 @@ async def test_turn_rejects_an_unknown_effort(client: AsyncClient, model: FakeSt
 
     assert response.status_code == 422
     assert model.bodies == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"tools": [{"type": "web_search"}]},
+        {"tools": [{"type": "mcp", "server_url": "https://example.com/mcp"}]},
+        {"tool_choice": {"type": "code_interpreter"}},
+        {"tool_choice": "web_search"},
+    ],
+)
+async def test_hosted_tools_are_refused(
+    client: AsyncClient,
+    model: FakeStudioModel,
+    agent_quota: FakeAgentQuota,
+    change: dict[str, Any],
+) -> None:
+    response = await client.post("/v1/studio/ai/responses", json={**TURN, **change})
+
+    assert response.status_code == 422
+    assert model.bodies == []
+    assert agent_quota.claims == []
+
+
+async def test_an_oversized_turn_is_refused(
+    client: AsyncClient,
+    model: FakeStudioModel,
+    agent_quota: FakeAgentQuota,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "studio_ai_max_input_chars", 1_000)
+    big = {
+        "type": "message",
+        "role": "user",
+        "content": [{"type": "input_text", "text": "x" * 2_000}],
+    }
+
+    response = await client.post("/v1/studio/ai/responses", json={**TURN, "input": [big]})
+
+    assert response.status_code == 422
+    assert model.bodies == []
+
+
+async def test_one_address_cannot_spend_the_shared_budget_from_many_workspaces(
+    client: AsyncClient,
+    model: FakeStudioModel,
+    agent_quota: FakeAgentQuota,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(client_studio_limit, "limit", 1)
+
+    async def turn(address: str) -> int:
+        headers = {"X-Forwarded-For": address}
+        return (
+            await client.post("/v1/studio/ai/responses", json=TURN, headers=headers)
+        ).status_code
+
+    assert [await turn("203.0.113.7"), await turn("203.0.113.7"), await turn("198.51.100.4")] == [
+        200,
+        429,
+        200,
+    ]
+    # The refused address never took a turn from the shared daily budget.
+    assert len(agent_quota.claims) == 2
