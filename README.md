@@ -44,17 +44,13 @@ E2E_BASE_URL=https://growthreceipt.addisstack.com npx playwright test   # hosted
 
 The hosted suite also runs daily from `.github/workflows/smoke.yml`. Add `E2E_PAYPAL=1 --grep @paypal` for a real PayPal sandbox purchase and refund.
 
-## Background
-
-The repository started as a broader approval first marketing system: brief to campaign, platform specific content, human approval, scheduling, measurement and evidence backed lessons. GrowthReceipt is the payment backed slice of it built for the hackathon. The original plan lives in [SPEC.md](./docs/background/SPEC.md) and [ARCHITECTURE.md](./docs/background/ARCHITECTURE.md). Parts of it, such as Buffer scheduling, Telegram and Stripe, were never built.
-
 ## Current implementation
 
 ```text
 apps/web              Next.js campaign review workspace
 apps/api              FastAPI and agent/job interfaces
 supabase              Local configuration and migrations
-docs/background       Original pre hackathon plan, kept as background
+docs                  Architecture, design system, decisions and judge notes
 ```
 
 ### Local setup
@@ -207,7 +203,8 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/hackathon/architecture.md](./docs/hackathon/architecture.md) shows the architecture diagram, the eight step loop, and the payment model.
 - [docs/hackathon/who-its-for.md](./docs/hackathon/who-its-for.md) describes the target user, the issue they have, and the planned pricing.
 - [docs/integrations/linkedin.md](./docs/integrations/linkedin.md) is the LinkedIn setup runbook: app form values, which products to request, redirect URLs, Railway variables, token renewal and open gaps.
-- [SPEC.md](./docs/background/SPEC.md), [ARCHITECTURE.md](./docs/background/ARCHITECTURE.md) and [PROMPTS.md](./docs/background/PROMPTS.md) are the original pre hackathon plan and build prompts, kept as background. They describe more than GrowthReceipt ships.
+- [docs/design-system.md](./docs/design-system.md) describes the visual system: colors, type, spacing and the campaign progress ribbon.
+- [docs/decisions/0001-modular-monolith.md](./docs/decisions/0001-modular-monolith.md) records why the API is a modular monolith with agent runs stored as jobs in Postgres.
 
 ## License
 
