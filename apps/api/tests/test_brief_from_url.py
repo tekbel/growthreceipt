@@ -174,6 +174,7 @@ async def test_page_reads_are_rate_limited_before_any_fetch(
         raise PageReadError("That link does not point to a public site.")
 
     app.dependency_overrides[get_page_reader] = lambda: refuse
+    app.dependency_overrides[get_agent_gateway] = lambda: FakeAgentGateway({})
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             body = {"url": "https://example.com/"}
@@ -181,6 +182,7 @@ async def test_page_reads_are_rate_limited_before_any_fetch(
             second = await client.post("/v1/agents/brief-from-url", json=body)
     finally:
         app.dependency_overrides.pop(get_page_reader, None)
+        app.dependency_overrides.pop(get_agent_gateway, None)
 
     assert (first.status_code, second.status_code) == (422, 429)
     assert reads == ["https://example.com/"]
