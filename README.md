@@ -206,6 +206,10 @@ Without these variables the Integrations page keeps the share link behaviour. Li
 - [docs/design-system.md](./docs/design-system.md) describes the visual system: colors, type, spacing and the campaign progress ribbon.
 - [docs/decisions/0001-modular-monolith.md](./docs/decisions/0001-modular-monolith.md) records why the API is a modular monolith with agent runs stored as jobs in Postgres.
 
+## Credits
+
+Demo video narration is the author's own voice, generated with ElevenLabs voice cloning.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
